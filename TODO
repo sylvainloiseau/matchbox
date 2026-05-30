@@ -1,0 +1,24 @@
+- Search replace
+- undo redo
+- italics for modified text
+- display error of antlr4 parsing
+lexer: CONTENT, select markeur by user, tag
+filter sur file list
+igt table -> jump to good text
+  ... or display only igt of text?
+ask for save before close
+
+clic in text -> move to good object
+
+tooltip
+https://docs.oracle.com/javase/8/javafx/api/javafx/scene/control/Tooltip.html
+
+Test if changing text update correctly igt and lexical
+
+
+
+
+
+
+
+

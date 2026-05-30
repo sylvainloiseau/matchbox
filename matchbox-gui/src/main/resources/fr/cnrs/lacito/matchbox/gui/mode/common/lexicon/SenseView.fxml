@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox spacing="4.0" style="-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-padding: 8;" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1">
+  <children>
+    <!-- Definition text -->
+    <HBox spacing="5.0">
+      <children>
+        <Label text="Definition:" style="-fx-font-weight: bold;" />
+        <TextField fx:id="definitionField" HBox.hgrow="ALWAYS" editable="false" />
+      </children>
+    </HBox>
+    
+    <!-- Holder for examples -->
+    <VBox fx:id="examplesContainer" spacing="4.0" style="-fx-padding: 5 0 0 10;">
+      <children>
+        <Label text="Examples:" style="-fx-font-style: italic;" />
+      </children>
+    </VBox>
+  </children>
+</VBox>

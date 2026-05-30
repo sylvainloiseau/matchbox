@@ -1,0 +1,9 @@
+#!/bin/sh
+
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+APP_HOME="$DIR"
+
+java \
+  -cp "$DIR/lib/*" \
+  -Dmatchbox.plugins.dir="$APP_HOME/plugins" \
+  fr.cnrs.lacito.matchbox.Starter

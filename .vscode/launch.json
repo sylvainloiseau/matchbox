@@ -1,0 +1,32 @@
+{
+    "version": "2.0.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "MatchboxApplication",
+            "request": "launch",
+            "mainClass": "fr.cnrs.lacito.matchbox.MatchboxApplication",
+            "projectName": "matchbox-gui"
+        },
+        {
+            "type": "antlr-debug",
+            "name": "ANTLR: Parse conll (TestRig)",
+            "input": "src/test/data/test.conll",
+            "request": "launch",
+            "grammar": "src/main/antlr4/fr/cnrs/lacito/matchbox/grammar/conllParser.g4",
+            "startRule": "sample",
+            "printParseTree": true,
+            "visualParseTree": true
+        },
+        {
+            "type": "antlr-debug",
+            "name": "ANTLR: Parse Notebook (TestRig)",
+            "input": "src/test/data/notebook3.md",
+            "request": "launch",
+            "grammar": "src/main/antlr4/fr/cnrs/lacito/matchbox/grammar/NotebookParser.g4",
+            "startRule": "document",
+            "printParseTree": true,
+            "visualParseTree": true
+        }
+    ]
+}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox spacing="8.0" style="-fx-border-color: #cccccc; -fx-border-width: 1; -fx-padding: 10;" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1">
+  <children>
+    <!-- Lexical entry word -->
+    <HBox spacing="5.0">
+      <children>
+        <Label text="Entry Word:" style="-fx-font-weight: bold;" />
+        <TextField fx:id="entryWordField" HBox.hgrow="ALWAYS" editable="false" />
+      </children>
+    </HBox>
+    
+    <VBox fx:id="senseContainer" spacing="6.0" style="-fx-padding: 5;">
+      <children>
+        <Label text="Definitions:" style="-fx-font-weight: bold; -fx-padding: 0 0 5 0;" />
+      </children>
+    </VBox>
+  </children>
+</VBox>

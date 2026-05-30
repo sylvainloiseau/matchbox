@@ -1,0 +1,39 @@
+# sent_id = 2014.II.S12__1
+# text = i -ne wa- ia -ne onoma a tete -nai -mwii
+# doc_id = 2014.II.S12
+# doc_title = 2014.II.S12
+# origin_s_id = 1
+1	i	i	light verb	_	_	_	_	_	Gloss=to_go
+2	-ne	-ne_1	v:(Chaining)	_	_	_	_	_	Gloss=-MED
+3	wa-	wa-_1	v:(Modality1)	_	_	_	_	_	Gloss=back-
+4	ia	ia_1	v	_	_	_	_	_	Gloss=kam_antap
+5	-ne	-ne_1	v:(Chaining)	_	_	_	_	_	Gloss=-MED
+6	onoma	onoma	adv	_	_	_	_	_	Gloss=to_house
+7	a	a_1	v	_	_	_	_	_	Gloss=to_come
+8	tete	teto	v	_	_	_	_	_	Gloss=kamap_sanap
+9	-nai	-nai	v:(Aspect/Modality2)	_	_	_	_	_	Gloss=-IRR
+10	-mwii	-mwii	v:(GenderNumber)	_	_	_	_	_	Gloss=-DEM1:SG.M
+
+# sent_id = 2014.II.S12__2
+# text = helene -fe iaanmela
+# doc_id = 2014.II.S12
+# doc_title = 2014.II.S12
+# origin_s_id = 2
+1	helene	helene	n  (fe)	_	_	_	_	_	Gloss=leg
+2	-fe	-fe_1	n:(NounGenderNumber)	_	_	_	_	_	Gloss=-VII.SG
+3	iaanmela	iaamela	v	_	_	_	_	_	Gloss=to_correct
+
+# sent_id = 2014.II.S12__3
+# text = ta fali mali -o mol -wii nulie -io
+# doc_id = 2014.II.S12
+# doc_title = 2014.II.S12
+# origin_s_id = 3
+1	ta	ta_1	pers	_	_	_	_	_	Gloss=1PL
+2	fali	fali	v	_	_	_	_	_	Gloss=COMPL
+3	mali	mali	v	_	_	_	_	_	Gloss=to_talk
+4	-o	-io_1	v:(Chaining)	_	_	_	_	_	Gloss=-FIN
+5	mol	mol	v	_	_	_	_	_	Gloss=to_correct
+6	-wii	-mwii	v:(GenderNumber)	_	_	_	_	_	Gloss=-DEM1:SG.M
+7	nulie	nulia	adv	_	_	_	_	_	Gloss=adversatif_temporel_but
+8	-io	-io_1	v:(Chaining)	_	_	_	_	_	Gloss=-FIN
+

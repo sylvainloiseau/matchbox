@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<HBox spacing="8.0" style="-fx-padding: 4 0 4 20; -fx-border-color: #f0f0f0; -fx-border-width: 0 0 1 0;" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1">
+  <children>
+    <Label text="Example:" style="-fx-font-style: italic; -fx-text-fill: #555555;" />
+    <TextField fx:id="transcriptionField" HBox.hgrow="ALWAYS" editable="false" />
+    <TextField fx:id="translationField" HBox.hgrow="ALWAYS" editable="false" />
+  </children>
+</HBox>

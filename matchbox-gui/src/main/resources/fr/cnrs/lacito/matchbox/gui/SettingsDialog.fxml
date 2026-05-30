@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Rectangle?>
+<VBox
+    spacing="10.0"
+    xmlns="http://javafx.com/javafx/8.0.171"
+    xmlns:fx="http://javafx.com/fxml/1"
+>
+  <children>
+    <TabPane fx:id="tabs">
+      <tabs>
+        <Tab text="Color" closable="false">
+          <content>
+            <VBox spacing="8.0">
+              <children>
+                <HBox spacing="10.0" style="-fx-padding: 15;">
+                  <children>
+                    <Label text="igt paragraph" />
+                    <Rectangle
+                                            fx:id="igtColorPreview"
+                                            width="24.0"
+                                            height="16.0"
+                                        />
+                    <ColorPicker fx:id="igtColorPicker" />
+                  </children>
+                </HBox>
+                <HBox spacing="10.0" style="-fx-padding: 5 0 0 0;">
+                  <children>
+                    <Label
+                                            text="lexical description"
+                                            style="-fx-font-weight: bold;"
+                                        />
+                    <Rectangle
+                                            fx:id="lexicalColorPreview"
+                                            width="24.0"
+                                            height="16.0"
+                                        />
+                    <ColorPicker fx:id="lexicalColorPicker" />
+                  </children>
+                </HBox>
+              </children>
+            </VBox>
+          </content>
+        </Tab>
+        <Tab text="Grammar" closable="false">
+          <content>
+            <VBox spacing="10.0" style="-fx-padding: 15;">
+              <children>
+                <Label
+                                    text="Morpheme separators (characters):"
+                                    style="-fx-font-weight: bold;"
+                                />
+                <TextField fx:id="separatorsField" promptText="e.g. -,/" />
+              </children>
+            </VBox>
+          </content>
+        </Tab>
+        <Tab text="File pattern" closable="false">
+          <content>
+            <VBox spacing="8.0" style="-fx-padding: 15;">
+              <children>
+                <Label
+                                    text="File extensions (comma separated):"
+                                    style="-fx-font-weight: bold;"
+                                />
+                <TextArea
+                                    fx:id="fileExtensionsArea"
+                                    prefRowCount="1"
+                                >txt,md</TextArea>
+                <Label
+                                    text="File patterns (comma separated):"
+                                    style="-fx-font-weight: bold;"
+                                />
+                <TextArea fx:id="filePatternsArea" prefRowCount="3" />
+              </children>
+            </VBox>
+          </content>
+        </Tab>
+        <Tab text="Application" closable="false">
+          <content>
+            <VBox spacing="10.0" style="-fx-padding: 15;">
+              <children>
+                <Label
+                                    text="Maximum number of recent files to record:"
+                                    style="-fx-font-weight: bold;"
+                                />
+                <TextField fx:id="recentFilesLimitField" promptText="e.g. 10" />
+                <Label
+                                    text="Reopen last project ?"
+                                    style="-fx-font-weight: bold;"
+                                />
+                <CheckBox fx:id="openLastProjectCheckBox" />
+              </children>
+            </VBox>
+          </content>
+        </Tab>
+      </tabs>
+    </TabPane>
+    <Separator />
+    <HBox
+            spacing="10.0"
+            style="-fx-alignment: center-right; -fx-padding: 0 5 5 5;"
+        >
+      <children>
+        <Button fx:id="okButton" text="OK" prefWidth="80.0" />
+        <Button fx:id="cancelButton" text="Cancel" prefWidth="80.0" />
+      </children>
+    </HBox>
+  </children>
+</VBox>
