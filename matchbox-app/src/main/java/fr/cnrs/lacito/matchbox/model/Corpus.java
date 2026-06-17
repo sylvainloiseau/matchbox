@@ -6,11 +6,10 @@ import java.util.stream.Collectors;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-
-import fr.cnrs.lacito.matchboxgrammarapi.ParseError;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.CorpusObject;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleIGT;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleLexicalDefinition;
+import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.language.corpusObject.CorpusObject;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleIGT;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleLexicalDefinition;
 
 /**
  * Manages file operations
@@ -48,6 +47,10 @@ public class Corpus {
     }
 
 
+    public void removeCorpusObjectsForFile(Path selectedFilePath) {
+        corpus.removeIf(obj -> obj.getTextCoordinate().path().equals(selectedFilePath));
+    }
+    
     public void addCorpusObjects(List<CorpusObject> corpusObjects) {
         // TODO Auto-generated method stub
         corpus.addAll(corpusObjects);

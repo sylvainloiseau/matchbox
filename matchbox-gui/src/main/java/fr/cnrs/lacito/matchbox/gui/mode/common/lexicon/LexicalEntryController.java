@@ -1,7 +1,5 @@
 package fr.cnrs.lacito.matchbox.gui.mode.common.lexicon;
 
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleLexicalDefinition;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleSense;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -11,6 +9,9 @@ import javafx.scene.layout.VBox;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleLexicalDefinition;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleSense;
 
 /**
  * Controller for displaying a lexical entry with its definitions and examples

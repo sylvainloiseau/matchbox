@@ -1,6 +1,6 @@
 package fr.cnrs.lacito.matchbox.gui.mode.common.lexicon;
 
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleExample;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleExample;
 import javafx.fxml.FXML;
 import javafx.scene.control.TextField;
 

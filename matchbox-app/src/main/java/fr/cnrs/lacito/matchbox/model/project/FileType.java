@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 
-import fr.cnrs.lacito.matchboxgrammarapi.GrammarPlugin;
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 
 /**
  * Model class representing a file type pattern with associated grammars

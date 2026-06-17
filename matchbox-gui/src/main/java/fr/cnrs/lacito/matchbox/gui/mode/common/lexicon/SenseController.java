@@ -10,8 +10,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleExample;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleSense;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleExample;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleSense;
 
 /**
  * Controller for displaying a definition with its examples

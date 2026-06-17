@@ -1,12 +1,13 @@
 package fr.cnrs.lacito.matchbox.gui.mode.fileMode;
 
+import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleIGT;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleLexicalDefinition;
 import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
 import fr.cnrs.lacito.matchbox.model.Corpus;
-import fr.cnrs.lacito.matchboxgrammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.model.project.Project;
-import fr.cnrs.lacito.matchbox.model.TextParser;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleIGT;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleLexicalDefinition;
+import fr.cnrs.lacito.matchbox.model.TextDocument;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import javafx.application.Platform;
@@ -233,7 +234,7 @@ public class EditorController {
         if (selectedFilePath == null) {
             throw new IOException("No file is currently being edited.");
         }
-        TextParser text = project.getParsedText(selectedFilePath);
+        TextDocument text = project.getParsedText(selectedFilePath);
         if (text == null) {
             throw new IOException(
                 "No parser found for the current edited file."

@@ -1,10 +1,10 @@
 package fr.cnrs.lacito.matchbox.gui;
 
 import fr.cnrs.lacito.matchbox.PluginManager;
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.mode.FileModeController;
 import fr.cnrs.lacito.matchbox.model.project.FileType;
 import fr.cnrs.lacito.matchbox.model.project.Project;
-import fr.cnrs.lacito.matchboxgrammarapi.GrammarPlugin;
 
 import java.io.File;
 import java.util.List;

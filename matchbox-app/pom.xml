@@ -21,57 +21,28 @@
     >Components responsible for the main application logic, reusable by a CLI or a GUI interface</description>
 
     <dependencies>
-
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-language</artifactId>
         </dependency>
-
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-grammar-api</artifactId>
         </dependency>
-
-        <!-- ANTLR Runtime -->
-        <dependency>
-            <groupId>org.antlr</groupId>
-            <artifactId>antlr4-runtime</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>
         </dependency>
-
     </dependencies>
 
     <build>
         <plugins>
-            <!-- ANTLR Maven Plugin -->
-            <plugin>
-                <groupId>org.antlr</groupId>
-                <artifactId>antlr4-maven-plugin</artifactId>
-                <version>${antlr.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>antlr4</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <visitor>true</visitor>
-                    <listener>true</listener>
-                </configuration>
-            </plugin>
-
             <!-- Compiler Plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
             </plugin>
-
             <!-- JAR Plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -86,8 +57,6 @@
                     </archive>
                 </configuration>
             </plugin>
-
-
         </plugins>
     </build>
 </project>

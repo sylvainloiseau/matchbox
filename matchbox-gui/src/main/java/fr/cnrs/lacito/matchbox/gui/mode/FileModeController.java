@@ -1,14 +1,15 @@
 package fr.cnrs.lacito.matchbox.gui.mode;
 
+import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.gui.mode.common.lexicon.LexicalEntryController;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleIGT;
+import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleLexicalDefinition;
 import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
 import fr.cnrs.lacito.matchbox.model.Corpus;
 import fr.cnrs.lacito.matchbox.model.project.Project;
-import fr.cnrs.lacito.matchboxgrammarapi.ParseError;
-import fr.cnrs.lacito.matchbox.model.TextParser;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleIGT;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.SimpleLexicalDefinition;
+import fr.cnrs.lacito.matchbox.model.TextDocument;
+
 import java.io.File;
 import java.io.IOException;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -34,7 +35,7 @@ import org.fxmisc.richtext.InlineCssTextArea;
 public class FileModeController {
 
     @FXML
-    private ListView<TextParser> fileListView;
+    private ListView<TextDocument> fileListView;
 
     @FXML
     private TextField filterFileTextField;
@@ -142,8 +143,8 @@ public class FileModeController {
     }
 
     private void setupFileListView() throws Exception {
-        FilteredList<TextParser> filteredList = new FilteredList<>(
-            project.getPassiveFileList()
+        FilteredList<TextDocument> filteredList = new FilteredList<>(
+            project.getDerivedFileList()
         );
         filterFileTextField
             .textProperty()
@@ -164,13 +165,13 @@ public class FileModeController {
 
         fileListView.setItems(filteredList);
         fileListView.setCellFactory(
-            new Callback<ListView<TextParser>, ListCell<TextParser>>() {
+            new Callback<ListView<TextDocument>, ListCell<TextDocument>>() {
                 @Override
-                public ListCell<TextParser> call(ListView<TextParser> param) {
-                    return new ListCell<TextParser>() {
+                public ListCell<TextDocument> call(ListView<TextDocument> param) {
+                    return new ListCell<TextDocument>() {
                         @Override
                         protected void updateItem(
-                            TextParser item,
+                            TextDocument item,
                             boolean empty
                         ) {
                             super.updateItem(item, empty);
@@ -310,12 +311,12 @@ public class FileModeController {
     }
 
     public void handleCloseFile() {
-        TextParser selected = fileListView
+        TextDocument selected = fileListView
             .getSelectionModel()
             .getSelectedItem();
         if (selected != null) {
             project.removeFile(selected.getFilePath());
-            if (!project.getPassiveFileList().isEmpty()) {
+            if (!project.getDerivedFileList().isEmpty()) {
                 fileListView.getSelectionModel().select(0);
             }
         }
@@ -328,7 +329,7 @@ public class FileModeController {
             } else {
                 project.addFile(f.toPath());
             }
-            if (!project.getPassiveFileList().isEmpty()) {
+            if (!project.getDerivedFileList().isEmpty()) {
                 fileListView.getSelectionModel().select(0);
             }
             applicationSettings.addToHistory(f.toString());
@@ -340,7 +341,7 @@ public class FileModeController {
         File selected = chooser.showDialog(primaryStage);
         if (selected != null) {
             project.addDirectory(selected.toPath(), true);
-            if (!project.getPassiveFileList().isEmpty()) {
+            if (!project.getDerivedFileList().isEmpty()) {
                 fileListView.getSelectionModel().select(0);
             }
         }
@@ -352,7 +353,7 @@ public class FileModeController {
 
     public java.util.List<String> getOpenedFiles() {
         java.util.List<String> files = new java.util.ArrayList<>();
-        for (TextParser parser : project.getPassiveFileList()) {
+        for (TextDocument parser : project.getDerivedFileList()) {
             files.add(parser.getFilePath().toString());
         }
         return files;

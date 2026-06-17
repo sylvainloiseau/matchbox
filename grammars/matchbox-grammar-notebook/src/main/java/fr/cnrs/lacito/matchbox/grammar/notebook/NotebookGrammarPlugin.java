@@ -1,17 +1,18 @@
 package fr.cnrs.lacito.matchbox.grammar.notebook;
 
-import fr.cnrs.lacito.matchboxgrammarapi.AbstractGrammarPlugin;
-import fr.cnrs.lacito.matchboxlanguage.corpusObject.*;
+import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookLexer;
+import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookParser.ExampleContext;
+import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookParser.SenseContext;
+import fr.cnrs.lacito.matchbox.grammarapi.AbstractGrammarPlugin;
+import fr.cnrs.lacito.matchbox.grammarapi.CollectingErrorListener;
+import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
+import fr.cnrs.lacito.matchbox.language.corpusObject.*;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookParser.ExampleContext;
-import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookParser.SenseContext;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import fr.cnrs.lacito.matchboxgrammarapi.CollectingErrorListener;
-import fr.cnrs.lacito.matchboxgrammarapi.ParseError;
-import fr.cnrs.lacito.matchboxgrammarapi.ParseResult;
 
 public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
 
@@ -69,11 +70,15 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
                 listener
                     .getIGTs()
                     .stream()
-                    .map(
-                        x -> new SimpleIGT(
+                    .map(x ->
+                        new SimpleIGT(
                             new TextCoordinate(
-                                filePath, x.getStart().getStartIndex(), x.getStop().getStopIndex(), x.getStart().getLine(), x.getStop().getLine()
-                            ), 
+                                filePath,
+                                x.getStart().getStartIndex(),
+                                x.getStop().getStopIndex(),
+                                x.getStart().getLine(),
+                                x.getStop().getLine()
+                            ),
                             x.IMB_LINE(0).getText(),
                             x.IMB_LINE(1).getText(),
                             x.IMB_QUOTED_LINE().getText()
@@ -83,12 +88,23 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
             );
 
             objects.addAll(
-                listener.getLexicalDefinitions().stream().map(
-                    x -> {
-                        TextCoordinate coordinate = new TextCoordinate(filePath, x.getStart().getStartIndex(), x.getStop().getStopIndex(), x.getStart().getLine(), x.getStop().getLine());
-                        SimpleLexicalDefinition sld = new SimpleLexicalDefinition(coordinate, 
-                            x.TXT().getText());
-                        
+                listener
+                    .getLexicalDefinitions()
+                    .stream()
+                    .map(x -> {
+                        TextCoordinate coordinate = new TextCoordinate(
+                            filePath,
+                            x.getStart().getStartIndex(),
+                            x.getStop().getStopIndex(),
+                            x.getStart().getLine(),
+                            x.getStop().getLine()
+                        );
+                        SimpleLexicalDefinition sld =
+                            new SimpleLexicalDefinition(
+                                coordinate,
+                                x.TXT().getText()
+                            );
+
                         for (SenseContext sense : x.sense()) {
                             SimpleSense s = new SimpleSense(
                                 new TextCoordinate(
@@ -118,8 +134,8 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
                             sld.addSense(s);
                         }
                         return sld;
-                    }
-                ).toList()
+                    })
+                    .toList()
             );
             errors.clear();
             errors.addAll(errorListener.getErrors());

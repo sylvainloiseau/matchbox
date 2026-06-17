@@ -14,16 +14,18 @@ import java.util.logging.Logger;
  */
 public class ApplicationSettings {
 
+    private final static String APPLICATION_NAME = "matchbox";
+
     private static final Logger LOG = Logger.getLogger(
         ApplicationSettings.class.getName()
     );
 
     private static final String LOG_FILE_URI_CONF = "logfile";
-    private static final String LOG_FILE_URI_DEFAULT = ".notebook.log";
-    private static final String CONFIG_DIR = ".config/notebook";
-    private static final String HISTORY_FILE = "fieldnode.history";
-    private static final String HISTORY_FILESET_FILE = "fileset.history";
-    private static final String HISTORY_PROJECT_FILE = "project.history";
+    private static final String LOG_FILE_URI_DEFAULT = "." + APPLICATION_NAME + ".log";
+    private static final String CONFIG_DIR = ".config/" + APPLICATION_NAME;
+    private static final String HISTORY_FILE = APPLICATION_NAME + ".history";
+    private static final String HISTORY_FILESET_FILE = APPLICATION_NAME + ".fileset.history";
+    private static final String HISTORY_PROJECT_FILE = APPLICATION_NAME + ".project.history";
     private static final String CONFIG_FILE = "configuration.txt";
 
     private Path configPath;
@@ -45,8 +47,6 @@ public class ApplicationSettings {
     private Path logFileUri = null;
     private boolean non_default_log_file = false;
     private boolean openLastProject = false;
-
-    private int maxRecentProject = 10;
 
     public ApplicationSettings() {
         Path homeDir = Paths.get(System.getProperty("user.home"));
@@ -80,6 +80,7 @@ public class ApplicationSettings {
         this.recentFiles = loadHistory(this.historyPath);
         this.recentFileSets = loadHistory(this.historyFileSetPath);
         this.recentProjects = loadHistory(this.historyProjectPath);
+        this.maxRecentProjects = 10;
     }
 
     private void loadConfiguration() {
@@ -221,7 +222,7 @@ public class ApplicationSettings {
         recentProjects.add(0, filePath); // Add to top
 
         // Keep only up to maxRecentFiles entries
-        if (recentProjects.size() > maxRecentProject) {
+        if (recentProjects.size() > maxRecentProjects) {
             recentProjects = recentProjects.subList(0, maxRecentProjects);
         }
         saveProjectHistory();

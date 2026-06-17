@@ -1,16 +1,17 @@
 package fr.cnrs.lacito.matchbox.model.project;
 
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
+import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
+import fr.cnrs.lacito.matchbox.model.Corpus;
+import fr.cnrs.lacito.matchbox.model.TextDocument;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import fr.cnrs.lacito.matchbox.model.Corpus;
-import fr.cnrs.lacito.matchbox.model.TextParser;
-import fr.cnrs.lacito.matchboxgrammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchboxgrammarapi.ParseResult;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.MapChangeListener;
 import javafx.collections.ObservableList;
@@ -22,103 +23,127 @@ import javafx.collections.ObservableMap;
  */
 public class Project {
 
-    public static final Object DEFAULT_PLUGIN_ID = "notebook-grammar";
+    public static final String DEFAULT_PLUGIN_ID = "notebook-grammar";
     private String name;
     private String description;
 
     private List<FileType> fileTypes = new ArrayList<>();
-    private Corpus corpus;
+    private final Corpus corpus;
 
     private List<GrammarPlugin> plugins;
 
     private List<Path> filesAndDirectories = new ArrayList<>();
 
     private boolean isDesynchronized = true;
+    private SimpleBooleanProperty isProjectDefinitionOutdated =
+        new SimpleBooleanProperty(false);
 
-    private ObservableMap<Path, TextParser> parserMap = FXCollections.observableHashMap();
-    private ObservableList<TextParser> passiveFileList = FXCollections.observableArrayList();
+    private ObservableMap<Path, TextDocument> textDocumentByPath =
+        FXCollections.observableHashMap();
+
+    private ObservableList<TextDocument> derivedFileList =
+        FXCollections.observableArrayList();
+
     private Map<Path, List<Path>> filesByDir = new HashMap<>();
 
-    private Project(List<GrammarPlugin> plugins, String name, String description) {
-        this(plugins);
-        this.name = name;
-        this.description = description;
-    }
+    private SimpleObjectProperty<File> projectFile = new SimpleObjectProperty<>(
+        null
+    );
 
-    private Project(List<GrammarPlugin> plugins) {
+    protected Project(List<GrammarPlugin> plugins) {
         this.corpus = new Corpus();
         this.name = "";
         this.description = "";
         this.plugins = plugins;
 
         // derive the passiveTextList from the parserMap
-        this.parserMap.values().forEach(textParser -> {
-            this.passiveFileList.add(textParser);
+        this.textDocumentByPath.values().forEach(textParser -> {
+            this.derivedFileList.add(textParser);
         });
-        this.parserMap.addListener((MapChangeListener.Change<? extends Path, ? extends TextParser> change) -> {
-            if (change.wasAdded()) {
-                passiveFileList.add(change.getValueAdded());
-            } else if (change.wasRemoved()) {
-                passiveFileList.remove(change.getValueRemoved());
+        this.textDocumentByPath.addListener(
+            (
+                MapChangeListener.Change<
+                    ? extends Path,
+                    ? extends TextDocument
+                > change
+            ) -> {
+                if (change.wasAdded()) {
+                    derivedFileList.add(change.getValueAdded());
+                } else if (change.wasRemoved()) {
+                    derivedFileList.remove(change.getValueRemoved());
+                }
             }
-        });
+        );
     }
 
-    public final static Project loadProject(List<GrammarPlugin> plugins, File projectFile) throws Exception {
-        Project project = Project.createEmptyProject(plugins);
-        ProjectXMLSerializer.load(projectFile, project);
+    public static final Project loadProject(
+        List<GrammarPlugin> plugins,
+        File projectFile
+    ) throws Exception {
+        Project project = ProjectXMLSerializer.load(projectFile, plugins);
         return project;
     }
 
-    public final static Project createEmptyProject(List<GrammarPlugin> plugins) {
-        Project project = new Project(plugins);
-        return project;
-    }
-
-    /** Creates a default project with a single file type "All files" and a single grammar "IGT" applied to all files. 
-    */
-    public final static Project createDefaultProject(List<GrammarPlugin> plugins) {
+    /** Creates a default project with a single file type "All files" and a single grammar "IGT" applied to all files.
+     */
+    public static final Project createDefaultProject(
+        List<GrammarPlugin> plugins
+    ) {
         Project project = new Project(plugins);
         FileType fileType = new FileType("All files", ".+");
-        GrammarPlugin defaultPlugin = plugins.stream()
+        GrammarPlugin defaultPlugin = plugins
+            .stream()
             .filter(p -> p.getId().equals(DEFAULT_PLUGIN_ID))
             .findFirst()
-            .orElseThrow(() -> new RuntimeException("Default plugin not found"));
+            .orElseThrow(() ->
+                new RuntimeException("Default plugin not found")
+            );
         fileType.addGrammar(defaultPlugin);
         project.fileTypes.add(fileType);
+        project.isProjectDefinitionOutdatedProperty().set(true);
         return project;
     }
 
-    protected void parseProject() {
-        for (TextParser textParser : passiveFileList) {
+    public SimpleBooleanProperty isProjectDefinitionOutdatedProperty() {
+        return isProjectDefinitionOutdated;
+    }
+
+    public void parseProject() {
+        for (TextDocument textParser : derivedFileList) {
             parseTextObject(textParser);
         }
         isDesynchronized = false;
     }
 
     public void parsePath(Path filePath) {
-        TextParser text = getParsedText(filePath);
+        TextDocument text = getParsedText(filePath);
         parseTextObject(text);
     }
 
-        // // TODO. rather add listener to each text.getIGTs() (an observable list)
-        // igtList.stream().filter(p -> {
-        //     System.out.println("Filtering IGTs for file: " + filePath.toString());
-        //     System.out.println("IGT source: " + p.getFilePath());
-        //     return ! p.getFilePath().equals(filePath);
-        // }).collect(Collectors.toList());
-        // igtList.addAll(text.getIGTs());
+    // // TODO. rather add listener to each text.getIGTs() (an observable list)
+    // igtList.stream().filter(p -> {
+    //     System.out.println("Filtering IGTs for file: " + filePath.toString());
+    //     System.out.println("IGT source: " + p.getFilePath());
+    //     return ! p.getFilePath().equals(filePath);
+    // }).collect(Collectors.toList());
+    // igtList.addAll(text.getIGTs());
 
-        // lexList.stream().filter(p -> {
-        //     return ! p.getFilePath().equals(filePath);
-        // }).collect(Collectors.toList());
-        // lexList.addAll(text.getLexicalDefinitions());
+    // lexList.stream().filter(p -> {
+    //     return ! p.getFilePath().equals(filePath);
+    // }).collect(Collectors.toList());
+    // lexList.addAll(text.getLexicalDefinitions());
 
-    public void parseTextObject(TextParser textParser) {
+    public void parseTextObject(TextDocument textParser) {
+        // TODO or to be done after, when re-synchronizing the corpus with the project?
+        corpus.removeCorpusObjectsForFile(textParser.getFilePath());
         for (FileType fileType : fileTypes) {
             if (fileType.matches(textParser.getFilePath())) {
                 for (GrammarPlugin plugin : fileType.getGrammars()) {
-                    ParseResult result = plugin.getResult(textParser.getFilePath(), textParser.getCurrentText());
+                    ParseResult result = plugin.getResult(
+                        textParser.getFilePath(),
+                        textParser.getCurrentText()
+                    );
+                    // TODO or to be done after, when re-synchronizing the corpus with the project?
                     corpus.addCorpusObjects(result.getCorpusObjects());
                     corpus.addErrors(result.getErrors());
                     // Process the parse result as needed
@@ -133,6 +158,7 @@ public class Project {
 
     public void setName(String name) {
         this.name = name;
+        this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
     public String getDescription() {
@@ -141,19 +167,20 @@ public class Project {
 
     public void setDescription(String description) {
         this.description = description;
+        this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
     // ----------------------
     // Files and directory
     // ----------------------
 
-    /** 
+    /**
      * Returns the actual list of files in the project
      * (built from the user-defined list of directories and files).
-     * 
+     *
      */
-    public ObservableList<TextParser> getPassiveFileList() {
-        return passiveFileList;
+    public ObservableList<TextDocument> getDerivedFileList() {
+        return derivedFileList;
     }
 
     /**
@@ -168,7 +195,9 @@ public class Project {
      */
     public void addDirectory(Path path, boolean recursive) throws IOException {
         if (!Files.isDirectory(path)) {
-            throw new IllegalArgumentException("The provided path is not a directory.");
+            throw new IllegalArgumentException(
+                "The provided path is not a directory."
+            );
         }
 
         filesAndDirectories.add(path);
@@ -178,10 +207,12 @@ public class Project {
         try (var stream = Files.walk(path, depth)) {
             stream
                 .filter(Files::isRegularFile)
-                // .filter(p -> {
-                //     String filename = p.getFileName().toString().toLowerCase();
-                //     return filename.endsWith(".md") || filename.endsWith(".txt");
-                // })
+                .filter(p -> {
+                    String filename = p.getFileName().toString().toLowerCase();
+                    return (
+                        filename.endsWith(".md") || filename.endsWith(".txt")
+                    );
+                })
                 .forEach(p -> {
                     try {
                         files.add(p);
@@ -195,13 +226,15 @@ public class Project {
             e.printStackTrace();
         }
         filesByDir.put(path, files);
+        this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
     private void addFileInternal(Path filePath) throws IOException {
-        TextParser textParser = new TextParser(filePath);
-        parserMap.put(filePath, textParser);
+        TextDocument textParser = new TextDocument(filePath);
+        textDocumentByPath.put(filePath, textParser);
         parseTextObject(textParser);
         //isDesynchronized = true;
+        this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
     /**
@@ -211,25 +244,31 @@ public class Project {
      */
     public void addFile(Path filePath) throws IOException {
         if (!Files.isRegularFile(filePath)) {
-            throw new IllegalArgumentException("The provided path is not a regular file:" + filePath.toString());
+            throw new IllegalArgumentException(
+                "The provided path is not a regular file:" + filePath.toString()
+            );
         }
-        if (parserMap.containsKey(filePath)) {
-            throw new IllegalArgumentException("The file is already loaded: " + filePath.toString());
+        if (textDocumentByPath.containsKey(filePath)) {
+            throw new IllegalArgumentException(
+                "The file is already loaded: " + filePath.toString()
+            );
         }
         filesAndDirectories.add(filePath);
         addFileInternal(filePath);
     }
 
-    public TextParser getParsedText(Path filePath) {
-        TextParser textParser = parserMap.get(filePath);
+    public TextDocument getParsedText(Path filePath) {
+        TextDocument textParser = textDocumentByPath.get(filePath);
         if (textParser != null) {
             return textParser;
         }
-        throw new IllegalArgumentException("No TextParser found for the given file path.");
+        throw new IllegalArgumentException(
+            "No TextParser found for the given file path."
+        );
     }
 
     public void updateFileContent(String fileContent, Path filePath) {
-        TextParser text = getParsedText(filePath);
+        TextDocument text = getParsedText(filePath);
         text.updateText(fileContent);
     }
 
@@ -239,11 +278,13 @@ public class Project {
 
     public void removeFile(Path selected) {
         filesAndDirectories.remove(selected);
-        parserMap.remove(selected);
+        textDocumentByPath.remove(selected);
+        this.isProjectDefinitionOutdatedProperty().set(true);
     }
-    
+
     public List<String> getFiles() {
-        return filesAndDirectories.stream()
+        return filesAndDirectories
+            .stream()
             .filter(p -> Files.isRegularFile(p))
             .map(p -> p.toString())
             .collect(Collectors.toList());
@@ -259,7 +300,8 @@ public class Project {
     }
 
     public List<String> getDirectories() {
-        return filesAndDirectories.stream()
+        return filesAndDirectories
+            .stream()
             .filter(p -> Files.isDirectory(p))
             .map(p -> p.toString())
             .collect(Collectors.toList());
@@ -276,9 +318,15 @@ public class Project {
 
     public void removeDirectory(Path dirPath) {
         filesAndDirectories.remove(dirPath);
-        for (Path p : filesByDir.get(dirPath)) {
-            parserMap.remove(p);
+        for (Path p : filesByDir.getOrDefault(
+            dirPath,
+            Collections.emptyList()
+        )) {
+            textDocumentByPath.remove(p);
+            // TODO or to be done after, when re-synchronizing the corpus with the project?
+            corpus.removeCorpusObjectsForFile(p);
         }
+        this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
     public void removeDirectory(String dirPath) {
@@ -286,7 +334,7 @@ public class Project {
     }
 
     public void saveFile(Path editedFilePath, String text) throws IOException {
-        TextParser textParser = getParsedText(editedFilePath);
+        TextDocument textParser = getParsedText(editedFilePath);
         textParser.updateText(text);
         textParser.writeFile();
     }
@@ -294,7 +342,6 @@ public class Project {
     // ------------------------
     // File types
     // ------------------------
-    
 
     public List<FileType> getFileTypes() {
         return fileTypes;
@@ -303,15 +350,24 @@ public class Project {
     public void addFileType(FileType type) {
         fileTypes.add(type);
         isDesynchronized = true;
+        this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
     public void removeFileType(FileType type) {
         fileTypes.remove(type);
         isDesynchronized = true;
+        this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
     public Corpus getCorpus() {
         return this.corpus;
     }
 
+    public void setFile(File projectFile) {
+        this.projectFile.set(projectFile);
+    }
+
+    public SimpleObjectProperty<File> fileProperty() {
+        return this.projectFile;
+    }
 }

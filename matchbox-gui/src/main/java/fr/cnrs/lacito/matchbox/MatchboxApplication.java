@@ -1,8 +1,8 @@
 package fr.cnrs.lacito.matchbox;
 
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.MainController;
 import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
-import fr.cnrs.lacito.matchboxgrammarapi.GrammarPlugin;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;

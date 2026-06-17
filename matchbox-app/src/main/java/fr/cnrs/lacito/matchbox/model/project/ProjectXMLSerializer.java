@@ -1,6 +1,9 @@
 package fr.cnrs.lacito.matchbox.model.project;
 
+import fr.cnrs.lacito.matchbox.PluginManager;
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import java.io.File;
+import java.util.List;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.Transformer;
@@ -8,9 +11,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import org.w3c.dom.*;
-
-import fr.cnrs.lacito.matchbox.PluginManager;
-import fr.cnrs.lacito.matchboxgrammarapi.GrammarPlugin;
 
 /**
  * Handles serialization and deserialization of Project objects to/from XML
@@ -23,7 +23,12 @@ public class ProjectXMLSerializer {
      * @param file the file to save to
      * @throws Exception if there's an error during serialization
      */
-    public static void save(Project project, File file) throws Exception {
+    public static void save(Project project) throws Exception {
+        File file = project.fileProperty().get();
+        if (file == null) {
+            throw new IllegalArgumentException("Project file is not set");
+        }
+
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = builder.newDocument();
@@ -96,7 +101,10 @@ public class ProjectXMLSerializer {
      * @return the loaded project
      * @throws Exception if there's an error during deserialization
      */
-    public static void load(File file, Project project) throws Exception {
+    public static Project load(File file, List<GrammarPlugin> plugins)
+        throws Exception {
+        Project project = new Project(plugins);
+
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = builder.parse(file);
@@ -153,7 +161,7 @@ public class ProjectXMLSerializer {
             for (int j = 0; j < grammarList.getLength(); j++) {
                 Element grammarElement = (Element) grammarList.item(j);
                 String grammarId = grammarElement.getAttribute("id");
-                
+
                 GrammarPlugin grammar = PluginManager.getPluginById(grammarId);
                 if (grammar == null) {
                     throw new IllegalArgumentException(
@@ -166,6 +174,6 @@ public class ProjectXMLSerializer {
             project.addFileType(pattern);
         }
 
-        // return project;
+        return project;
     }
 }

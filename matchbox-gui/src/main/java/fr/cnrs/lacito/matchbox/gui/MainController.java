@@ -1,14 +1,15 @@
 package fr.cnrs.lacito.matchbox.gui;
 
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.mode.FileModeController;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
 import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
 import fr.cnrs.lacito.matchbox.model.project.Project;
-import fr.cnrs.lacito.matchboxgrammarapi.GrammarPlugin;
-
+import fr.cnrs.lacito.matchbox.model.project.ProjectXMLSerializer;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -36,7 +37,7 @@ public class MainController {
     private SplitPane topSplitPane;
 
     @FXML
-    private MenuItem createProjectMenuItem;
+    private MenuItem saveAsProjectMenuItem;
 
     @FXML
     private Menu openRecentMenu;
@@ -60,19 +61,19 @@ public class MainController {
     private MenuItem saveCurrentFileMenuItem;
 
     @FXML
-    private MenuItem openFilesetMenuItem;
+    private MenuItem openProjectMenuItem;
 
     @FXML
     private Menu openRecentProjectsMenuItem;
 
     @FXML
-    private MenuItem closeCurrentFilesetMenuItem;
+    private MenuItem closeCurrentProjectMenuItem;
 
     @FXML
-    private MenuItem saveFilesetMenuItem;
+    private MenuItem newProjectMenuItem;
 
     @FXML
-    private MenuItem saveFilesetAsMenuItem;
+    private MenuItem saveProjectMenuItem;
 
     @FXML
     private Label statusBarRightLabel;
@@ -109,7 +110,10 @@ public class MainController {
 
     private Project project;
 
-    public MainController(ApplicationSettings applicationSettings, List<GrammarPlugin> plugins) {
+    public MainController(
+        ApplicationSettings applicationSettings,
+        List<GrammarPlugin> plugins
+    ) {
         this.applicationSettings = applicationSettings;
         this.plugins = plugins;
         if (
@@ -153,13 +157,21 @@ public class MainController {
         };
     }
 
+    private void onProjectChangeHook() {
+        saveProjectMenuItem
+            .disableProperty()
+            .bind(project.fileProperty().isNotNull());
+    }
+
     private FileModeController loadFileMode() {
         FileModeController fileModeController = new FileModeController(
             applicationSettings
         );
         FXMLLoader loader = new FXMLLoader();
         loader.setLocation(
-            getClass().getResource("/fr/cnrs/lacito/matchbox/gui/mode/FileMode.fxml")
+            getClass().getResource(
+                "/fr/cnrs/lacito/matchbox/gui/mode/FileMode.fxml"
+            )
         );
         loader.setController(fileModeController);
         try {
@@ -182,6 +194,7 @@ public class MainController {
         wireMenuItem();
         switchToFileMode();
     }
+
     private void switchToFileMode() {
         viewPane.getChildren().clear();
         viewPane.getChildren().add(fileModePane);
@@ -201,8 +214,7 @@ public class MainController {
         // enable search only when the code area has focus
         if (searchMenuItem != null && fileContentCodeArea != null) {
             searchMenuItem.disableProperty().bind(
-                fileContentCodeArea
-                    .focusedProperty() //.not()
+                fileContentCodeArea.focusedProperty() //.not()
             );
         }
     }
@@ -259,10 +271,12 @@ public class MainController {
 
     private void openProject(File f) {
         try {
-            Project project = Project.loadProject(this.plugins, f);
+            this.project = Project.loadProject(this.plugins, f);
             fileModeController.setProject(project);
             applicationSettings.addToProjectHistory(f.getAbsolutePath());
             loadRecentProjectsMenu();
+            project.parseProject();
+            onProjectChangeHook();
         } catch (Exception e) {
             showError("Error opening project", e.getMessage());
         }
@@ -270,7 +284,7 @@ public class MainController {
 
     private void openFileOrDirectory(File f) {
         try {
-                fileModeController.openFileOrDirectory(f);
+            fileModeController.openFileOrDirectory(f);
         } catch (Exception e) {
             showError("Error opening file", e.getMessage());
         }
@@ -297,16 +311,63 @@ public class MainController {
         }
     }
 
-    public void handleOpenFileset() {
-        // TODO implement
+    // Project
+
+    public void handleOpenProject() {
+        FileChooser chooser = new FileChooser();
+        chooser
+            .getExtensionFilters()
+            .addAll(
+                new FileChooser.ExtensionFilter(
+                    "Matchbox project files",
+                    "*.mbx"
+                ),
+                new FileChooser.ExtensionFilter("All Files", "*.*")
+            );
+        File selected = chooser.showOpenDialog(primaryStage);
+        openProject(selected);
     }
 
     public void handleOpenRecentFileset() {
         // TODO implement
     }
 
-    public void handleCloseCurrentFileset() {
-        // TODO implement
+    public void handleSaveCurrentProject() {
+        if (project.fileProperty().isNull().get()) {
+            handleSaveAsProject();
+            return;
+        }
+        try {
+            ProjectXMLSerializer.save(project);
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    public void handleNewProject() {
+        handleCloseCurrentProject();
+        Project newProject = Project.createDefaultProject(plugins);
+        project = newProject;
+        onProjectChangeHook();
+    }
+
+    public void handleCloseCurrentProject() {
+        if (project.isProjectDefinitionOutdatedProperty().get()) {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Project Definition Outdated");
+            alert.setHeaderText("The project definition is outdated.");
+            alert.setContentText(
+                "Do you want to save the changes before closing?"
+            );
+            Optional<ButtonType> result = alert.showAndWait();
+            if (result.isPresent() && result.get() == ButtonType.OK) {
+                handleSaveCurrentProject();
+            }
+        }
+        //project.close();
+        this.project = Project.createDefaultProject(plugins);
+        onProjectChangeHook();
     }
 
     public void handleCloseAllFiles() {
@@ -392,7 +453,7 @@ public class MainController {
         }
     }
 
-    public void handleCreateProject() {
+    public void handleSaveAsProject() {
         CreateProjectDialog dialog = new CreateProjectDialog(
             primaryStage,
             fileModeController,
@@ -402,7 +463,10 @@ public class MainController {
     }
 
     public void handleSettings() {
-        SettingsDialog dialog = new SettingsDialog(applicationSettings, primaryStage);
+        SettingsDialog dialog = new SettingsDialog(
+            applicationSettings,
+            primaryStage
+        );
         dialog.showAndWait();
     }
 

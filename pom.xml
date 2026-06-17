@@ -44,47 +44,39 @@
                 <artifactId>matchbox-gui</artifactId>
                 <version>${revision}</version>
             </dependency>
-
             <dependency>
                 <groupId>fr.cnrs.lacito</groupId>
                 <artifactId>matchbox-language</artifactId>
                 <version>${revision}</version>
             </dependency>
-
             <dependency>
                 <groupId>fr.cnrs.lacito</groupId>
                 <artifactId>matchbox-grammar-api</artifactId>
                 <version>${revision}</version>
             </dependency>
-
             <dependency>
                 <groupId>fr.cnrs.lacito</groupId>
                 <artifactId>matchbox-app</artifactId>
                 <version>${revision}</version>
             </dependency>
-
             <!-- ANTLR Runtime -->
             <dependency>
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr4-runtime</artifactId>
                 <version>${antlr.version}</version>
             </dependency>
-
             <!-- RichTextFX for editable rich text area -->
             <dependency>
                 <groupId>org.fxmisc.richtext</groupId>
                 <artifactId>richtextfx</artifactId>
                 <version>0.11.7</version>
             </dependency>
-
             <!-- JavaFX -->
-            
             <dependency>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-base</artifactId>
                 <version>${javafx.version}</version>
             </dependency>
-
             <dependency>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-controls</artifactId>
@@ -105,33 +97,16 @@
 
     <build>
         <plugins>
-            <!-- ANTLR Maven Plugin -->
-            <plugin>
-                <groupId>org.antlr</groupId>
-                <artifactId>antlr4-maven-plugin</artifactId>
-                <version>${antlr.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>antlr4</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <visitor>true</visitor>
-                    <listener>true</listener>
-                </configuration>
-            </plugin>
-
+ 
             <!-- Compiler Plugin -->
-            <plugin>
+            <!-- <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
-            </plugin>
+            </plugin> -->
 
             <!-- JAR Plugin -->
-            <plugin>
+            <!-- <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.3.0</version>
@@ -143,7 +118,7 @@
                         </manifest>
                     </archive>
                 </configuration>
-            </plugin>
+            </plugin> -->
 
         </plugins>
     </build>
