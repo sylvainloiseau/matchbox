@@ -19,7 +19,8 @@
     <modules>
         <module>grammars/matchbox-grammar-notebook</module>
         <module>grammars/matchbox-grammar-lex</module>
-        <module>matchbox-language</module>
+        <module>grammars/matchbox-grammar-conll</module>
+        <module>matchbox-corpus</module>
         <module>matchbox-gui</module>
         <module>matchbox-grammar-api</module>
         <module>matchbox-app</module>
@@ -33,7 +34,7 @@
         <javafx.version>23.0.2</javafx.version>
         <antlr.version>4.13.1</antlr.version>
         <revision>1.0.0</revision>
-        <plugins.dir>${project.basedir}/plugins</plugins.dir>    
+        <plugins.dir>${project.basedir}/plugins</plugins.dir>
         <build.root>${maven.multiModuleProjectDirectory}/build</build.root>
     </properties>
 
@@ -46,7 +47,7 @@
             </dependency>
             <dependency>
                 <groupId>fr.cnrs.lacito</groupId>
-                <artifactId>matchbox-language</artifactId>
+                <artifactId>matchbox-corpus</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
@@ -97,7 +98,7 @@
 
     <build>
         <plugins>
- 
+
             <!-- Compiler Plugin -->
             <!-- <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

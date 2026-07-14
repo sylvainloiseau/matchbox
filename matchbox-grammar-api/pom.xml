@@ -23,7 +23,7 @@
     <dependencies>
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
-            <artifactId>matchbox-language</artifactId>
+            <artifactId>matchbox-corpus</artifactId>
         </dependency>
         <!-- ANTLR Runtime -->
         <dependency>

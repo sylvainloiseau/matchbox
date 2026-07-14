@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project>
+  <fileset>
+    <directory path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/projects"/>
+    <directory path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/projects"/>
+  </fileset>
+  <pattern>
+    <name>All files</name>
+    <regex>.+</regex>
+    <grammar id="notebook-grammar" rank="0"/>
+  </pattern>
+  <pattern>
+    <name>test</name>
+    <regex>*.txt</regex>
+    <grammar id="notebook-grammar" rank="0"/>
+    <grammar id="notebook-grammar" rank="1"/>
+  </pattern>
+  <pattern>
+    <name>test2</name>
+    <regex>*.conll</regex>
+    <grammar id="notebook-grammar" rank="0"/>
+    <grammar id="notebook-grammar" rank="1"/>
+  </pattern>
+</project>

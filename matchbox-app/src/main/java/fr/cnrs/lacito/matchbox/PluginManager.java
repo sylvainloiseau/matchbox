@@ -70,12 +70,15 @@ public class PluginManager {
                             "Loaded plugin: " + plugin.getDisplayName()
                         );
                     }
+
                     // or :
                     //                      GrammarPlugin plugin =
                     //      loader.findFirst()
                     //            .orElseThrow();
                     //             plugins.add(plugin);
-                    cl.close();
+
+                    // the cl should be closed, otherwise classes in the plugin will not be found
+                    //cl.close();
                 } catch (Exception e) {
                     logger.severe(
                         "Error loading plugin from JAR: " + jar.toAbsolutePath()

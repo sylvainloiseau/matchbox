@@ -1,8 +1,8 @@
 package fr.cnrs.lacito.matchbox.grammar.notebook;
 
-import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookLexer;
 import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookParser.ExampleContext;
 import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookParser.SenseContext;
+import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookLexer;
 import fr.cnrs.lacito.matchbox.grammarapi.AbstractGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.CollectingErrorListener;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseError;

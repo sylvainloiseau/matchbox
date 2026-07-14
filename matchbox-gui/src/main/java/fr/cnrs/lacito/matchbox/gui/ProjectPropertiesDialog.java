@@ -41,8 +41,8 @@ public class ProjectPropertiesDialog {
     private ListView<String> filesetListView;
     private ObservableList<String> filesetItems;
 
-    private ListView<String> fileTypeListView;
-    private ObservableList<String> fileTypeItems;
+    private ListView<String> fileSetItemsListView;
+    private ObservableList<String> fileSetItems;
     private TextField fileTypeNameField;
     private TextField matchingFilesField;
     private ListView<GrammarItem> grammarListView;
@@ -177,7 +177,7 @@ public class ProjectPropertiesDialog {
             "-fx-border-color: #cccccc; -fx-border-width: 1; -fx-padding: 10;"
         );
 
-        Label label = new Label("Grammars by file type");
+        Label label = new Label("Define file sets with file patterns and select appopriate grammars");
         label.setStyle("-fx-font-weight: bold;");
 
         // Main horizontal split: left side (file types list) and right side (details)
@@ -185,12 +185,12 @@ public class ProjectPropertiesDialog {
         VBox.setVgrow(mainBox, Priority.ALWAYS);
 
         // Left side: File type list
-        VBox leftBox = createFileTypeListSection();
+        VBox leftBox = createFileSetListSection();
         mainBox.getChildren().add(leftBox);
         HBox.setHgrow(leftBox, Priority.ALWAYS);
 
         // Right side: File type details
-        VBox rightBox = createFileTypeDetailsSection();
+        VBox rightBox = createFileSetDetailsSection();
         mainBox.getChildren().add(rightBox);
         HBox.setHgrow(rightBox, Priority.ALWAYS);
 
@@ -199,18 +199,21 @@ public class ProjectPropertiesDialog {
         return section;
     }
 
-    private VBox createFileTypeListSection() {
+    private VBox createFileSetListSection() {
         VBox box = new VBox(5);
+        box.setStyle(
+            "-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-padding: 5;"
+        );
 
-        Label title = new Label("File Types:");
+        Label title = new Label("File sets:");
         title.setStyle("-fx-font-weight: bold;");
 
-        fileTypeItems = FXCollections.observableArrayList();
-        fileTypeListView = new ListView<>(fileTypeItems);
-        fileTypeListView.setPrefHeight(200);
-        fileTypeListView.setStyle("-fx-control-inner-background: #f5f5f5;");
+        fileSetItems = FXCollections.observableArrayList();
+        fileSetItemsListView = new ListView<>(fileSetItems);
+        fileSetItemsListView.setPrefHeight(200);
+        fileSetItemsListView.setStyle("-fx-control-inner-background: #f5f5f5;");
 
-        fileTypeListView
+        fileSetItemsListView
             .getSelectionModel()
             .selectedItemProperty()
             .addListener((obs, oldVal, newVal) -> {
@@ -236,30 +239,32 @@ public class ProjectPropertiesDialog {
 
         buttonBox.getChildren().addAll(addButton, removeButton);
 
-        box.getChildren().addAll(title, fileTypeListView, buttonBox);
-        VBox.setVgrow(fileTypeListView, Priority.ALWAYS);
+        box.getChildren().addAll(title, fileSetItemsListView, buttonBox);
+        VBox.setVgrow(fileSetItemsListView, Priority.ALWAYS);
         return box;
     }
 
-    private VBox createFileTypeDetailsSection() {
+    private VBox createFileSetDetailsSection() {
         VBox box = new VBox(5);
         box.setStyle(
             "-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-padding: 5;"
         );
+        Label title = new Label("File set detail:");
+        title.setStyle("-fx-font-weight: bold;");
 
         // File type name field
         Label nameLabel = new Label("File type name:");
         nameLabel.setStyle("-fx-font-weight: bold;");
         fileTypeNameField = new TextField();
-        fileTypeNameField.setPromptText("e.g., Python files");
+        fileTypeNameField.setPromptText("e.g., 'Conll files', 'Old fieldwork (with simple lexical pattern)'");
         fileTypeNameField.textProperty().addListener((obs, oldVal, newVal) -> {
             if (currentPattern != null) {
                 currentPattern.setName(newVal);
                 // Update the list view
-                int selectedIndex = fileTypeListView
+                int selectedIndex = fileSetItemsListView
                     .getSelectionModel()
                     .getSelectedIndex();
-                fileTypeItems.set(selectedIndex, newVal);
+                fileSetItems.set(selectedIndex, newVal);
             }
         });
 
@@ -267,7 +272,7 @@ public class ProjectPropertiesDialog {
         Label regexLabel = new Label("Matching files (regex):");
         regexLabel.setStyle("-fx-font-weight: bold;");
         matchingFilesField = new TextField();
-        matchingFilesField.setPromptText("e.g., .*\\\\.py$");
+        matchingFilesField.setPromptText("e.g., .*\\\\.md$");
         matchingFilesField.textProperty().addListener((obs, oldVal, newVal) -> {
             if (currentPattern != null) {
                 currentPattern.setRegex(newVal);
@@ -416,18 +421,19 @@ public class ProjectPropertiesDialog {
                 }
 
                 project.addFileType(pattern);
-                fileTypeItems.add(fileTypeName);
-                fileTypeListView.getSelectionModel().selectLast();
+                fileSetItems.add(fileTypeName);
+                fileSetItemsListView.getSelectionModel().selectLast();
+                currentPattern = pattern;
             }
         }
     }
 
     private void handleRemoveFileType() {
-        int selectedIndex = fileTypeListView
+        int selectedIndex = fileSetItemsListView
             .getSelectionModel()
             .getSelectedIndex();
         if (selectedIndex >= 0) {
-            String removed = fileTypeItems.remove(selectedIndex);
+            String removed = fileSetItems.remove(selectedIndex);
             project.removeFileType(currentPattern);
             currentPattern = null;
             updateDetailsPanel();
@@ -461,7 +467,6 @@ public class ProjectPropertiesDialog {
                 currentPattern.addGrammar(item.getGrammar());
             }
         }
-
         saved = true;
         stage.close();
     }
@@ -544,7 +549,7 @@ public class ProjectPropertiesDialog {
                             }
                             //grammar.setRank(maxRank + 1);
                         }
-                    }  
+                    }
                 });
                 setGraphic(container);
             }

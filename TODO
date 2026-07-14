@@ -1,3 +1,5 @@
+matchbox-language -> matchbox-corpus
+
 - Search replace
 - undo redo
 - italics for modified text
@@ -14,11 +16,3 @@ tooltip
 https://docs.oracle.com/javase/8/javafx/api/javafx/scene/control/Tooltip.html
 
 Test if changing text update correctly igt and lexical
-
-
-
-
-
-
-
-

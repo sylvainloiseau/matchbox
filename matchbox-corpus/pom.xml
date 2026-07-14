@@ -12,13 +12,13 @@
         <version>1.0.0</version>
     </parent>
 
-    <artifactId>matchbox-language</artifactId>
+    <artifactId>matchbox-corpus</artifactId>
     <version>${revision}</version>
     <packaging>jar</packaging>
 
-    <name>Matchbox Language</name>
+    <name>Matchbox Corpus</name>
     <description
-    >The DSL language for updating a corpus and a dictionary</description>
+    >The objects created by the parsers representing linguistic data</description>
 
      <dependencies>
 

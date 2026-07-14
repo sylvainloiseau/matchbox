@@ -32,18 +32,32 @@ public class Project {
 
     private List<GrammarPlugin> plugins;
 
-    private List<Path> filesAndDirectories = new ArrayList<>();
-
     private boolean isDesynchronized = true;
+
     private SimpleBooleanProperty isProjectDefinitionOutdated =
         new SimpleBooleanProperty(false);
 
+    /**
+     * The list of files and directories in the project
+     * as edited by the user.
+     */
+    private List<Path> filesAndDirectories = new ArrayList<>();
+
+    /**
+     * For all actual files, map the Path to the TextDocument.
+     */
     private ObservableMap<Path, TextDocument> textDocumentByPath =
         FXCollections.observableHashMap();
 
+    /**
+     * Derived from textDocumentByPath. used by #parseProject
+     */
     private ObservableList<TextDocument> derivedFileList =
         FXCollections.observableArrayList();
 
+    /**
+     * Used in add directory and remove directory.
+     */
     private Map<Path, List<Path>> filesByDir = new HashMap<>();
 
     private SimpleObjectProperty<File> projectFile = new SimpleObjectProperty<>(

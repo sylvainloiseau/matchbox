@@ -29,7 +29,7 @@
 
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
-            <artifactId>matchbox-language</artifactId>
+            <artifactId>matchbox-corpus</artifactId>
         </dependency>
 
         <dependency>
@@ -40,7 +40,6 @@
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-app</artifactId>
-
         </dependency>
 
         <!-- ANTLR Runtime -->

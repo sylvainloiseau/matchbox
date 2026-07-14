@@ -161,6 +161,7 @@ public class MainController {
         saveProjectMenuItem
             .disableProperty()
             .bind(project.fileProperty().isNotNull());
+        project.isProjectDefinitionOutdatedProperty().set(true);
     }
 
     private FileModeController loadFileMode() {
@@ -188,7 +189,7 @@ public class MainController {
             .selectedToggleProperty()
             .addListener(toggleGroupListener);
         viewToggleGroup.selectToggle(fileModeToggleButton);
-        loadRecentFilesMenu();
+        //loadRecentFilesMenu();
         loadRecentProjectsMenu();
         // loadRecentFileSetsMenu();
         wireMenuItem();
@@ -257,6 +258,12 @@ public class MainController {
         dialog.show();
     }
 
+    public void handleExportDictionary() {
+        //TODO
+    }
+
+    // start open file submenus
+    //
     public void handleOpenFileWithFileChooser() {
         FileChooser chooser = new FileChooser();
         chooser
@@ -268,19 +275,43 @@ public class MainController {
         File selected = chooser.showOpenDialog(primaryStage);
         openFileOrDirectory(selected);
     }
-
-    private void openProject(File f) {
+    public void handleOpenDirectory() {
         try {
-            this.project = Project.loadProject(this.plugins, f);
-            fileModeController.setProject(project);
-            applicationSettings.addToProjectHistory(f.getAbsolutePath());
-            loadRecentProjectsMenu();
-            project.parseProject();
-            onProjectChangeHook();
+            fileModeController.handleOpenDirectory(primaryStage);
         } catch (Exception e) {
-            showError("Error opening project", e.getMessage());
+            showError("Error opening directory", e.getMessage());
         }
     }
+
+    private void loadRecentFilesMenu() {
+        this.openRecentMenu.getItems().clear();
+        List<String> recent = applicationSettings.getRecentFiles();
+        if (recent.isEmpty()) {
+            MenuItem noRecentItem = new MenuItem("No recent files");
+            noRecentItem.setDisable(true);
+            openRecentMenu.getItems().add(noRecentItem);
+        } else {
+            for (String filepath : recent) {
+                MenuItem item = new MenuItem(filepath);
+                item.setOnAction(e -> openFileOrDirectory(new File(filepath)));
+                openRecentMenu.getItems().add(item);
+            }
+            // Add separator
+            openRecentMenu.getItems().add(new SeparatorMenuItem());
+            // Add clear recent files item
+            MenuItem clearItem = new MenuItem("Clear Recent Files");
+            clearItem.setOnAction(e -> {
+                applicationSettings.clearRecentFiles();
+                loadRecentFilesMenu();
+            });
+            openRecentMenu.getItems().add(clearItem);
+        }
+    }
+
+    /**
+    */
+
+    // End open file submenus
 
     private void openFileOrDirectory(File f) {
         try {
@@ -303,15 +334,22 @@ public class MainController {
         }
     }
 
-    public void handleOpenDirectory() {
+    // ---------------------------------------------
+    // Project
+    // ---------------------------------------------
+
+    private void openProject(File f) {
         try {
-            fileModeController.handleOpenDirectory(primaryStage);
+            this.project = Project.loadProject(this.plugins, f);
+            fileModeController.setProject(project);
+            applicationSettings.addToProjectHistory(f.getAbsolutePath());
+            loadRecentProjectsMenu();
+            project.parseProject();
+            onProjectChangeHook();
         } catch (Exception e) {
-            showError("Error opening directory", e.getMessage());
+            showError("Error opening project", e.getMessage());
         }
     }
-
-    // Project
 
     public void handleOpenProject() {
         FileChooser chooser = new FileChooser();
@@ -325,7 +363,9 @@ public class MainController {
                 new FileChooser.ExtensionFilter("All Files", "*.*")
             );
         File selected = chooser.showOpenDialog(primaryStage);
-        openProject(selected);
+        if (selected != null) {
+            openProject(selected);
+        }
     }
 
     public void handleOpenRecentFileset() {
@@ -343,6 +383,7 @@ public class MainController {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+        project.isProjectDefinitionOutdatedProperty().set(false);
     }
 
     public void handleNewProject() {
@@ -352,9 +393,27 @@ public class MainController {
         onProjectChangeHook();
     }
 
+    public void handleEditProject() {
+        ProjectPropertiesDialog dialog = new ProjectPropertiesDialog(
+            primaryStage,
+            this.project,
+            fileModeController
+        );
+        dialog.showAndWait();
+        if (dialog.isSaved()) {
+            onProjectChangeHook();
+        }
+    }
+
     public void handleCloseCurrentProject() {
         if (project.isProjectDefinitionOutdatedProperty().get()) {
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            ButtonType ok = new ButtonType("foo", ButtonBar.ButtonData.OK_DONE);
+            ButtonType no = new ButtonType("bar", ButtonBar.ButtonData.NO);
+            ButtonType cancel = new ButtonType("bar", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+                "would you like to discard change in current project?",
+                ok, no, cancel);
             alert.setTitle("Project Definition Outdated");
             alert.setHeaderText("The project definition is outdated.");
             alert.setContentText(
@@ -363,6 +422,8 @@ public class MainController {
             Optional<ButtonType> result = alert.showAndWait();
             if (result.isPresent() && result.get() == ButtonType.OK) {
                 handleSaveCurrentProject();
+            } else if (result.isPresent() && result.get() == ButtonType.CANCEL) {
+                return;
             }
         }
         //project.close();
@@ -425,31 +486,6 @@ public class MainController {
                 loadRecentProjectsMenu();
             });
             openRecentProjectsMenuItem.getItems().add(clearItem);
-        }
-    }
-
-    private void loadRecentFilesMenu() {
-        this.openRecentMenu.getItems().clear();
-        List<String> recent = applicationSettings.getRecentFiles();
-        if (recent.isEmpty()) {
-            MenuItem noRecentItem = new MenuItem("No recent files");
-            noRecentItem.setDisable(true);
-            openRecentMenu.getItems().add(noRecentItem);
-        } else {
-            for (String filepath : recent) {
-                MenuItem item = new MenuItem(filepath);
-                item.setOnAction(e -> openFileOrDirectory(new File(filepath)));
-                openRecentMenu.getItems().add(item);
-            }
-            // Add separator
-            openRecentMenu.getItems().add(new SeparatorMenuItem());
-            // Add clear recent files item
-            MenuItem clearItem = new MenuItem("Clear Recent Files");
-            clearItem.setOnAction(e -> {
-                applicationSettings.clearRecentFiles();
-                loadRecentFilesMenu();
-            });
-            openRecentMenu.getItems().add(clearItem);
         }
     }
 
