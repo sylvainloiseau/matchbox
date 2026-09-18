@@ -4,6 +4,53 @@ Write field notes in plain text with lightweight conventions and parse the files
 
 ## Installation
 
+Download the latest release from the [GitHub releases page](https://github.com/sylvainloiseau/matchbox/releases) for your OS.
+
+### Prerequisite
+
+A Java runtime environment (JRE or JDK), version 17 or later, available on your `PATH`.
+
+### First launch on macOS
+
+The macOS application is **not notarized by Apple**, because notarization requires a paid
+Developer ID. As a consequence, the first time you open the downloaded application, macOS
+displays a warning of the form:
+
+> *Apple could not verify "matchbox" is free of malware…*
+
+This is expected and does not mean the application is broken. Downloading a file sets the
+`com.apple.quarantine` attribute on it, and macOS refuses to run a quarantined application
+that carries no notarization ticket. You only have to lift that restriction **once**; every
+later launch works normally. Choose either of the two routes below.
+
+#### Route 1 — System Settings (works on all recent macOS, including 15 Sequoia)
+
+1. Open the downloaded `.dmg` and drag **matchbox.app** into your `/Applications` folder.
+2. Double-click **matchbox** in `/Applications`. The warning above appears: dismiss it
+   with **Done**.
+3. Open **System Settings → Privacy & Security** and scroll to the bottom of the
+   **Security** section, where a notice reads *"matchbox" was blocked…*.
+4. Click **Open Anyway** and confirm with Touch ID or your password.
+5. On macOS 15 (Sequoia) you may need to double-click the application a second time and
+   confirm once more. After that, matchbox opens directly.
+
+#### Route 2 — Terminal (a single command)
+
+After copying **matchbox.app** to `/Applications`, run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/matchbox.app
+```
+
+This removes the quarantine attribute, so the notarization check no longer applies and the
+application opens on a normal double-click.
+
+> **Note:** up to macOS 14, right-clicking the application and choosing **Open**
+> was enough to bypass this warning. Apple removed that Control-click override in macOS 15
+> (Sequoia), so instructions you may find elsewhere telling you to right-click → Open no
+> longer work — use one of the two routes above instead.
+
+
 ## Scenario
 
 This app experiments with an alternative way of working with linguistic notes (text, lexicon) using plain text.
@@ -112,3 +159,14 @@ mvn -pl grammars/matchbox-grammar-notebook package
 mvn -pl matchbox-gui -am clean package
 
 bash build/assembly/matchbox-distribution-1.0.0-distribution/bin/matchbox
+
+### Releases GitHub
+
+A GitHub workflow (`.github/workflows/release.yml`) automatically builds the installers for **Linux**, **Windows** and **macOS** when a **tag** is pushed, for example :
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The artifacts are attached to the corresponding **Release** on GitHub (`.deb`, `.msi`, `.exe`, `.dmg` files according to the successful jobs).
