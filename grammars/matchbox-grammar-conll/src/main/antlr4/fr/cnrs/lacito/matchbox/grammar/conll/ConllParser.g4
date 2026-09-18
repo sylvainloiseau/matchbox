@@ -1,6 +1,6 @@
 parser grammar ConllParser;
 
-options { tokenVocab=conllLexer; }
+options { tokenVocab=ConllLexer; }
 
 sample : blankLines* sentence (blankLines sentence)* blankLines* EOF ;
 
