@@ -1,0 +1,73 @@
+# Create native installers (jlink + jpackage) on push of semantic tags (e.g., v1.0.0).
+# Each OS builds in parallel and attaches its binaries to the GitHub release of the tag.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: ${{ matrix.runner }} (${{ matrix.javafx }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            javafx: linux
+          - runner: windows-latest
+            javafx: win
+          - runner: macos-latest
+            javafx: mac-aarch64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Install Maven 3.9.9
+        shell: bash
+        run: |
+          curl -fsSL "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz" | tar xz -C /tmp
+          echo "/tmp/apache-maven-3.9.9/bin" >> "$GITHUB_PATH"
+
+      - name: generate plugin notebook
+        shell: bash
+        run: mvn -pl grammars/matchbox-grammar-notebook package
+
+      - name: generate plugin conll
+        shell: bash
+        run: mvn -pl grammars/matchbox-grammar-conll package
+
+      - name: generate plugin lex
+        shell: bash
+        run: mvn -pl grammars/matchbox-grammar-lex package
+
+      - name: generate distribution
+        shell: bash
+        run: mvn -pl matchbox-distribution package
+
+      - name: Publish artifacts on the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: false
+          generate_release_notes: true
+          files: |
+            build/target/installer/*
