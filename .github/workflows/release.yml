@@ -48,13 +48,13 @@ jobs:
           curl -fsSL "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz" | tar xz -C /tmp
           echo "/tmp/apache-maven-3.9.9/bin" >> "$GITHUB_PATH"
 
-      - name: generate plugin corpus
+      - name: generate corpus
         shell: bash
         run: mvn -pl matchbox-corpus install
 
-      - name: generate plugin api
+      - name: generate api
         shell: bash
-        run: mvn -pl matchbox-api install
+        run: mvn -pl matchbox-grammar-api install
 
       - name: generate plugin notebook
         shell: bash
