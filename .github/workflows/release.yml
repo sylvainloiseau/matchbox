@@ -50,7 +50,7 @@ jobs:
 
       - name: generate plugin corpus
         shell: bash
-        run: mvn -pl grammars/matchbox-corpus install
+        run: mvn -pl matchbox-corpus install
 
       - name: generate plugin api
         shell: bash
@@ -58,7 +58,7 @@ jobs:
 
       - name: generate plugin notebook
         shell: bash
-        run: mvn -pl matchbox-grammar-notebook package
+        run: mvn -pl grammars/matchbox-grammar-notebook package
 
       - name: generate plugin conll
         shell: bash
