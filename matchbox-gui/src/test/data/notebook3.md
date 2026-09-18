@@ -1,11 +1,12 @@
 
+
+<mami> {pig}
+
+<jaflo> {canoe}
+
+
 :::
-transcription
-gloss
-'translation'
+a mio-jaflo-m-wi-j
+1SG down-canoe-TOP-M.SG-PRED
+'I went down in canoe'
 :::
-
-
-<foo> {def}
-
-<bar> {def « tr / trsl » }

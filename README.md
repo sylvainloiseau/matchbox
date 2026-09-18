@@ -1,22 +1,22 @@
-# matchbox -- an application for parsing fieldnote and building corpus as plain text
+# matchbox -- an application for parsing field notes and building a corpus from plain text
 
-Write field notes in plain text with small convention and parse the file for extracting IGT text and lexicon entries without copying them.
+Write field notes in plain text with lightweight conventions and parse the files for extracting IGT texts, lexicon entries or other linguistic data without copying them manually into dedicated apps.
 
 ## Installation
 
 ## Scenario
 
-This app experiment a alternative workflow for the annotation of linguistic data (text, lexicon) using plain text.
+This app experiments with an alternative way of working with linguistic notes (text, lexicon) using plain text.
 
-The typical workflow with linguistic fieldnote is to take note following purely idiosyncratic conventions, and the to copy lexical pieces of information and texts into a dedicated application, such as Flex or Elan. In doing so :
+The typical workflow with linguistic fieldnotes is to take notes -- following idiosyncratic conventions --, and later on to copy data (lexical description, texts) into dedicated applications, such as Flex or Elan. In doing so:
 
-- the other information written down in manuscript of digital notebook are not looked at again. Some data are lost, such as short sentences that are not full text;
-- it is not easy to keep the track from a pieces of information into a lexical database and the notebook page it comes from;
-- the copy process is tedious; lot of fielnote data stay unexploited due to the fact that the time is missing to copy everything.
+- the other pieces of information written down in (manuscript or digital) notebooks are not looked at again. Some data are lost because they do not fit well into the app, such as short sentences that are not full text;
+- it is not easy to keep track of the relation between a piece of information in a lexical database and the notebook page it comes from;
+- the copy process is tedious; a lot of fieldnote data stays unexploited because there is not enough time to copy everything.
 
-The matchbox application expriment another workflow, that may be usefull in some situations. The idea is to write down information, in notebook, in plain text, using small conventions for delimiting interlinear gloss or lexical information, that make it possible to parse the text files and to automatically extract pieces of information that could be gathered as corpus, or as lexicon. The matchbox application offer several parsers for matching information according to various conventions.
+The matchbox application experiments with another workflow, which may be useful in some situations. The idea is to write digital notebooks in plain text, using lightweight conventions for delimiting interlinear gloss or lexical information, that make it possible to parse the text files and to automatically extract pieces of information that could be gathered into a corpus and a lexicon. The matchbox application offers several small parsers for matching information according to various conventions.
 
-For instance, suppose you write down your fieldnote in the following manner :
+For instance, if you write down your field notes using the following format:
 
 ```
 <mami> 'pig'
@@ -29,11 +29,30 @@ a mio-jaflo-m-wi-j
 :::
 ```
 
-you can further use matchbox to extract the lexical information and add them to a lift dictionary ; to extract text in a text database or to convert it into flextext (for ingestion by Fex), or elan, etc.
+you can further use matchbox to extract the lexical information and add them to a LIFT dictionary; to extract text into a text database or to convert it into flextext (for ingestion by Flex), or Elan, etc. matchbox offers various ways to aggregate the information found into existing dictionaries or text databases.
 
-##
+## Existing parser
 
-A set of parsers, matching various conventions, can be associated with you fieldnote files. For instance, it is possible to add markdown-like headings for organizing texts.
+Parsers exist for the following conventions:
+
+### Simple lexical declaration:
+
+```
+```
+
+### Simple IGT
+
+### Text title and reference
+
+### Link to audio file
+
+### Conll
+
+## Create parser for new conventions
+
+## 
+
+A set of parsers, matching various conventions, can be associated with your fieldnote files. For instance, it is possible to add markdown-like headings for organizing texts.
 
 ```
 # data session : lexicon
@@ -53,7 +72,7 @@ a mio-jaflo-m-wi-j
 ```
 
 
-If your lexical information are more structured, you can use a more complete language for defining lexical information :
+If your lexical information is more structured, you can use a more complete language for defining lexical information:
 
 ```
 # Lexical data session : lexicon
