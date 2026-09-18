@@ -48,36 +48,36 @@ jobs:
           curl -fsSL "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz" | tar xz -C /tmp
           echo "/tmp/apache-maven-3.9.9/bin" >> "$GITHUB_PATH"
 
-      - name: generate matchbox parent
+      - name: install matchbox parent pom
         shell: bash
         run: mvn install -am
 
-      - name: generate corpus
+      - name: install matchbox-corpus
         shell: bash
         run: mvn -pl matchbox-corpus install
 
-      - name: generate api
+      - name: install matchbox-grammar-api
         shell: bash
         run: mvn -pl matchbox-grammar-api install
 
-      - name: generate plugin notebook
+      - name: install grammars plugin notebook
         shell: bash
         run: mvn -pl grammars/matchbox-grammar-notebook package
 
-      - name: generate plugin conll
+      - name: install grammars plugin conll
         shell: bash
         run: mvn -pl grammars/matchbox-grammar-conll package
 
-      - name: generate plugin lex
+      - name: install grammars plugin lex
         shell: bash
         run: mvn -pl grammars/matchbox-grammar-lex package
 
-      - name: generate distribution
+      - name: install distribution
         shell: bash
         run: mvn -pl matchbox-distribution package
 
       - name: Publish artifacts on the GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           fail_on_unmatched_files: false
           generate_release_notes: true
