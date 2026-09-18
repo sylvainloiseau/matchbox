@@ -54,11 +54,11 @@ jobs:
 
       - name: generate plugin api
         shell: bash
-        run: mvn -pl grammars/matchbox-api install
+        run: mvn -pl matchbox-api install
 
       - name: generate plugin notebook
         shell: bash
-        run: mvn -pl grammars/matchbox-grammar-notebook package
+        run: mvn -pl matchbox-grammar-notebook package
 
       - name: generate plugin conll
         shell: bash
