@@ -205,6 +205,17 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+              <artifactId>maven-clean-plugin</artifactId>
+              <version>3.5.0</version>
+              <configuration>
+                <filesets>
+                  <fileset>
+                    <directory>../build/target</directory>
+                  </fileset>
+                </filesets>
+              </configuration>
+            </plugin>
         <plugin>
             <groupId>org.panteleyev</groupId>
             <artifactId>jpackage-maven-plugin</artifactId>
