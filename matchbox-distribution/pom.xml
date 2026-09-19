@@ -82,7 +82,6 @@
                     <plugin>
                         <groupId>org.panteleyev</groupId>
                         <artifactId>jpackage-maven-plugin</artifactId>
-
                         <configuration>
                             <icon>${project.basedir}/src/main/resources/icon.ico</icon>
                             <winMenu>true</winMenu>
@@ -103,7 +102,6 @@
                     <plugin>
                         <groupId>org.panteleyev</groupId>
                         <artifactId>jpackage-maven-plugin</artifactId>
-
                         <configuration>
                             <icon>${project.basedir}/src/main/resources/icon.icns</icon>
                         </configuration>
@@ -124,7 +122,6 @@
                         <groupId>org.panteleyev</groupId>
                         <artifactId>jpackage-maven-plugin</artifactId>
                         <configuration>
-                            <type>APP_IMAGE</type>
                             <icon>${project.basedir}/src/main/resources/icon.png</icon>
                         </configuration>
                     </plugin>
