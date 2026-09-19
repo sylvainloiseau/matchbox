@@ -74,7 +74,7 @@ jobs:
 
       - name: install distribution
         shell: bash
-        run: mvn -pl matchbox-distribution package
+        run: mvn -pl matchbox-distribution clean package
 
       - name: Publish artifacts on the GitHub release
         uses: softprops/action-gh-release@v3
