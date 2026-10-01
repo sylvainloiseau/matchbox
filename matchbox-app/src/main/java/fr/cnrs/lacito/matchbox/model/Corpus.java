@@ -34,6 +34,8 @@ public class Corpus {
 
     /** file → (grammar id → validated result), grammars in the order they were applied. */
     private final Map<Path, Map<String, ParseResult>> results = new HashMap<>();
+    /** file → the text its results were computed from (null text is not stored). */
+    private final Map<Path, String> parsedTexts = new HashMap<>();
 
     private final ObservableList<CorpusObject> corpus = FXCollections.observableArrayList();
     private final ObservableList<ParseError> errors = FXCollections.observableArrayList();
@@ -75,6 +77,11 @@ public class Corpus {
             validated.put(grammarId, validate(file, grammarId, result, text))
         );
         Map<String, ParseResult> previous = results.put(file, validated);
+        if (text != null) {
+            parsedTexts.put(file, text);
+        } else {
+            parsedTexts.remove(file);
+        }
         if (previous != null) {
             removeDerived(previous);
         }
@@ -88,6 +95,7 @@ public class Corpus {
     /** Removes everything a file produced. */
     public void removeFile(Path file) {
         Map<String, ParseResult> previous = results.remove(file);
+        parsedTexts.remove(file);
         if (previous != null) {
             removeDerived(previous);
             fireFileChanged(file);
@@ -157,6 +165,16 @@ public class Corpus {
     // ------------------------------------------------------------------
     // Queries
     // ------------------------------------------------------------------
+
+    /** Files that have results, sorted by path. */
+    public List<Path> files() {
+        return results.keySet().stream().sorted().toList();
+    }
+
+    /** The text the results of a file were computed from (their spans refer to it). */
+    public Optional<String> parsedText(Path file) {
+        return Optional.ofNullable(parsedTexts.get(file));
+    }
 
     /** Top-level objects of a file, grammars in rank order. */
     public List<CorpusObject> objectsFor(Path file) {

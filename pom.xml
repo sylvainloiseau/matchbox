@@ -25,6 +25,7 @@
         <module>matchbox-grammar-api</module>
         <module>matchbox-grammar-fx</module>
         <module>matchbox-app</module>
+        <module>matchbox-assist</module>
         <module>matchbox-distribution</module>
     </modules>
 
@@ -66,6 +67,11 @@
             <dependency>
                 <groupId>fr.cnrs.lacito</groupId>
                 <artifactId>matchbox-grammar-fx</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>fr.cnrs.lacito</groupId>
+                <artifactId>matchbox-assist</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

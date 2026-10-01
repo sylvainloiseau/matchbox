@@ -312,7 +312,7 @@ Properties, debounced saving, `snapshot()` / `apply()`. Tests:
 - extension matching (case, leading dot, empty list).
 
 ### Phase 8: packaging and documentation
-- If the jlink runtime is used (see the `runTimeImage` → `runtimeImage` typo found earlier), check the modules required by Jackson with `jdeps`.
+- ~~If the jlink runtime is used (see the `runTimeImage` → `runtimeImage` typo found earlier), check the modules required by Jackson with `jdeps`.~~ Done (2026-10-01): the ignored `runTimeImage` parameter was replaced by an explicit `addModules` list in `matchbox-distribution/pom.xml` (jpackage runs jlink itself); Jackson needs `java.sql`, which is in the list.
 - Update `CLAUDE.md` §9: its "Configuration" section still names `~/.config/notebook/fieldnote.history`.
 - Update `README.md` with the location table and the `matchbox.settings.dir` override.
 

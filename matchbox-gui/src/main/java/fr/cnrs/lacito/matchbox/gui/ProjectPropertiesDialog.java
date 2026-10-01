@@ -49,6 +49,7 @@ public class ProjectPropertiesDialog {
     private ObservableList<GrammarItem> grammarItems;
 
     private FileType currentPattern;
+    private CheckBox allowCloudAssistCheckBox;
 
     public ProjectPropertiesDialog(
         Stage parentStage,
@@ -88,6 +89,9 @@ public class ProjectPropertiesDialog {
         VBox grammarsSection = createGrammarsSection();
         root.getChildren().add(grammarsSection);
         VBox.setVgrow(grammarsSection, Priority.ALWAYS);
+
+        // Section 5: AI assistant
+        root.getChildren().add(createAssistantSection());
 
         // Bottom buttons
         HBox buttonBox = createButtonBox();
@@ -343,6 +347,25 @@ public class ProjectPropertiesDialog {
         return box;
     }
 
+    private VBox createAssistantSection() {
+        VBox section = new VBox(5);
+        section.setStyle(
+            "-fx-border-color: #cccccc; -fx-border-width: 1; -fx-padding: 10;"
+        );
+        Label label = new Label("AI assistant");
+        label.setStyle("-fx-font-weight: bold;");
+        allowCloudAssistCheckBox = new CheckBox("Allow cloud AI providers for this project");
+        allowCloudAssistCheckBox.setSelected(project.isCloudAssistAllowed());
+        Label help = new Label(
+            "Uncheck if the notes must not leave this computer (e.g. personal data of consultants): " +
+            "only a local model (Ollama) can then be used for this project."
+        );
+        help.setWrapText(true);
+        help.setStyle("-fx-text-fill: #666666;");
+        section.getChildren().addAll(label, allowCloudAssistCheckBox, help);
+        return section;
+    }
+
     private HBox createButtonBox() {
         HBox box = new HBox(10);
         box.setAlignment(Pos.CENTER_RIGHT);
@@ -443,6 +466,7 @@ public class ProjectPropertiesDialog {
     private void handleSave() {
         project.setName(projectNameField.getText());
         project.setDescription(projectDescriptionArea.getText());
+        project.setCloudAssistAllowed(allowCloudAssistCheckBox.isSelected());
 
         // Update fileset
         project.getFiles().clear();

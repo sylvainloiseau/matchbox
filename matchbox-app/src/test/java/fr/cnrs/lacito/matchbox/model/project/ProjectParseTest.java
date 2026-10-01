@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import java.nio.file.Files;
@@ -25,6 +26,9 @@ class ProjectParseTest {
         public String getId() { return Project.DEFAULT_PLUGIN_ID; }
         public String getDisplayName() { return "test"; }
         public String getDisplayDescription() { return "test"; }
+        public String getFormatDocumentation() { return ""; }
+        public List<GrammarExample> getExamples() { return List.of(); }
+        public String getGrammarSource() { return ""; }
         public int getApiVersion() { return API_VERSION; }
 
         public ParseResult getResult(Path file, String content) {

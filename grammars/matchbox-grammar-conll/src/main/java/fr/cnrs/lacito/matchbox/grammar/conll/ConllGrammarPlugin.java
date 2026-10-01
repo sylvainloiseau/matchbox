@@ -3,6 +3,7 @@ package fr.cnrs.lacito.matchbox.grammar.conll;
 import fr.cnrs.lacito.matchbox.grammar.conll.ConllLexer;
 import fr.cnrs.lacito.matchbox.grammarapi.AbstractGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.CollectingErrorListener;
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
@@ -109,6 +110,24 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
     @Override
     public String getDisplayDescription() {
         return "Grammar for parsing Conll files";
+    }
+
+    // TODO: describe the notation for users and AI prompts
+    @Override
+    public String getFormatDocumentation() {
+        return "";
+    }
+
+    // TODO: add canonical snippets, each parsing without errors
+    @Override
+    public List<GrammarExample> getExamples() {
+        return List.of();
+    }
+
+    // TODO: return the .g4 sources
+    @Override
+    public String getGrammarSource() {
+        return "";
     }
 
     @Override

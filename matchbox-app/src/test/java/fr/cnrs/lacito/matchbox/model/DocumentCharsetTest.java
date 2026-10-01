@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import fr.cnrs.lacito.matchbox.model.project.Project;
@@ -29,6 +30,9 @@ class DocumentCharsetTest {
         public String getId() { return Project.DEFAULT_PLUGIN_ID; }
         public String getDisplayName() { return "noop"; }
         public String getDisplayDescription() { return ""; }
+        public String getFormatDocumentation() { return ""; }
+        public List<GrammarExample> getExamples() { return List.of(); }
+        public String getGrammarSource() { return ""; }
         public ParseResult getResult(Path file, String content) { return ParseResult.empty(); }
         public int getApiVersion() { return API_VERSION; }
     }

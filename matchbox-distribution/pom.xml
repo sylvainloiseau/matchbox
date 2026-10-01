@@ -45,6 +45,10 @@
             <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-app</artifactId>
         </dependency>
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-assist</artifactId>
+        </dependency>
 
         <!-- ANTLR Runtime -->
         <dependency>
@@ -270,7 +274,25 @@
                         <!-- Output installer -->
                         <destination>${build.root}/target/installer</destination>
 
-                        <runTimeImage>${build.root}/runtime/jlink-image</runTimeImage>
+                        <!-- Java runtime of the installer: jpackage runs jlink with these JDK
+                             modules only (JavaFX and the other libraries stay as jars in the
+                             application). The list comes from jdeps on the assembled jars:
+                               jdeps -q -ignore-missing-deps -print-module-deps -class-path ...
+                             Add a module here when a new dependency needs one, otherwise the
+                             installed application fails with NoClassDefFoundError. -->
+                        <addModules>
+                            <addModule>java.base</addModule>
+                            <addModule>java.desktop</addModule>      <!-- JavaFX -->
+                            <addModule>java.logging</addModule>      <!-- log files -->
+                            <addModule>java.xml</addModule>          <!-- .mbx project files, FXML -->
+                            <addModule>java.scripting</addModule>    <!-- JavaFX (FXML) -->
+                            <addModule>java.sql</addModule>          <!-- Jackson -->
+                            <addModule>java.net.http</addModule>     <!-- AI assistant: HTTP clients of the providers -->
+                            <addModule>jdk.unsupported</addModule>   <!-- JavaFX, RichTextFX -->
+                            <addModule>jdk.jfr</addModule>           <!-- required by a library (jdeps) -->
+                            <addModule>jdk.charsets</addModule>      <!-- all charsets offered in the settings -->
+                            <addModule>jdk.localedata</addModule>    <!-- locales other than English -->
+                        </addModules>
                         <!-- Type will depend on OS -->
                         <!-- Will be decided automatically according to the OS-->
                         <!--<type>ALL</type>-->

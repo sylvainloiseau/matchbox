@@ -4,6 +4,9 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
+import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
+import fr.cnrs.lacito.matchbox.gui.assist.GhostTextController;
+import fr.cnrs.lacito.matchbox.gui.assist.SuggestionPanelController;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
 import fr.cnrs.lacito.matchbox.gui.view.Kinds;
 import fr.cnrs.lacito.matchbox.gui.view.ObjectViewRegistry;
@@ -27,6 +30,16 @@ import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TabPane;
@@ -71,6 +84,18 @@ public class FileModeController {
     private Tab parsingErrorPane;
 
     @FXML
+    private SplitPane editorSplitPane;
+
+    @FXML
+    private ToggleButton suggestionsToggle;
+
+    @FXML
+    private Hyperlink assistStatusLink;
+
+    @FXML
+    private Label assistMessageLabel;
+
+    @FXML
     private TableView<ParseError> errorTableView;
 
     @FXML
@@ -93,6 +118,13 @@ public class FileModeController {
     private UserSettings settings;
     private EditorController editorController;
     private ObjectViewRegistry viewRegistry;
+    private final AssistController assist;
+    private GhostTextController ghostText;
+    private SuggestionPanelController suggestionPanel;
+
+    private static final KeyCombination NEXT_SUGGESTION = new KeyCodeCombination(KeyCode.F8);
+    private static final KeyCombination PREVIOUS_SUGGESTION = new KeyCodeCombination(KeyCode.F8, KeyCombination.SHIFT_DOWN);
+    private static final KeyCombination APPLY_SUGGESTION = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.ALT_DOWN);
 
     /** One tab per kind of top-level object of the current file, in order of appearance. */
     private final Map<String, Tab> tabsByKind = new LinkedHashMap<>();
@@ -101,8 +133,9 @@ public class FileModeController {
     /** True while the selection is propagated, to avoid feedback between table and editor. */
     private boolean propagatingSelection;
 
-    public FileModeController(UserSettings settings) {
+    public FileModeController(UserSettings settings, AssistController assist) {
         this.settings = settings;
+        this.assist = assist;
     }
 
     /** This method should be called after initialization 
@@ -138,6 +171,7 @@ public class FileModeController {
             );
 
         this.editorController.setProject(project);
+        assist.setProject(project);
     }
 
     @FXML
@@ -149,6 +183,94 @@ public class FileModeController {
         this.viewRegistry = ObjectViewRegistry.load();
         setupObjectsTab();
         setupErrorTab();
+        setupAssistant();
+    }
+
+    // ------------------------------------------------------------------
+    // Assistant
+    // ------------------------------------------------------------------
+
+    private void setupAssistant() {
+        ghostText = new GhostTextController(editorController, assist, assistMessageLabel::setText);
+        suggestionPanel = new SuggestionPanelController(editorController, assist);
+
+        assistStatusLink.textProperty().bind(assist.statusProperty());
+        assistStatusLink.setOnAction(e -> {
+            assistStatusLink.setVisited(false);
+            assist.openSettings();
+        });
+
+        // the panel's visibility is a setting
+        suggestionsToggle.setSelected(assist.data().suggestionPanelVisible());
+        showSuggestionPanel(suggestionsToggle.isSelected());
+        suggestionsToggle.selectedProperty().addListener((obs, o, visible) -> {
+            showSuggestionPanel(visible);
+            if (visible != assist.data().suggestionPanelVisible()) {
+                settings.assistProperty().set(assist.data().withSuggestionPanelVisible(visible));
+            }
+        });
+        settings.assistProperty().addListener((obs, o, n) -> suggestionsToggle.setSelected(n.suggestionPanelVisible()));
+
+        fileContentCodeArea.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            if (NEXT_SUGGESTION.match(e) || PREVIOUS_SUGGESTION.match(e)) {
+                e.consume();
+                setSuggestionPanelVisible(true);
+                suggestionPanel.next(!e.isShiftDown());
+            } else if (APPLY_SUGGESTION.match(e)) {
+                e.consume();
+                suggestionPanel.applySelected();
+            }
+        });
+
+        MenuItem suggest = new MenuItem("Suggest completion (Ctrl+Space)");
+        suggest.setOnAction(e -> requestCompletion());
+        MenuItem explain = new MenuItem("Explain error here");
+        explain.setOnAction(e -> explainErrorAtCaret());
+        MenuItem reviewSelection = new MenuItem("Review selection with AI");
+        reviewSelection.setOnAction(e -> review("Selection"));
+        MenuItem reviewBlock = new MenuItem("Review current block with AI");
+        reviewBlock.setOnAction(e -> review("Current block"));
+        ContextMenu menu = new ContextMenu(suggest, explain, new SeparatorMenuItem(), reviewBlock, reviewSelection);
+        menu.setOnShowing(e -> {
+            explain.setDisable(editorController.errorAt(fileContentCodeArea.getCaretPosition()).isEmpty());
+            reviewSelection.setDisable(fileContentCodeArea.getSelection().getLength() == 0);
+        });
+        fileContentCodeArea.setContextMenu(menu);
+    }
+
+    private void showSuggestionPanel(boolean visible) {
+        var items = editorSplitPane.getItems();
+        if (visible && !items.contains(suggestionPanel.getRoot())) {
+            items.add(suggestionPanel.getRoot());
+            editorSplitPane.setDividerPositions(0.72);
+        } else if (!visible) {
+            items.remove(suggestionPanel.getRoot());
+        }
+    }
+
+    public void setSuggestionPanelVisible(boolean visible) {
+        suggestionsToggle.setSelected(visible);
+    }
+
+    /** Asks for an inline suggestion at the cursor. */
+    public void requestCompletion() {
+        fileContentCodeArea.requestFocus();
+        ghostText.request(true);
+    }
+
+    public void explainErrorAtCaret() {
+        setSuggestionPanelVisible(true);
+        suggestionPanel.explainErrorAtCaret();
+    }
+
+    /** Reviews "Current block", "Selection" or "Whole file". */
+    public void review(String what) {
+        setSuggestionPanelVisible(true);
+        suggestionPanel.review(what);
+    }
+
+    public AssistController getAssist() {
+        return assist;
     }
 
     private void setupFileListView() throws Exception {
@@ -246,6 +368,30 @@ public class FileModeController {
                 }
             });
         errorTableView.setItems(editorController.getCurrentFileErrors());
+
+        MenuItem explain = new MenuItem("Explain");
+        explain.setOnAction(e -> {
+            ParseError error = errorTableView.getSelectionModel().getSelectedItem();
+            if (error != null) {
+                setSuggestionPanelVisible(true);
+                suggestionPanel.showError(error, true);
+            }
+        });
+        MenuItem show = new MenuItem("Show in suggestions panel");
+        show.setOnAction(e -> {
+            ParseError error = errorTableView.getSelectionModel().getSelectedItem();
+            if (error != null) {
+                setSuggestionPanelVisible(true);
+                suggestionPanel.showError(error, false);
+            }
+        });
+        ContextMenu menu = new ContextMenu(explain, show);
+        menu.setOnShowing(e -> {
+            boolean none = errorTableView.getSelectionModel().getSelectedItem() == null;
+            explain.setDisable(none);
+            show.setDisable(none);
+        });
+        errorTableView.setContextMenu(menu);
     }
 
     // ------------------------------------------------------------------

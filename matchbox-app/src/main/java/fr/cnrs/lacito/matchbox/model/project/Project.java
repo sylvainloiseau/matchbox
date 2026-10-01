@@ -52,6 +52,9 @@ public class Project {
     private SimpleBooleanProperty isProjectDefinitionOutdated =
         new SimpleBooleanProperty(false);
 
+    /** Whether the AI assistant may send text of this project to providers outside this computer. */
+    private boolean cloudAssistAllowed = true;
+
     /**
      * The list of files and directories in the project
      * as edited by the user.
@@ -274,6 +277,18 @@ public class Project {
     public void setName(String name) {
         this.name = name;
         this.isProjectDefinitionOutdatedProperty().set(true);
+    }
+
+    /** False if the AI assistant may only use providers on this computer for this project. */
+    public boolean isCloudAssistAllowed() {
+        return cloudAssistAllowed;
+    }
+
+    public void setCloudAssistAllowed(boolean allowed) {
+        if (allowed != cloudAssistAllowed) {
+            this.cloudAssistAllowed = allowed;
+            this.isProjectDefinitionOutdatedProperty().set(true);
+        }
     }
 
     public String getDescription() {

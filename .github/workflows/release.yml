@@ -1,4 +1,4 @@
-# Create native installers (jlink + jpackage) on push of semantic tags (e.g., v1.0.0).
+# Create native installers (jpackage runs jlink) on push of semantic tags (e.g., v1.0.0).
 # Each OS builds in parallel and attaches its binaries to the GitHub release of the tag.
 
 name: Release

@@ -1,7 +1,9 @@
 package fr.cnrs.lacito.matchbox.gui;
 
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
+import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
 import fr.cnrs.lacito.matchbox.gui.mode.FileModeController;
+import fr.cnrs.lacito.matchbox.settings.AssistSettingsData;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
 import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import fr.cnrs.lacito.matchbox.model.project.Project;
@@ -85,6 +87,12 @@ public class MainController {
     private Label statusBarRightLabel;
 
     @FXML
+    private CheckMenuItem inlineSuggestionsMenuItem;
+
+    @FXML
+    private CheckMenuItem suggestionPanelMenuItem;
+
+    @FXML
     private Pane viewPane;
 
     @FXML
@@ -116,12 +124,15 @@ public class MainController {
 
     private Project project;
 
+    private final AssistController assist;
+
     public MainController(
         UserSettings settings,
         List<GrammarPlugin> plugins
     ) {
         this.settings = settings;
         this.plugins = plugins;
+        this.assist = new AssistController(settings, () -> primaryStage);
         List<Path> recentProjects = settings.recentProjects().existing();
         if (settings.openLastProjectProperty().get() && !recentProjects.isEmpty()) {
             File lastProjectFile = recentProjects.get(0).toFile();
@@ -168,7 +179,8 @@ public class MainController {
 
     private FileModeController loadFileMode() {
         FileModeController fileModeController = new FileModeController(
-            settings
+            settings,
+            assist
         );
         FXMLLoader loader = new FXMLLoader();
         loader.setLocation(
@@ -197,7 +209,59 @@ public class MainController {
         settings.recentProjects().items().addListener((Observable o) -> loadRecentProjectsMenu());
         // loadRecentFileSetsMenu();
         wireMenuItem();
+        wireAssistantMenu();
         switchToFileMode();
+    }
+
+    private void wireAssistantMenu() {
+        AssistSettingsData d = settings.assistProperty().get();
+        inlineSuggestionsMenuItem.setSelected(d.inlineEnabled());
+        suggestionPanelMenuItem.setSelected(d.suggestionPanelVisible());
+        settings.assistProperty().addListener((obs, o, n) -> {
+            inlineSuggestionsMenuItem.setSelected(n.inlineEnabled());
+            suggestionPanelMenuItem.setSelected(n.suggestionPanelVisible());
+        });
+        inlineSuggestionsMenuItem.setOnAction(e -> settings.assistProperty().set(
+            settings.assistProperty().get().withInlineEnabled(inlineSuggestionsMenuItem.isSelected())));
+        suggestionPanelMenuItem.setOnAction(e ->
+            fileModeController.setSuggestionPanelVisible(suggestionPanelMenuItem.isSelected()));
+    }
+
+    // ---------------------------------------------
+    // Assistant
+    // ---------------------------------------------
+
+    public void handleAiAssistant() {
+        assist.openSettings();
+    }
+
+    public void handleSuggestCompletion() {
+        fileModeController.requestCompletion();
+    }
+
+    public void handleExplainError() {
+        fileModeController.explainErrorAtCaret();
+    }
+
+    public void handleReviewBlock() {
+        fileModeController.review("Current block");
+    }
+
+    public void handleReviewSelection() {
+        fileModeController.review("Selection");
+    }
+
+    public void handleReviewFile() {
+        fileModeController.review("Whole file");
+    }
+
+    public void handleRefreshExamples() {
+        assist.refreshExamples();
+    }
+
+    /** Stops the assistant's background threads. */
+    public void shutdown() {
+        assist.close();
     }
 
     private void switchToFileMode() {
@@ -238,6 +302,7 @@ public class MainController {
     }
 
     public void handleUndoMenuItem() {
+        editorController.dismissGhost();
         if (
             fileContentCodeArea != null && fileContentCodeArea.isUndoAvailable()
         ) {
@@ -246,6 +311,7 @@ public class MainController {
     }
 
     public void handleRedoMenuItem() {
+        editorController.dismissGhost();
         if (
             fileContentCodeArea != null && fileContentCodeArea.isRedoAvailable()
         ) {
@@ -410,6 +476,8 @@ public class MainController {
         dialog.showAndWait();
         if (dialog.isSaved()) {
             onProjectChangeHook();
+            // the project may now allow local models only
+            assist.updateStatus();
         }
     }
 

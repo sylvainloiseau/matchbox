@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
  * @param maxRecentProjects  size of the recent projects list
  * @param openLastProject    reopen the last project at startup
  * @param logFile            log file chosen by the user, {@code null} for the default location
+ * @param assist             settings of the AI assistant
  */
 public record SettingsData(
     Integer version,
@@ -41,10 +42,11 @@ public record SettingsData(
     Integer maxRecentFiles,
     Integer maxRecentProjects,
     Boolean openLastProject,
-    String logFile
+    String logFile,
+    AssistSettingsData assist
 ) {
 
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
     private static final Pattern COLOR = Pattern.compile(
         "#(\\p{XDigit}{3}|\\p{XDigit}{4}|\\p{XDigit}{6}|\\p{XDigit}{8})|[a-zA-Z]+"
@@ -62,7 +64,8 @@ public record SettingsData(
             10,
             10,
             false,
-            null
+            null,
+            AssistSettingsData.defaults()
         );
     }
 
@@ -91,8 +94,15 @@ public record SettingsData(
             positive(maxRecentFiles, d.maxRecentFiles, "maxRecentFiles", problems),
             positive(maxRecentProjects, d.maxRecentProjects, "maxRecentProjects", problems),
             openLastProject == null ? d.openLastProject : openLastProject,
-            logFile == null || logFile.isBlank() ? null : logFile.strip()
+            logFile == null || logFile.isBlank() ? null : logFile.strip(),
+            assist == null ? d.assist : assist.validated(problems)
         );
+    }
+
+    /** Copy with other assistant settings. */
+    public SettingsData withAssist(AssistSettingsData newAssist) {
+        return new SettingsData(version, charset, igtColor, lexicalColor, morphemeSeparators, fileExtensions,
+            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist);
     }
 
     /** Validated copy, problems ignored. */

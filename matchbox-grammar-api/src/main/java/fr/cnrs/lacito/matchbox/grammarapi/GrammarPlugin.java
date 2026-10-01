@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox.grammarapi;
 
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Contract of a grammar plugin, discovered with {@link java.util.ServiceLoader} in the jars of the
@@ -23,6 +24,25 @@ public interface GrammarPlugin {
     String getDisplayName();
 
     String getDisplayDescription();
+
+    /**
+     * Description of the notation recognised by the grammar (Markdown allowed), detailed enough
+     * to be given to an AI assistant: what each construct means linguistically, not only its
+     * syntax. Empty string if not documented yet; never {@code null}.
+     */
+    String getFormatDocumentation();
+
+    /**
+     * Canonical snippets of the notation, each parsing without errors with this grammar alone.
+     * Empty list if none; never {@code null}.
+     */
+    List<GrammarExample> getExamples();
+
+    /**
+     * Source of the grammar (e.g. the ANTLR lexer and parser {@code .g4} files, concatenated).
+     * Empty string if not provided; never {@code null}.
+     */
+    String getGrammarSource();
 
     /**
      * Parses one file.

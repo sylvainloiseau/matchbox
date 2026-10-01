@@ -27,6 +27,7 @@ public class MatchboxApplication extends Application {
     private static final Logger logger = Logger.getLogger(MatchboxApplication.class.getName());
 
     private UserSettings settings;
+    private MainController mainController;
 
     @Override
     public void start(Stage primaryStage) throws IOException {
@@ -46,7 +47,7 @@ public class MatchboxApplication extends Application {
         );
 
         // set the controller and set up dependencies
-        MainController mainController = new MainController(settings, plugins);
+        mainController = new MainController(settings, plugins);
         loader.setController(mainController);
         var root = loader.load();
 
@@ -88,6 +89,9 @@ public class MatchboxApplication extends Application {
 
     @Override
     public void stop() {
+        if (mainController != null) {
+            mainController.shutdown();
+        }
         if (settings != null) {
             settings.close();
         }

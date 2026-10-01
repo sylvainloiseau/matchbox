@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.CheckMenuItem?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
@@ -131,6 +132,12 @@
                     text="Settings"
                 />
                <MenuItem
+                    fx:id="aiAssistantItem"
+                    mnemonicParsing="false"
+                    onAction="#handleAiAssistant"
+                    text="AI assistant…"
+                />
+               <MenuItem
                     fx:id="quitItem"
                     mnemonicParsing="false"
                     onAction="#handleQuit"
@@ -182,6 +189,58 @@
                 />
         </items>
       </Menu>
+            <Menu fx:id="assistantMenu" text="Assistant">
+              <items>
+                <MenuItem
+                    mnemonicParsing="false"
+                    onAction="#handleSuggestCompletion"
+                    text="Suggest completion (Ctrl+Space)"
+                />
+                <CheckMenuItem
+                    fx:id="inlineSuggestionsMenuItem"
+                    mnemonicParsing="false"
+                    text="Inline suggestions"
+                />
+                <SeparatorMenuItem mnemonicParsing="false" />
+                <MenuItem
+                    mnemonicParsing="false"
+                    onAction="#handleExplainError"
+                    text="Explain error at cursor"
+                />
+                <MenuItem
+                    mnemonicParsing="false"
+                    onAction="#handleReviewBlock"
+                    text="Review current block"
+                />
+                <MenuItem
+                    mnemonicParsing="false"
+                    onAction="#handleReviewSelection"
+                    text="Review selection"
+                />
+                <MenuItem
+                    mnemonicParsing="false"
+                    onAction="#handleReviewFile"
+                    text="Review whole file"
+                />
+                <SeparatorMenuItem mnemonicParsing="false" />
+                <CheckMenuItem
+                    fx:id="suggestionPanelMenuItem"
+                    mnemonicParsing="false"
+                    text="Suggestions panel"
+                />
+                <MenuItem
+                    mnemonicParsing="false"
+                    onAction="#handleRefreshExamples"
+                    text="Refresh project examples"
+                />
+                <SeparatorMenuItem mnemonicParsing="false" />
+                <MenuItem
+                    mnemonicParsing="false"
+                    onAction="#handleAiAssistant"
+                    text="AI assistant settings…"
+                />
+              </items>
+            </Menu>
             <Menu fx:id="exportMenu" text="Export">
               <items>
                 <MenuItem

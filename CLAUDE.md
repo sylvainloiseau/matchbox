@@ -34,6 +34,7 @@ The project is a **Maven multi-module** repository with the following structure:
 | `matchbox-distribution`        | Packaging and distribution logic (e.g., assembly scripts).                                  |
 | `matchbox-corpus`              | Corpus objects produced by grammars: `CorpusObject` interface, capability interfaces, `Simple*` implementations (no JavaFX). |
 | `matchbox-grammar-api`         | Defines the contract for grammars (`GrammarPlugin`, `ParseResult`, `ParseError`, `Spans`), no JavaFX. |
+| `matchbox-assist`              | AI assistant without JavaFX: providers (Anthropic, OpenAI-compatible/Ollama), prompts, grammar validation of suggested edits, suggestion model (see `AI_SUGGESTIONS_PLAN.md`). |
 | `matchbox-grammar-fx`          | Optional JavaFX contract for plugins that provide views of their objects (`ObjectViewFactory`, `ObjectColumn`, `ViewContext`). |
 | `matchbox-gui`                 | JavaFX GUI code (MVC pattern).                                                              |
 | `.github/`                     | GitHub workflows and templates.                                                             |

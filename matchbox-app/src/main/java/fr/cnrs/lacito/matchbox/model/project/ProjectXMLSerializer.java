@@ -81,6 +81,13 @@ public class ProjectXMLSerializer {
             }
         }
 
+        // Restrictions of the AI assistant (absent: no restriction)
+        if (!project.isCloudAssistAllowed()) {
+            Element assistantElement = doc.createElement("assistant");
+            assistantElement.setAttribute("allowCloud", "false");
+            rootElement.appendChild(assistantElement);
+        }
+
         // Write to file
         TransformerFactory transformerFactory =
             TransformerFactory.newInstance();
@@ -178,6 +185,12 @@ public class ProjectXMLSerializer {
             }
 
             project.addFileType(pattern);
+        }
+
+        NodeList assistantList = rootElement.getElementsByTagName("assistant");
+        if (assistantList.getLength() > 0) {
+            Element assistantElement = (Element) assistantList.item(0);
+            project.setCloudAssistAllowed(!"false".equals(assistantElement.getAttribute("allowCloud")));
         }
 
         return project;

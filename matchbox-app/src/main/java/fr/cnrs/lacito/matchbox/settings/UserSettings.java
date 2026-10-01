@@ -56,6 +56,7 @@ public final class UserSettings implements AutoCloseable {
     private final IntegerProperty maxRecentProjects = new SimpleIntegerProperty();
     private final BooleanProperty openLastProject = new SimpleBooleanProperty();
     private String logFile;
+    private final ObjectProperty<AssistSettingsData> assist = new SimpleObjectProperty<>();
     private final RecentItems recentFiles = new RecentItems(maxRecentFiles);
     private final RecentItems recentProjects = new RecentItems(maxRecentProjects);
 
@@ -85,7 +86,7 @@ public final class UserSettings implements AutoCloseable {
         updating = false;
 
         for (Observable o : List.<Observable>of(charset, igtColor, lexicalColor, morphemeSeparators,
-                fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects, openLastProject)) {
+                fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, assist)) {
             o.addListener(obs -> settingsChanged());
         }
         recentFiles.items().addListener((Observable obs) -> recentChanged());
@@ -170,6 +171,8 @@ public final class UserSettings implements AutoCloseable {
     public IntegerProperty maxRecentFilesProperty() { return maxRecentFiles; }
     public IntegerProperty maxRecentProjectsProperty() { return maxRecentProjects; }
     public BooleanProperty openLastProjectProperty() { return openLastProject; }
+    /** Settings of the AI assistant (an immutable value: set a modified copy to change them). */
+    public ObjectProperty<AssistSettingsData> assistProperty() { return assist; }
     public RecentItems recentFiles() { return recentFiles; }
     public RecentItems recentProjects() { return recentProjects; }
 
@@ -209,7 +212,8 @@ public final class UserSettings implements AutoCloseable {
             maxRecentFiles.get(),
             maxRecentProjects.get(),
             openLastProject.get(),
-            logFile
+            logFile,
+            assist.get()
         );
     }
 
@@ -235,6 +239,7 @@ public final class UserSettings implements AutoCloseable {
         maxRecentProjects.set(d.maxRecentProjects());
         openLastProject.set(d.openLastProject());
         logFile = d.logFile();
+        assist.set(d.assist());
     }
 
     // ------------------------------------------------------------------

@@ -147,7 +147,8 @@ public class SettingsDialog {
             positiveInt(recentFilesLimitField.getText(), "Maximum number of recent files"),
             positiveInt(recentProjectsLimitField.getText(), "Maximum number of recent projects"),
             openLastProjectCheckBox.isSelected(),
-            current.logFile()
+            current.logFile(),
+            current.assist()
         );
     }
 

@@ -35,8 +35,10 @@ class SettingsStoreTest {
 
     @Test
     void roundTrip() throws IOException {
-        SettingsData data = new SettingsData(1, "ISO-8859-1", "#123456", "red", "-",
-            List.of("txt"), List.of("notes-*"), 5, 7, true, "/tmp/m.log");
+        AssistSettingsData assist = new AssistSettingsData("ollama", "http://localhost:11434", "llama3.2",
+            "qwen3:8b", false, AssistSettingsData.AUTO, 600, 3000, 500, true, false, "French", List.of("anthropic"));
+        SettingsData data = new SettingsData(SettingsData.CURRENT_VERSION, "ISO-8859-1", "#123456", "red", "-",
+            List.of("txt"), List.of("notes-*"), 5, 7, true, "/tmp/m.log", assist);
         store.saveSettings(data);
         store.saveRecent(new RecentData(1, List.of("/a.txt", "/b"), List.of("/p.mbx")));
 
@@ -102,8 +104,32 @@ class SettingsStoreTest {
 
     @Test
     void blankLogFileBecomesNull() {
-        SettingsData d = new SettingsData(null, null, null, null, null, null, null, null, null, null, "  ").validated();
+        SettingsData d = new SettingsData(null, null, null, null, null, null, null, null, null, null, "  ", null).validated();
         assertNull(d.logFile());
         assertEquals(SettingsData.defaults(), d);
+    }
+
+    @Test
+    void version1FilesGetDefaultAssistantSettings() throws Exception {
+        java.nio.file.Files.createDirectories(store.settingsFile().getParent());
+        java.nio.file.Files.writeString(store.settingsFile(),
+            "{\"version\":1,\"charset\":\"UTF-8\",\"maxRecentFiles\":4}");
+        SettingsData d = store.loadSettings().value();
+        assertEquals(SettingsData.CURRENT_VERSION, d.version());
+        assertEquals(4, d.maxRecentFiles());
+        assertEquals(AssistSettingsData.defaults(), d.assist());
+    }
+
+    @Test
+    void invalidAssistantValuesAreReplaced() {
+        List<String> problems = new java.util.ArrayList<>();
+        AssistSettingsData a = new AssistSettingsData("gemini", null, null, null, null, "sometimes", 5, null, null,
+            null, null, " ", java.util.Arrays.asList("openai", "openai", "x", null)).validated(problems::add);
+        assertEquals("none", a.provider());
+        assertEquals(AssistSettingsData.MANUAL, a.trigger());
+        assertEquals(AssistSettingsData.defaults().debounceMs(), a.debounceMs());
+        assertEquals("English", a.language());
+        assertEquals(List.of("openai"), a.cloudConsentGiven());
+        assertEquals(3, problems.size());
     }
 }

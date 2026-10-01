@@ -2,6 +2,7 @@ package fr.cnrs.lacito.matchbox;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import java.nio.file.Path;
@@ -15,6 +16,9 @@ class PluginManagerTest {
         public String getId() { return "classpath-grammar"; }
         public String getDisplayName() { return "Class path grammar"; }
         public String getDisplayDescription() { return ""; }
+        public String getFormatDocumentation() { return ""; }
+        public List<GrammarExample> getExamples() { return List.of(); }
+        public String getGrammarSource() { return ""; }
         public ParseResult getResult(Path file, String content) { return ParseResult.empty(); }
         public int getApiVersion() { return API_VERSION; }
     }
