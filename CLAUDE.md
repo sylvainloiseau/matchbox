@@ -8,7 +8,7 @@ This document provides contextual information about the `matchbox` project to he
 
 **Purpose**:
 
-Matchbox is a **JavaFX application** for parsing linguistic field notes files, extracting lexical information and texts from these notes, and showing the resulting corpora. It allows users to:
+Matchbox is an **application** for parsing linguistic field notes files, extracting lexical information and texts from these notes according to various grammars, and showing the resulting corpora. It allows users to:
 
 - Write field notes in plain text using lightweight conventions.
 - Parse and extract structured data (e.g., lexical entries, interlinear glossed text) using ANTLR grammars.

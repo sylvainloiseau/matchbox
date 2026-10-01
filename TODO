@@ -1,3 +1,37 @@
+# Add IA agent support
+
+General idea: You will create a plan for adding IA-agent-based suggestions into the main editor of
+the matchbox application. This includes:
+- in order to select the IA agent, I would like you to create a modal window, that can be
+called from the file menu, for selecting a model. This will be in the
+matchbox-gui submodule. The window will offer to select Claude or ChatGPT and to
+add their API keys. It will also offer to use Ollama for free weight model.
+- You will add the dependencies to the corresponding maven artifact in the pom.xml
+file of matchbox-gui submodule.
+- In the main text editor of the application, you
+will add suggestion returned by the selected agent. suggestions will appears as grey text
+in the editor.
+
+- What I would like to achieve is that the AI agent could take into account
+which grammars have been selected for the file currently edited in order to
+include suggestions that format the text according to this grammar. Indeed, in
+each project, files are associated with one or several grammars (the submodule
+in the grammars/ directory) that will match portions of the text. If you need
+the grammar contract (as defined in the matchbox-grammar-api module) to be
+changed in order to have more information that could be given to the prompt, for
+instance the antlr grammar or a description of the rule, please suggest such
+modifications.
+
+If you have suggestions about what could be added to the plan, how to improve
+it, or architectural change that would importe it, please suggest such
+modifications.
+
+
+could you please make a plan to improve the settings mechanism that is in the
+ApplicationSettings class in the matchbox-app module. I would like the ApplicationSettings
+class to be refactored to use a more modern settings mechanism and to write settings
+in the standard location of each OS.
+
 matchbox-language -> matchbox-corpus
 
 - Search replace
