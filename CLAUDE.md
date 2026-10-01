@@ -151,7 +151,7 @@ The project is a **Maven multi-module** repository with the following structure:
 - **Corpus objects** are immutable, keep no reference to ANTLR objects, and a child's span lies inside its parent's span.
 - **Threading**: parsing runs on a background thread (`Project.parseInBackground`); results are applied to `Corpus` on the JavaFX thread (`Project.setApplyExecutor(Platform::runLater)`).
 - **Plugin dependencies** on matchbox modules and JavaFX use the `provided` scope.
-- **Configuration files**: Stored in `~/.config/notebook/` (e.g., `fieldnote.history`, `configuration.txt`).
+- **User settings**: `fr.cnrs.lacito.matchbox.settings.UserSettings` (observable properties, saved automatically); never read or write settings files directly (see §9).
 
 ---
 
@@ -179,8 +179,26 @@ The project is a **Maven multi-module** repository with the following structure:
 
 ### User Configuration
 
-- **History**: `~/.config/notebook/fieldnote.history` (tracks recently opened files).
-- **Settings**: `~/.config/notebook/configuration.txt` (e.g., character sets).
+Managed by `fr.cnrs.lacito.matchbox.settings` (matchbox-app):
+
+| Class | Role |
+|---|---|
+| `AppDirectories` | Per-user directories of each OS (below); override with `-Dmatchbox.settings.dir=<dir>` or `MATCHBOX_SETTINGS_DIR` |
+| `UserSettings` | What the application uses: JavaFX properties (charset, colours, file extensions…), `RecentItems` for recent files/projects, `documentOptions()` for projects; saved 500 ms after a change, `close()` on exit |
+| `SettingsData`, `RecentData` | Immutable records written as JSON (Jackson); `validated()` replaces missing or invalid values by defaults |
+| `SettingsStore` | Atomic reads/writes; an unreadable file is renamed `*.broken-<timestamp>` |
+| `LegacySettingsImporter` | One-time import of `~/.config/matchbox/configuration.txt` and `*.history`, then deletes them and `~/.matchbox.log` |
+| `LoggingSetup` | Plain-text rotating log (`matchbox-0.log` … `matchbox-4.log`, 1 MB each), appended across launches |
+
+| OS | `settings.json` | `recent.json` | Logs |
+|---|---|---|---|
+| macOS | `~/Library/Application Support/Matchbox/` | same | `~/Library/Logs/Matchbox/` |
+| Windows | `%APPDATA%\Matchbox\` | `%LOCALAPPDATA%\Matchbox\` | `%LOCALAPPDATA%\Matchbox\Logs\` |
+| Linux | `$XDG_CONFIG_HOME/matchbox/` (`~/.config/matchbox/`) | `$XDG_STATE_HOME/matchbox/` (`~/.local/state/matchbox/`) | `$XDG_STATE_HOME/matchbox/logs/` |
+
+- The `charset` setting is applied when a file is opened (`TextDocument` keeps it and saves with it); invalid bytes are reported, not replaced.
+- `fileExtensions` selects the files added from a directory (empty list: all files).
+- In tests, use `UserSettings.load(dirs, home, delay)` or `-Dmatchbox.settings.dir` and `-Duser.home` pointing to a temporary directory: loading migrates and **deletes** the legacy files of the given home.
 
 ### Project Configuration
 

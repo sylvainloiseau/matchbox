@@ -4,10 +4,10 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.gui.view.HighlightStyles;
-import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
 import fr.cnrs.lacito.matchbox.model.Corpus;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
 import fr.cnrs.lacito.matchbox.model.project.Project;
+import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -61,7 +61,7 @@ public class EditorController {
 
     public EditorController(
         InlineCssTextArea codeArea,
-        ApplicationSettings applicationSettings
+        UserSettings settings
     ) {
         this.changeListener = (obs, oldText, newText) -> {
             long currentTime = System.currentTimeMillis();
@@ -73,7 +73,10 @@ public class EditorController {
         this.textArea = codeArea;
 
         this.lastParseTime = 0;
-        this.highlightStyles = new HighlightStyles(applicationSettings);
+        this.highlightStyles = new HighlightStyles(settings);
+        // show colour changes made in the settings immediately
+        settings.igtColorProperty().addListener((obs, o, n) -> highlightText());
+        settings.lexicalColorProperty().addListener((obs, o, n) -> highlightText());
         clearEditor();
 
         this.textArea.setOnMouseClicked(e -> handleCodeAreaClick());

@@ -7,7 +7,7 @@ import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
 import fr.cnrs.lacito.matchbox.gui.view.Kinds;
 import fr.cnrs.lacito.matchbox.gui.view.ObjectViewRegistry;
-import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
+import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import fr.cnrs.lacito.matchbox.model.Corpus;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
@@ -90,7 +90,7 @@ public class FileModeController {
 
     private Project project;
     private Corpus corpus;
-    private ApplicationSettings applicationSettings;
+    private UserSettings settings;
     private EditorController editorController;
     private ObjectViewRegistry viewRegistry;
 
@@ -101,8 +101,8 @@ public class FileModeController {
     /** True while the selection is propagated, to avoid feedback between table and editor. */
     private boolean propagatingSelection;
 
-    public FileModeController(ApplicationSettings conf) {
-        this.applicationSettings = conf;
+    public FileModeController(UserSettings settings) {
+        this.settings = settings;
     }
 
     /** This method should be called after initialization 
@@ -144,7 +144,7 @@ public class FileModeController {
     public void initialize() throws Exception {
         this.editorController = new EditorController(
             fileContentCodeArea,
-            applicationSettings
+            settings
         );
         this.viewRegistry = ObjectViewRegistry.load();
         setupObjectsTab();
@@ -413,7 +413,7 @@ public class FileModeController {
             if (!project.getDerivedFileList().isEmpty()) {
                 fileListView.getSelectionModel().select(0);
             }
-            applicationSettings.addToHistory(f.toString());
+            settings.recentFiles().add(f.toPath());
         }
     }
 

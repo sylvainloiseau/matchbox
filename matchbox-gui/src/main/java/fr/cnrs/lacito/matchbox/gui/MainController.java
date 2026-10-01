@@ -3,14 +3,18 @@ package fr.cnrs.lacito.matchbox.gui;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.mode.FileModeController;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
-import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
+import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.model.project.ProjectXMLSerializer;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.application.Platform;
+import javafx.beans.Observable;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.fxml.FXML;
@@ -26,6 +30,8 @@ import org.fxmisc.richtext.InlineCssTextArea;
  * Main controller for the Notebook application
  */
 public class MainController {
+
+    private static final Logger logger = Logger.getLogger(MainController.class.getName());
 
     @FXML
     private VBox mainBorderPane;
@@ -95,7 +101,7 @@ public class MainController {
 
     SplitPane fileModePane = null;
 
-    private ApplicationSettings applicationSettings;
+    private UserSettings settings;
     private Stage primaryStage;
 
     private FileModeController fileModeController;
@@ -111,26 +117,22 @@ public class MainController {
     private Project project;
 
     public MainController(
-        ApplicationSettings applicationSettings,
+        UserSettings settings,
         List<GrammarPlugin> plugins
     ) {
-        this.applicationSettings = applicationSettings;
+        this.settings = settings;
         this.plugins = plugins;
-        if (
-            applicationSettings.isOpenLastProject() &&
-            applicationSettings.getRecentProjects().size() > 0
-        ) {
-            File lastProjectFile = new File(
-                applicationSettings.getRecentProjects().get(0)
-            );
+        List<Path> recentProjects = settings.recentProjects().existing();
+        if (settings.openLastProjectProperty().get() && !recentProjects.isEmpty()) {
+            File lastProjectFile = recentProjects.get(0).toFile();
             try {
-                this.project = Project.loadProject(plugins, lastProjectFile);
+                this.project = Project.loadProject(plugins, lastProjectFile, settings.documentOptions());
             } catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+                logger.log(Level.WARNING, "Cannot reopen the last project " + lastProjectFile, e);
             }
-        } else {
-            this.project = Project.createDefaultProject(plugins);
+        }
+        if (this.project == null) {
+            this.project = Project.createDefaultProject(plugins, settings.documentOptions());
         }
 
         // Load file mode controller, editor controller and fileContentCodeArea
@@ -166,7 +168,7 @@ public class MainController {
 
     private FileModeController loadFileMode() {
         FileModeController fileModeController = new FileModeController(
-            applicationSettings
+            settings
         );
         FXMLLoader loader = new FXMLLoader();
         loader.setLocation(
@@ -189,8 +191,10 @@ public class MainController {
             .selectedToggleProperty()
             .addListener(toggleGroupListener);
         viewToggleGroup.selectToggle(fileModeToggleButton);
-        //loadRecentFilesMenu();
+        loadRecentFilesMenu();
         loadRecentProjectsMenu();
+        settings.recentFiles().items().addListener((Observable o) -> loadRecentFilesMenu());
+        settings.recentProjects().items().addListener((Observable o) -> loadRecentProjectsMenu());
         // loadRecentFileSetsMenu();
         wireMenuItem();
         switchToFileMode();
@@ -285,15 +289,15 @@ public class MainController {
 
     private void loadRecentFilesMenu() {
         this.openRecentMenu.getItems().clear();
-        List<String> recent = applicationSettings.getRecentFiles();
+        List<Path> recent = settings.recentFiles().existing();
         if (recent.isEmpty()) {
             MenuItem noRecentItem = new MenuItem("No recent files");
             noRecentItem.setDisable(true);
             openRecentMenu.getItems().add(noRecentItem);
         } else {
-            for (String filepath : recent) {
-                MenuItem item = new MenuItem(filepath);
-                item.setOnAction(e -> openFileOrDirectory(new File(filepath)));
+            for (Path path : recent) {
+                MenuItem item = new MenuItem(path.toString());
+                item.setOnAction(e -> openFileOrDirectory(path.toFile()));
                 openRecentMenu.getItems().add(item);
             }
             // Add separator
@@ -301,8 +305,7 @@ public class MainController {
             // Add clear recent files item
             MenuItem clearItem = new MenuItem("Clear Recent Files");
             clearItem.setOnAction(e -> {
-                applicationSettings.clearRecentFiles();
-                loadRecentFilesMenu();
+                settings.recentFiles().clear();
             });
             openRecentMenu.getItems().add(clearItem);
         }
@@ -340,12 +343,17 @@ public class MainController {
 
     private void openProject(File f) {
         try {
-            this.project = Project.loadProject(this.plugins, f);
+            this.project = Project.loadProject(this.plugins, f, settings.documentOptions());
             fileModeController.setProject(project);
-            applicationSettings.addToProjectHistory(f.getAbsolutePath());
-            loadRecentProjectsMenu();
+            settings.recentProjects().add(f.toPath());
             project.parseProject();
             onProjectChangeHook();
+            if (!project.getLoadProblems().isEmpty()) {
+                showError(
+                    "Some files of the project could not be read",
+                    String.join("\n", project.getLoadProblems())
+                );
+            }
         } catch (Exception e) {
             showError("Error opening project", e.getMessage());
         }
@@ -388,7 +396,7 @@ public class MainController {
 
     public void handleNewProject() {
         handleCloseCurrentProject();
-        Project newProject = Project.createDefaultProject(plugins);
+        Project newProject = Project.createDefaultProject(plugins, settings.documentOptions());
         project = newProject;
         onProjectChangeHook();
     }
@@ -427,7 +435,7 @@ public class MainController {
             }
         }
         //project.close();
-        this.project = Project.createDefaultProject(plugins);
+        this.project = Project.createDefaultProject(plugins, settings.documentOptions());
         onProjectChangeHook();
     }
 
@@ -466,15 +474,15 @@ public class MainController {
 
     private void loadRecentProjectsMenu() {
         this.openRecentProjectsMenuItem.getItems().clear();
-        List<String> recent = applicationSettings.getRecentProjects();
+        List<Path> recent = settings.recentProjects().existing();
         if (recent.isEmpty()) {
             MenuItem noRecentItem = new MenuItem("No recent projects");
             noRecentItem.setDisable(true);
             openRecentProjectsMenuItem.getItems().add(noRecentItem);
         } else {
-            for (String filepath : recent) {
-                MenuItem item = new MenuItem(filepath);
-                item.setOnAction(e -> openProject(new File(filepath)));
+            for (Path path : recent) {
+                MenuItem item = new MenuItem(path.toString());
+                item.setOnAction(e -> openProject(path.toFile()));
                 openRecentProjectsMenuItem.getItems().add(item);
             }
             // Add separator
@@ -482,8 +490,7 @@ public class MainController {
             // Add clear recent projects item
             MenuItem clearItem = new MenuItem("Clear Recent Projects");
             clearItem.setOnAction(e -> {
-                applicationSettings.clearRecentProjects();
-                loadRecentProjectsMenu();
+                settings.recentProjects().clear();
             });
             openRecentProjectsMenuItem.getItems().add(clearItem);
         }
@@ -500,7 +507,7 @@ public class MainController {
 
     public void handleSettings() {
         SettingsDialog dialog = new SettingsDialog(
-            applicationSettings,
+            settings,
             primaryStage
         );
         dialog.showAndWait();

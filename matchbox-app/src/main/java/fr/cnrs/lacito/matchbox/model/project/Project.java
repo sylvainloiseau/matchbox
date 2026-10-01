@@ -4,6 +4,7 @@ import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import fr.cnrs.lacito.matchbox.model.Corpus;
+import fr.cnrs.lacito.matchbox.model.DocumentOptions;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
 import java.io.File;
 import java.io.IOException;
@@ -43,6 +44,9 @@ public class Project {
 
     private static final Logger logger = Logger.getLogger(Project.class.getName());
     private Executor applyExecutor = Runnable::run;
+    private final DocumentOptions documentOptions;
+    /** Files of the project definition that could not be read (with the reason). */
+    private final List<String> loadProblems = new ArrayList<>();
     private ExecutorService parserExecutor;
 
     private SimpleBooleanProperty isProjectDefinitionOutdated =
@@ -76,6 +80,11 @@ public class Project {
     );
 
     protected Project(List<GrammarPlugin> plugins) {
+        this(plugins, DocumentOptions.DEFAULT);
+    }
+
+    protected Project(List<GrammarPlugin> plugins, DocumentOptions documentOptions) {
+        this.documentOptions = Objects.requireNonNull(documentOptions);
         this.corpus = new Corpus();
         this.name = "";
         this.description = "";
@@ -105,8 +114,19 @@ public class Project {
         List<GrammarPlugin> plugins,
         File projectFile
     ) throws Exception {
-        Project project = ProjectXMLSerializer.load(projectFile, plugins);
-        return project;
+        return loadProject(plugins, projectFile, DocumentOptions.DEFAULT);
+    }
+
+    /**
+     * Loads a project file. Files of the project that cannot be read are skipped and listed in
+     * {@link #getLoadProblems()}.
+     */
+    public static final Project loadProject(
+        List<GrammarPlugin> plugins,
+        File projectFile,
+        DocumentOptions documentOptions
+    ) throws Exception {
+        return ProjectXMLSerializer.load(projectFile, plugins, documentOptions);
     }
 
     /** Creates a default project with a single file type "All files" and a single grammar "IGT" applied to all files.
@@ -114,7 +134,14 @@ public class Project {
     public static final Project createDefaultProject(
         List<GrammarPlugin> plugins
     ) {
-        Project project = new Project(plugins);
+        return createDefaultProject(plugins, DocumentOptions.DEFAULT);
+    }
+
+    public static final Project createDefaultProject(
+        List<GrammarPlugin> plugins,
+        DocumentOptions documentOptions
+    ) {
+        Project project = new Project(plugins, documentOptions);
         FileType fileType = new FileType("All files", ".+");
         GrammarPlugin defaultPlugin = plugins
             .stream()
@@ -290,35 +317,34 @@ public class Project {
 
         filesAndDirectories.add(path);
         List<Path> files = new ArrayList<>();
+        List<String> failures = new ArrayList<>();
 
         int depth = recursive ? Integer.MAX_VALUE : 1;
         try (var stream = Files.walk(path, depth)) {
             stream
                 .filter(Files::isRegularFile)
-                .filter(p -> {
-                    String filename = p.getFileName().toString().toLowerCase();
-                    return (
-                        filename.endsWith(".md") || filename.endsWith(".txt")
-                    );
-                })
+                .filter(documentOptions::acceptsFile)
+                .sorted()
                 .forEach(p -> {
                     try {
-                        files.add(p);
                         addFileInternal(p);
+                        files.add(p);
                     } catch (IOException e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
+                        failures.add(e.getMessage());
                     }
                 });
-        } catch (IOException e) {
-            e.printStackTrace();
         }
         filesByDir.put(path, files);
         this.isProjectDefinitionOutdatedProperty().set(true);
+        if (!failures.isEmpty()) {
+            throw new IOException(
+                failures.size() + " file(s) of " + path + " could not be read:\n" + String.join("\n", failures)
+            );
+        }
     }
 
     private void addFileInternal(Path filePath) throws IOException {
-        TextDocument textParser = new TextDocument(filePath);
+        TextDocument textParser = new TextDocument(filePath, documentOptions.charset());
         textDocumentByPath.put(filePath, textParser);
         parseTextObject(textParser);
         //isDesynchronized = true;
@@ -379,12 +405,12 @@ public class Project {
             .collect(Collectors.toList());
     }
 
+    /** Adds a file of the project definition; a failure is recorded in {@link #getLoadProblems()}. */
     public void addFile(String filePath) {
         try {
             addFile(Path.of(filePath));
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        } catch (IOException | RuntimeException e) {
+            recordLoadProblem(filePath, e);
         }
     }
 
@@ -396,13 +422,28 @@ public class Project {
             .collect(Collectors.toList());
     }
 
+    /** Adds a directory of the project definition; failures are recorded in {@link #getLoadProblems()}. */
     public void addDirectory(String dirPath) {
         try {
             addDirectory(Path.of(dirPath));
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        } catch (IOException | RuntimeException e) {
+            recordLoadProblem(dirPath, e);
         }
+    }
+
+    private void recordLoadProblem(String path, Exception e) {
+        String message = e.getMessage() == null ? path + ": " + e : e.getMessage();
+        logger.warning(message);
+        loadProblems.add(message);
+    }
+
+    /** Files or directories of the project definition that could not be read when it was loaded. */
+    public List<String> getLoadProblems() {
+        return List.copyOf(loadProblems);
+    }
+
+    public DocumentOptions getDocumentOptions() {
+        return documentOptions;
     }
 
     public void removeDirectory(Path dirPath) {

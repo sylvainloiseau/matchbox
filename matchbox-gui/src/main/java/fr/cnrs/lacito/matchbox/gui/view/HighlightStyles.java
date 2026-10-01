@@ -4,7 +4,7 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearSentence;
 import fr.cnrs.lacito.matchbox.corpus.capability.LexicalEntry;
 import fr.cnrs.lacito.matchbox.corpus.capability.Sense;
-import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
+import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.util.List;
 import javafx.scene.paint.Color;
 
@@ -17,9 +17,9 @@ public class HighlightStyles {
         "#e8dff5", "#d4f0f0", "#fce1c8", "#e0f2d8"
     );
 
-    private final ApplicationSettings settings;
+    private final UserSettings settings;
 
-    public HighlightStyles(ApplicationSettings settings) {
+    public HighlightStyles(UserSettings settings) {
         this.settings = settings;
     }
 
@@ -29,10 +29,10 @@ public class HighlightStyles {
      */
     public String colorFor(CorpusObject object) {
         if (object instanceof InterlinearSentence) {
-            return validOr(settings.getIgtParagraphColor(), object);
+            return validOr(settings.igtColorProperty().get(), object);
         }
         if (object instanceof LexicalEntry) {
-            return validOr(settings.getLexicalDescriptionColor(), object);
+            return validOr(settings.lexicalColorProperty().get(), object);
         }
         if (object instanceof Sense) {
             return null;

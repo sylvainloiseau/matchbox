@@ -2,6 +2,7 @@ package fr.cnrs.lacito.matchbox.model.project;
 
 import fr.cnrs.lacito.matchbox.PluginManager;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
+import fr.cnrs.lacito.matchbox.model.DocumentOptions;
 import java.io.File;
 import java.util.List;
 import javax.xml.parsers.DocumentBuilder;
@@ -103,7 +104,12 @@ public class ProjectXMLSerializer {
      */
     public static Project load(File file, List<GrammarPlugin> plugins)
         throws Exception {
-        Project project = new Project(plugins);
+        return load(file, plugins, DocumentOptions.DEFAULT);
+    }
+
+    public static Project load(File file, List<GrammarPlugin> plugins, DocumentOptions documentOptions)
+        throws Exception {
+        Project project = new Project(plugins, documentOptions);
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();

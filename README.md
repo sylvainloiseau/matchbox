@@ -160,6 +160,20 @@ mvn -pl matchbox-gui -am clean package
 
 bash build/assembly/matchbox-distribution-1.0.0-distribution/bin/matchbox
 
+### Settings and logs
+
+Settings, recent files and logs are stored in the standard per-user locations of each OS:
+
+| OS | Settings (`settings.json`) | Recent files (`recent.json`) | Logs |
+|---|---|---|---|
+| macOS | `~/Library/Application Support/Matchbox/` | same | `~/Library/Logs/Matchbox/` |
+| Windows | `%APPDATA%\Matchbox\` | `%LOCALAPPDATA%\Matchbox\` | `%LOCALAPPDATA%\Matchbox\Logs\` |
+| Linux | `~/.config/matchbox/` (or `$XDG_CONFIG_HOME`) | `~/.local/state/matchbox/` (or `$XDG_STATE_HOME`) | `~/.local/state/matchbox/logs/` |
+
+`-Dmatchbox.settings.dir=<dir>` (or the environment variable `MATCHBOX_SETTINGS_DIR`) stores everything in one directory instead, e.g. for a portable installation.
+
+At the first start, the settings of older versions (`~/.config/matchbox/configuration.txt` and `*.history`) are imported, then these files and `~/.matchbox.log` are deleted.
+
 ### Grammar plugins
 
 Grammar plugins are jars in the `plugins` directory. Plugins built before version 2 of the grammar API (package `fr.cnrs.lacito.matchbox.language.corpusObject`) are not loaded and must be rebuilt; the log names the incompatible jars.

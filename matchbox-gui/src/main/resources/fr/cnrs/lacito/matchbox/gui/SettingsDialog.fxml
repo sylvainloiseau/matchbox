@@ -56,23 +56,34 @@
             </VBox>
           </content>
         </Tab>
-        <Tab text="File pattern" closable="false">
+        <Tab text="Files" closable="false">
           <content>
             <VBox spacing="8.0" style="-fx-padding: 15;">
               <children>
                 <Label
-                                    text="File extensions (comma separated):"
+                                    text="Charset of the text files:"
+                                    style="-fx-font-weight: bold;"
+                                />
+                <ComboBox fx:id="charsetComboBox" editable="true" />
+                <Label
+                                    text="Applies to files opened afterwards; open files keep their charset."
+                                    wrapText="true"
+                                    style="-fx-font-size: 0.9em; -fx-text-fill: #666666;"
+                                />
+                <Label
+                                    text="Extensions of the files added from a directory (one per line; empty: all files):"
+                                    wrapText="true"
                                     style="-fx-font-weight: bold;"
                                 />
                 <TextArea
                                     fx:id="fileExtensionsArea"
-                                    prefRowCount="1"
-                                >txt,md</TextArea>
+                                    prefRowCount="2"
+                                />
                 <Label
-                                    text="File patterns (comma separated):"
+                                    text="File patterns (one per line):"
                                     style="-fx-font-weight: bold;"
                                 />
-                <TextArea fx:id="filePatternsArea" prefRowCount="3" />
+                <TextArea fx:id="filePatternsArea" prefRowCount="2" />
               </children>
             </VBox>
           </content>
@@ -86,6 +97,11 @@
                                     style="-fx-font-weight: bold;"
                                 />
                 <TextField fx:id="recentFilesLimitField" promptText="e.g. 10" />
+                <Label
+                                    text="Maximum number of recent projects to record:"
+                                    style="-fx-font-weight: bold;"
+                                />
+                <TextField fx:id="recentProjectsLimitField" promptText="e.g. 10" />
                 <Label
                                     text="Reopen last project ?"
                                     style="-fx-font-weight: bold;"

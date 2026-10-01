@@ -35,6 +35,7 @@
         <javafx.version>23.0.2</javafx.version>
         <antlr.version>4.13.1</antlr.version>
         <junit.version>5.10.2</junit.version>
+        <jackson.version>2.20.1</jackson.version>
         <revision>1.0.0</revision>
         <plugins.dir>${project.basedir}/plugins</plugins.dir>
         <build.root>${maven.multiModuleProjectDirectory}/build</build.root>
@@ -77,6 +78,11 @@
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter</artifactId>
                 <version>${junit.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
             </dependency>
             <!-- ANTLR Runtime -->
             <dependency>

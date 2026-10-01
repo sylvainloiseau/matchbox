@@ -2,21 +2,21 @@ package fr.cnrs.lacito.matchbox;
 
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.MainController;
-import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
+import fr.cnrs.lacito.matchbox.settings.AppDirectories;
+import fr.cnrs.lacito.matchbox.settings.LoggingSetup;
+import fr.cnrs.lacito.matchbox.settings.UserSettings;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Path;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.logging.StreamHandler;
-import java.util.logging.XMLFormatter;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
 
 /**
@@ -24,20 +24,29 @@ import javafx.stage.Stage;
  */
 public class MatchboxApplication extends Application {
 
+    private static final Logger logger = Logger.getLogger(MatchboxApplication.class.getName());
+
+    private UserSettings settings;
+
     @Override
     public void start(Stage primaryStage) throws IOException {
-        ApplicationSettings applicationSettings = new ApplicationSettings();
-        initLoggingService(applicationSettings.getLogFile());
+        settings = UserSettings.load(AppDirectories.forCurrentUser());
+        try {
+            LoggingSetup.init(settings);
+        } catch (IOException e) {
+            // the application still works without a log file
+            logger.log(Level.WARNING, "Cannot write the log file", e);
+        }
 
         List<GrammarPlugin> plugins = PluginManager.loadPlugins();
-            
+
         // Load the FXML file
         FXMLLoader loader = new FXMLLoader(
             getClass().getResource("/fr/cnrs/lacito/matchbox/gui/MainView.fxml")
         );
 
         // set the controller and set up dependencies
-        MainController mainController = new MainController(applicationSettings, plugins);
+        MainController mainController = new MainController(settings, plugins);
         loader.setController(mainController);
         var root = loader.load();
 
@@ -58,16 +67,30 @@ public class MatchboxApplication extends Application {
         primaryStage.setScene(scene);
         primaryStage.setTitle("Notebook Application");
         primaryStage.show();
+
+        List<String> warnings = settings.getLoadWarnings();
+        if (!warnings.isEmpty()) {
+            Platform.runLater(() -> showSettingsWarnings(primaryStage, warnings));
+        }
     }
 
-    private static void initLoggingService(Path logFile)
-        throws FileNotFoundException {
-        OutputStream logOutputStream = new FileOutputStream(logFile.toFile());
-        StreamHandler sh = new StreamHandler(
-            logOutputStream,
-            new XMLFormatter()
-        );
-        Logger.getLogger("").addHandler(sh);
+    private static void showSettingsWarnings(Stage owner, List<String> warnings) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.initOwner(owner);
+        alert.setTitle("Settings");
+        alert.setHeaderText("Some settings could not be read; default values are used.");
+        TextArea details = new TextArea(String.join("\n", warnings));
+        details.setEditable(false);
+        details.setWrapText(true);
+        alert.getDialogPane().setContent(details);
+        alert.show();
+    }
+
+    @Override
+    public void stop() {
+        if (settings != null) {
+            settings.close();
+        }
     }
 
     public static void main(String[] args) {
