@@ -236,7 +236,6 @@
    <AnchorPane
         fx:id="viewPane"
         VBox.vgrow="ALWAYS"
-        AnchorPane.bottomAnchor="14.0"
     />
    <HBox
         id="HBox"
