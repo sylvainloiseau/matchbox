@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project
+    xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd"
+>
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>fr.cnrs.lacito</groupId>
+        <artifactId>matchbox</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>matchbox-grammar-fx</artifactId>
+    <version>${revision}</version>
+    <packaging>jar</packaging>
+
+    <name>Matchbox Grammar FX</name>
+    <description
+    >Optional JavaFX contract for grammar plugins that provide views for their corpus objects</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-corpus</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>

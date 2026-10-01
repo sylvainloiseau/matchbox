@@ -12,4 +12,6 @@ public abstract class AbstractGrammarPlugin implements GrammarPlugin {
 
     abstract public ParseResult getResult(Path filePath, String content);
 
+    abstract public int getApiVersion();
+
 }

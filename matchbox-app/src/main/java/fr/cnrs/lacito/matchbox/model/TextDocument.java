@@ -10,7 +10,8 @@ import javafx.beans.property.SimpleBooleanProperty;
  */
 public class TextDocument {
 
-    private String content;
+    private volatile String content;
+    private volatile long version;
     private Path filePath;
 
     public SimpleBooleanProperty couldBeWritten = new SimpleBooleanProperty(
@@ -43,14 +44,24 @@ public class TextDocument {
         return this.content;
     }
 
-    protected void isParsed() {
+    /** Marks the document as parsed (called when parse results matching its text are applied). */
+    public void markParsed() {
         couldBeReParsed.set(false);
     }
 
     public void updateText(String newText) {
+        if (newText.equals(this.content)) {
+            return;
+        }
         this.content = newText;
+        this.version++;
         couldBeWritten.set(true);
         couldBeReParsed.set(true);
+    }
+
+    /** Incremented at each change of the text; used to discard results of outdated parses. */
+    public long getVersion() {
+        return version;
     }
 
     /**

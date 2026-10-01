@@ -1,10 +1,12 @@
 package fr.cnrs.lacito.matchbox.gui.mode;
 
+import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
+import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
-import fr.cnrs.lacito.matchbox.gui.mode.common.lexicon.LexicalEntryController;
+import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
-import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleIGT;
-import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleLexicalDefinition;
+import fr.cnrs.lacito.matchbox.gui.view.Kinds;
+import fr.cnrs.lacito.matchbox.gui.view.ObjectViewRegistry;
 import fr.cnrs.lacito.matchbox.model.ApplicationSettings;
 import fr.cnrs.lacito.matchbox.model.Corpus;
 import fr.cnrs.lacito.matchbox.model.project.Project;
@@ -12,21 +14,28 @@ import fr.cnrs.lacito.matchbox.model.TextDocument;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import javafx.application.Platform;
+import javafx.collections.ListChangeListener;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -44,19 +53,10 @@ public class FileModeController {
     private InlineCssTextArea fileContentCodeArea;
 
     @FXML
-    private TableView<SimpleIGT> igtTableView;
+    private TabPane objectKindTabPane;
 
     @FXML
-    private TableColumn<SimpleIGT, String> transcriptionCol;
-
-    @FXML
-    private TableColumn<SimpleIGT, String> glossCol;
-
-    @FXML
-    private TableColumn<SimpleIGT, String> translationCol;
-
-    @FXML
-    private VBox lexicalInformationBoxes;
+    private ScrollPane objectDetailPane;
 
     @FXML
     private Button saveButton;
@@ -92,6 +92,14 @@ public class FileModeController {
     private Corpus corpus;
     private ApplicationSettings applicationSettings;
     private EditorController editorController;
+    private ObjectViewRegistry viewRegistry;
+
+    /** One tab per kind of top-level object of the current file, in order of appearance. */
+    private final Map<String, Tab> tabsByKind = new LinkedHashMap<>();
+    /** Object shown in the detail pane. */
+    private CorpusObject displayedObject;
+    /** True while the selection is propagated, to avoid feedback between table and editor. */
+    private boolean propagatingSelection;
 
     public FileModeController(ApplicationSettings conf) {
         this.applicationSettings = conf;
@@ -110,9 +118,7 @@ public class FileModeController {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
-        setupIgtTab();
-        setupErrorTab();
-        setupLexicalEntriesTab();
+        project.setApplyExecutor(Platform::runLater);
         saveButton
             .disableProperty()
             .bind(
@@ -140,6 +146,9 @@ public class FileModeController {
             fileContentCodeArea,
             applicationSettings
         );
+        this.viewRegistry = ObjectViewRegistry.load();
+        setupObjectsTab();
+        setupErrorTab();
     }
 
     private void setupFileListView() throws Exception {
@@ -206,7 +215,6 @@ public class FileModeController {
                                 newVal.toString()
                         );
                         editorController.selectEditedFile(newVal.getFilePath());
-                        editorController.highlightText();
                     } catch (Exception ex) {
                         throw ex;
                     }
@@ -214,28 +222,6 @@ public class FileModeController {
                     editorController.clearEditor();
                 }
             });
-    }
-
-    private void setupIgtTab() {
-        transcriptionCol.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getTranscription())
-        );
-        glossCol.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getMorpheme())
-        );
-        translationCol.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getFreeTranslation())
-        );
-
-        igtTableView
-            .getSelectionModel()
-            .selectedItemProperty()
-            .addListener((obs, oldVal, newIgt) -> {
-                if (newIgt != null) {
-                    editorController.selectLinesInEditor(newIgt);
-                }
-            });
-        igtTableView.setItems(editorController.getCurrentFileIgts());
     }
 
     private void setupErrorTab() {
@@ -262,48 +248,143 @@ public class FileModeController {
         errorTableView.setItems(editorController.getCurrentFileErrors());
     }
 
-    private void setupLexicalEntriesTab() {
-        ObservableList<SimpleLexicalDefinition> lexicalDefinitions =
-            editorController.getCurrentFileLexicalDefinition();
-        lexicalDefinitions.addListener(
-            (
-                javafx.collections.ListChangeListener.Change<
-                    ? extends SimpleLexicalDefinition
-                > change
-            ) -> {
-                lexicalInformationBoxes.getChildren().clear();
-                for (SimpleLexicalDefinition lexDef : lexicalDefinitions) {
-                    try {
-                        LexicalEntryController controller =
-                            new LexicalEntryController(lexDef);
-                        FXMLLoader loader = new FXMLLoader();
-                        loader.setLocation(
-                            getClass().getResource(
-                                "/fr/cnrs/lacito/matchbox/gui/mode/common/lexicon/LexicalEntryView.fxml"
-                            )
-                        );
-                        loader.setController(controller);
-                        Parent entryView = loader.load();
-                        VBox entryBox = (VBox) entryView;
-                        lexicalInformationBoxes.getChildren().add(entryBox);
-                    } catch (IOException e) {
-                        System.err.println(
-                            "Error loading lexical entry view: " +
-                                e.getMessage()
-                        );
-                    }
-                }
-            }
+    // ------------------------------------------------------------------
+    // Objects tab
+    // ------------------------------------------------------------------
+
+    private void setupObjectsTab() {
+        editorController.getCurrentFileObjects().addListener(
+            (ListChangeListener<CorpusObject>) change -> refreshObjectTabs()
+        );
+        editorController.selectedObjectProperty().addListener(
+            (obs, oldObject, newObject) -> onObjectSelected(newObject)
         );
     }
 
-    public void handleParseText() throws Exception {
-        try {
-            editorController.parseEditedFile();
-            editorController.highlightText();
-        } catch (Exception e) {
-            throw e;
+    /** Updates the per-kind tables, keeping existing tabs (and their selection state) when possible. */
+    private void refreshObjectTabs() {
+        Map<String, List<CorpusObject>> byKind = new LinkedHashMap<>();
+        for (CorpusObject o : editorController.getCurrentFileObjects()) {
+            byKind.computeIfAbsent(o.getKind(), k -> new ArrayList<>()).add(o);
         }
+        tabsByKind.keySet().removeIf(kind -> {
+            if (!byKind.containsKey(kind)) {
+                objectKindTabPane.getTabs().remove(tabsByKind.get(kind));
+                return true;
+            }
+            return false;
+        });
+        byKind.forEach((kind, objects) -> {
+            Tab tab = tabsByKind.computeIfAbsent(kind, this::createKindTab);
+            @SuppressWarnings("unchecked")
+            TableView<CorpusObject> table = (TableView<CorpusObject>) tab.getContent();
+            Class<?> type = objects.get(0).getClass();
+            if (!type.equals(table.getUserData())) {
+                table.getColumns().setAll(viewRegistry.columnsFor(type));
+                table.setUserData(type);
+            }
+            table.getItems().setAll(objects);
+            tab.setText(Kinds.title(kind) + " (" + objects.size() + ")");
+            if (!objectKindTabPane.getTabs().contains(tab)) {
+                objectKindTabPane.getTabs().add(tab);
+            }
+        });
+        if (byKind.isEmpty()) {
+            showDetail(null);
+        }
+    }
+
+    private Tab createKindTab(String kind) {
+        TableView<CorpusObject> table = new TableView<>();
+        table.setPlaceholder(new Label("No objects"));
+        table.getSelectionModel().selectedItemProperty().addListener((obs, oldObject, newObject) -> {
+            if (newObject != null && !propagatingSelection) {
+                editorController.selectedObjectProperty().set(newObject);
+                editorController.selectInEditor(newObject.getTextCoordinate());
+            }
+        });
+        return new Tab(Kinds.title(kind), table);
+    }
+
+    /** Shows the selected object and selects its top-level ancestor in the tables. */
+    private void onObjectSelected(CorpusObject object) {
+        showDetail(object);
+        if (object == null) return;
+        CorpusObject topLevel = editorController.getCurrentFileObjects().stream()
+            .filter(o -> Corpus.selfAndDescendants(o).anyMatch(d -> d == object))
+            .findFirst()
+            .orElse(null);
+        if (topLevel == null) return;
+        Tab tab = tabsByKind.get(topLevel.getKind());
+        if (tab == null) return;
+        propagatingSelection = true;
+        try {
+            objectKindTabPane.getSelectionModel().select(tab);
+            @SuppressWarnings("unchecked")
+            TableView<CorpusObject> table = (TableView<CorpusObject>) tab.getContent();
+            table.getSelectionModel().select(topLevel);
+            table.scrollTo(topLevel);
+        } finally {
+            propagatingSelection = false;
+        }
+    }
+
+    /**
+     * Shows an object in the detail pane. The view is not rebuilt if the object is a re-parsed
+     * copy of the displayed one (same kind, label and span), to avoid flicker.
+     */
+    private void showDetail(CorpusObject object) {
+        if (object == displayedObject || (object != null && sameContent(object, displayedObject))) {
+            displayedObject = object;
+            return;
+        }
+        displayedObject = object;
+        objectDetailPane.setContent(object == null ? null : viewRegistry.createView(object, viewContext));
+    }
+
+    private static boolean sameContent(CorpusObject a, CorpusObject b) {
+        return b != null
+            && a.getKind().equals(b.getKind())
+            && a.getTextCoordinate().equals(b.getTextCoordinate())
+            && Objects.equals(a.getLabel(), b.getLabel());
+    }
+
+    /** Services offered to object views. */
+    private final ViewContext viewContext = new ViewContext() {
+        @Override
+        public void selectInEditor(TextCoordinate span) {
+            if (span == null) return;
+            if (!Objects.equals(span.path(), editorController.getSelectedFilePath())) {
+                project.getDerivedFileList().stream()
+                    .filter(d -> d.getFilePath().equals(span.path()))
+                    .findFirst()
+                    .ifPresent(d -> fileListView.getSelectionModel().select(d));
+            }
+            if (Objects.equals(span.path(), editorController.getSelectedFilePath())) {
+                editorController.selectInEditor(span);
+            }
+        }
+
+        @Override
+        public void select(CorpusObject object) {
+            selectInEditor(object.getTextCoordinate());
+            editorController.selectedObjectProperty().set(object);
+        }
+
+        @Override
+        public String highlightColor(CorpusObject object) {
+            return editorController.getHighlightStyles().colorFor(object);
+        }
+    };
+
+    /** Parses the edited file in the background; the views refresh when the results arrive. */
+    public void handleParseText() {
+        editorController.parseEditedFile().exceptionally(e -> {
+            Platform.runLater(() ->
+                new Alert(Alert.AlertType.ERROR, "Parsing failed: " + e.getMessage()).showAndWait()
+            );
+            return null;
+        });
     }
 
     public InlineCssTextArea getFileContentArea() {

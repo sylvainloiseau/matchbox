@@ -1,0 +1,7 @@
+# sent_id = s1
+# text = The dog
+1	The	the	DET	_	_	2	det	_	_
+2	dog	dog	NOUN	_	_	0	root	_	_
+
+# sent_id = s2
+1	Barks	bark	VERB	_	_	0	root	_	_

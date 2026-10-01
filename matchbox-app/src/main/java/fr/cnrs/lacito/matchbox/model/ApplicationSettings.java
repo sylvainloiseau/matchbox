@@ -56,8 +56,8 @@ public class ApplicationSettings {
         this.historyProjectPath = configPath.resolve(HISTORY_PROJECT_FILE);
         this.configFilePath = configPath.resolve(CONFIG_FILE);
         this.currentCharset = StandardCharsets.UTF_8;
-        this.igtParagraphColor = "#000000";
-        this.lexicalDescriptionColor = "#000000";
+        this.igtParagraphColor = "#fff1c1";
+        this.lexicalDescriptionColor = "#dfe7fd";
         this.morphemeSeparators = "-,/";
         this.fileExtensions = "txt,md";
         this.filePatterns = "";

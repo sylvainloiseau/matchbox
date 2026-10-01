@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox.model.project;
 
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
+import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import fr.cnrs.lacito.matchbox.model.Corpus;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
@@ -9,6 +10,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -33,6 +40,10 @@ public class Project {
     private List<GrammarPlugin> plugins;
 
     private boolean isDesynchronized = true;
+
+    private static final Logger logger = Logger.getLogger(Project.class.getName());
+    private Executor applyExecutor = Runnable::run;
+    private ExecutorService parserExecutor;
 
     private SimpleBooleanProperty isProjectDefinitionOutdated =
         new SimpleBooleanProperty(false);
@@ -129,41 +140,104 @@ public class Project {
         isDesynchronized = false;
     }
 
+    /** Parses a file synchronously, on the calling thread. */
     public void parsePath(Path filePath) {
         TextDocument text = getParsedText(filePath);
         parseTextObject(text);
     }
 
-    // // TODO. rather add listener to each text.getIGTs() (an observable list)
-    // igtList.stream().filter(p -> {
-    //     System.out.println("Filtering IGTs for file: " + filePath.toString());
-    //     System.out.println("IGT source: " + p.getFilePath());
-    //     return ! p.getFilePath().equals(filePath);
-    // }).collect(Collectors.toList());
-    // igtList.addAll(text.getIGTs());
+    /** Parses a document synchronously and applies the results on the calling thread. */
+    public void parseTextObject(TextDocument document) {
+        ParseRun run = computeParse(
+            document.getFilePath(),
+            document.getCurrentText(),
+            document.getVersion(),
+            getGrammarsForFile(document.getFilePath())
+        );
+        applyParse(document, run);
+    }
 
-    // lexList.stream().filter(p -> {
-    //     return ! p.getFilePath().equals(filePath);
-    // }).collect(Collectors.toList());
-    // lexList.addAll(text.getLexicalDefinitions());
+    /**
+     * Parses a file on a background thread. The results are applied through the
+     * {@linkplain #setApplyExecutor apply executor}, and discarded if the text changed meanwhile
+     * or the file was removed.
+     */
+    public CompletableFuture<Void> parseInBackground(Path filePath) {
+        TextDocument document = getParsedText(filePath);
+        // snapshot on the calling thread
+        String text = document.getCurrentText();
+        long version = document.getVersion();
+        List<GrammarPlugin> grammars = getGrammarsForFile(filePath);
+        return CompletableFuture
+            .supplyAsync(() -> computeParse(filePath, text, version, grammars), parserExecutor())
+            .thenAcceptAsync(run -> {
+                if (textDocumentByPath.get(filePath) == document && document.getVersion() == run.version()) {
+                    applyParse(document, run);
+                }
+            }, applyExecutor);
+    }
 
-    public void parseTextObject(TextDocument textParser) {
-        // TODO or to be done after, when re-synchronizing the corpus with the project?
-        corpus.removeCorpusObjectsForFile(textParser.getFilePath());
+    /**
+     * Executor used to apply background parse results; the GUI sets it to
+     * {@code Platform::runLater} so that observable lists are only changed on the JavaFX thread.
+     */
+    public void setApplyExecutor(Executor applyExecutor) {
+        this.applyExecutor = Objects.requireNonNull(applyExecutor);
+    }
+
+    /** Grammars applied to a file, in file type and rank order, without duplicates. */
+    public List<GrammarPlugin> getGrammarsForFile(Path filePath) {
+        Map<String, GrammarPlugin> grammars = new LinkedHashMap<>();
         for (FileType fileType : fileTypes) {
-            if (fileType.matches(textParser.getFilePath())) {
+            if (fileType.matches(filePath)) {
                 for (GrammarPlugin plugin : fileType.getGrammars()) {
-                    ParseResult result = plugin.getResult(
-                        textParser.getFilePath(),
-                        textParser.getCurrentText()
-                    );
-                    // TODO or to be done after, when re-synchronizing the corpus with the project?
-                    corpus.addCorpusObjects(result.getCorpusObjects());
-                    corpus.addErrors(result.getErrors());
-                    // Process the parse result as needed
+                    grammars.putIfAbsent(plugin.getId(), plugin);
                 }
             }
         }
+        return List.copyOf(grammars.values());
+    }
+
+    /** Results of one parse of a file. */
+    private record ParseRun(String text, long version, Map<String, ParseResult> results) {}
+
+    /** Runs the grammars; thread-safe, does not touch observable state. */
+    private static ParseRun computeParse(Path filePath, String text, long version, List<GrammarPlugin> grammars) {
+        Map<String, ParseResult> results = new LinkedHashMap<>();
+        for (GrammarPlugin plugin : grammars) {
+            ParseResult result;
+            try {
+                result = plugin.getResult(filePath, text);
+                if (result == null) {
+                    throw new IllegalStateException("getResult returned null");
+                }
+            } catch (RuntimeException | LinkageError e) {
+                logger.log(Level.WARNING, "Grammar " + plugin.getId() + " failed on " + filePath, e);
+                result = new ParseResult(List.of(), List.of(
+                    new ParseError(filePath, plugin.getId(), 0, 0, "Internal error of the grammar: " + e)
+                ));
+            }
+            results.put(plugin.getId(), result);
+        }
+        return new ParseRun(text, version, results);
+    }
+
+    private void applyParse(TextDocument document, ParseRun run) {
+        corpus.setResults(document.getFilePath(), run.results(), run.text());
+        if (document.getVersion() == run.version()) {
+            document.markParsed();
+        }
+    }
+
+    private synchronized ExecutorService parserExecutor() {
+        if (parserExecutor == null) {
+            parserExecutor = Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "matchbox-parser");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        return parserExecutor;
     }
 
     public String getName() {
@@ -293,6 +367,7 @@ public class Project {
     public void removeFile(Path selected) {
         filesAndDirectories.remove(selected);
         textDocumentByPath.remove(selected);
+        corpus.removeFile(selected);
         this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
@@ -337,8 +412,7 @@ public class Project {
             Collections.emptyList()
         )) {
             textDocumentByPath.remove(p);
-            // TODO or to be done after, when re-synchronizing the corpus with the project?
-            corpus.removeCorpusObjectsForFile(p);
+            corpus.removeFile(p);
         }
         this.isProjectDefinitionOutdatedProperty().set(true);
     }

@@ -35,6 +35,13 @@
             <scope>provided</scope>
         </dependency>
 
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-corpus</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
         <!-- ANTLR Runtime -->
         <dependency>
             <groupId>org.antlr</groupId>

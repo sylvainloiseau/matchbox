@@ -10,8 +10,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleExample;
-import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleSense;
+import fr.cnrs.lacito.matchbox.corpus.capability.Example;
+import fr.cnrs.lacito.matchbox.corpus.capability.Sense;
 
 /**
  * Controller for displaying a definition with its examples
@@ -21,9 +21,9 @@ public class SenseController {
     @FXML private TextField definitionField;
     @FXML private VBox examplesContainer;
     private List<ExampleController> exampleControllers = new ArrayList<>();
-    private final SimpleSense sense;
+    private final Sense sense;
 
-    public SenseController(SimpleSense sense) {
+    public SenseController(Sense sense) {
        this.sense = sense;
     }
 
@@ -34,15 +34,15 @@ public class SenseController {
         addExamples(sense.getExamples());
     }
 
-    public void addExamples(List<SimpleExample> examples) {
+    public void addExamples(List<? extends Example> examples) {
         if (examples != null) {
-            for (SimpleExample example : examples) {
+            for (Example example : examples) {
                 addExample(example);
             }
         }
     }
 
-    private void addExample(SimpleExample example) {
+    private void addExample(Example example) {
         try {
             FXMLLoader loader = new FXMLLoader();
             loader.setLocation(getClass().getResource("/fr/cnrs/lacito/matchbox/gui/mode/common/lexicon/ExampleView.fxml"));

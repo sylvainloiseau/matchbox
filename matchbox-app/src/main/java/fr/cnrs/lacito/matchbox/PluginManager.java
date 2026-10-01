@@ -6,6 +6,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.*;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class PluginManager {
@@ -18,6 +19,7 @@ public class PluginManager {
     private static final String PLUGINS_DIR_PROPERTY = "matchbox.plugins.dir";
 
     private static final List<GrammarPlugin> plugins = new ArrayList<>();
+    private static final List<ClassLoader> pluginClassLoaders = new ArrayList<>();
 
     public static final GrammarPlugin getPluginById(String id) {
         return plugins
@@ -52,40 +54,12 @@ public class PluginManager {
             logger.info("Found file: " + x.getFileName())
         );
 
-        Files.list(pluginsDir)
-            .filter(path -> path.toString().endsWith(".jar"))
-            .forEach(jar -> {
-                logger.info("Found jar: " + jar.toAbsolutePath());
-                try {
-                    URLClassLoader cl = new URLClassLoader(
-                        new URL[] { jar.toUri().toURL() },
-                        PluginManager.class.getClassLoader()
-                    );
-                    ServiceLoader<GrammarPlugin> serviceLoader =
-                        ServiceLoader.load(GrammarPlugin.class, cl);
-
-                    for (GrammarPlugin plugin : serviceLoader) {
-                        plugins.add(plugin);
-                        logger.info(
-                            "Loaded plugin: " + plugin.getDisplayName()
-                        );
-                    }
-
-                    // or :
-                    //                      GrammarPlugin plugin =
-                    //      loader.findFirst()
-                    //            .orElseThrow();
-                    //             plugins.add(plugin);
-
-                    // the cl should be closed, otherwise classes in the plugin will not be found
-                    //cl.close();
-                } catch (Exception e) {
-                    logger.severe(
-                        "Error loading plugin from JAR: " + jar.toAbsolutePath()
-                    );
-                    e.printStackTrace();
-                }
-            });
+        try (var jars = Files.list(pluginsDir)) {
+            jars
+                .filter(path -> path.toString().endsWith(".jar"))
+                .sorted()
+                .forEach(PluginManager::loadJar);
+        }
 
         logger.info(
             "Found plugins: " +
@@ -99,6 +73,76 @@ public class PluginManager {
         );
 
         return plugins;
+    }
+
+    private static void loadJar(Path jar) {
+        logger.info("Found jar: " + jar.toAbsolutePath());
+        try {
+            // Not closed: the plugin classes are loaded lazily for the whole session.
+            URLClassLoader cl = new URLClassLoader(
+                new URL[] { jar.toUri().toURL() },
+                PluginManager.class.getClassLoader()
+            );
+            boolean found = false;
+            for (GrammarPlugin plugin : ServiceLoader.load(GrammarPlugin.class, cl)) {
+                if (plugin.getClass().getClassLoader() != cl) {
+                    continue; // provided by the application or another jar
+                }
+                found = true;
+                int version = plugin.getApiVersion();
+                if (version != GrammarPlugin.API_VERSION) {
+                    logger.severe(
+                        "Plugin " + plugin.getId() + " in " + jar.getFileName() +
+                            " uses grammar API version " + version + ", expected " +
+                            GrammarPlugin.API_VERSION + "; rebuild it. Skipped."
+                    );
+                    continue;
+                }
+                plugins.add(plugin);
+                logger.info("Loaded plugin: " + plugin.getDisplayName());
+            }
+            if (found) {
+                pluginClassLoaders.add(cl);
+            }
+        } catch (ServiceConfigurationError | LinkageError e) {
+            // e.g. a plugin compiled against an older API (NoClassDefFoundError, AbstractMethodError)
+            logger.log(Level.SEVERE,
+                "Incompatible plugin " + jar.getFileName() + ": rebuild it against grammar API version " +
+                    GrammarPlugin.API_VERSION + ". Skipped.", e);
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Error loading plugin from JAR: " + jar.toAbsolutePath(), e);
+        }
+    }
+
+    /**
+     * Loads the providers of a service declared by the application and by the plugin jars
+     * ({@code META-INF/services}), application providers first. Each provider class appears once:
+     * {@code ServiceLoader} on a plugin class loader also returns the parent's providers.
+     * A provider that fails to load is logged and skipped.
+     */
+    public static <S> List<S> loadServices(Class<S> service) {
+        Map<String, S> providers = new LinkedHashMap<>();
+        List<ClassLoader> loaders = new ArrayList<>();
+        loaders.add(PluginManager.class.getClassLoader());
+        loaders.addAll(pluginClassLoaders);
+        for (ClassLoader loader : loaders) {
+            Iterator<S> it = ServiceLoader.load(service, loader).iterator();
+            while (true) {
+                try {
+                    if (!it.hasNext()) break;
+                    S provider = it.next();
+                    providers.putIfAbsent(provider.getClass().getName(), provider);
+                } catch (ServiceConfigurationError | LinkageError e) {
+                    logger.log(Level.SEVERE, "Cannot load a provider of " + service.getName(), e);
+                }
+            }
+        }
+        return List.copyOf(providers.values());
+    }
+
+    /** True if the class was loaded from a plugin jar rather than from the application. */
+    public static boolean isFromPlugin(Class<?> type) {
+        return pluginClassLoaders.contains(type.getClassLoader());
     }
 
     private static Path findPluginsDirectory() {

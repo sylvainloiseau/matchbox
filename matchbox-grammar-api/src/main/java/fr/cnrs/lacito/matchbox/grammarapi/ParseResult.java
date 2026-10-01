@@ -2,23 +2,20 @@ package fr.cnrs.lacito.matchbox.grammarapi;
 
 import java.util.List;
 
-import fr.cnrs.lacito.matchbox.language.corpusObject.CorpusObject;
+import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 
-public class ParseResult {
+/**
+ * What a grammar extracted from one file: top-level corpus objects (nested objects are reached
+ * through {@link CorpusObject#getChildren()}) and syntax errors.
+ */
+public record ParseResult(List<CorpusObject> objects, List<ParseError> errors) {
 
-    private final List<CorpusObject> corpusObjects;
-    private final List<ParseError> errors;
-
-    public ParseResult(List<CorpusObject> corpusObjects, List<ParseError> errors) {
-        this.corpusObjects = corpusObjects;
-        this.errors = errors;
+    public ParseResult {
+        objects = List.copyOf(objects);
+        errors = List.copyOf(errors);
     }
 
-    public List<ParseError> getErrors() {
-        return errors;
-    }
-
-    public List<CorpusObject> getCorpusObjects() {
-        return corpusObjects;
+    public static ParseResult empty() {
+        return new ParseResult(List.of(), List.of());
     }
 }

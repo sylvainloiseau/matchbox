@@ -35,6 +35,25 @@
             <scope>provided</scope>
         </dependency>
 
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-corpus</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Optional: view of the sentences in the GUI -->
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-grammar-fx</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- ANTLR Runtime -->
         <dependency>
             <groupId>org.antlr</groupId>

@@ -31,6 +31,10 @@
         </dependency>
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-grammar-fx</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-app</artifactId>
         </dependency>
         <!-- RichTextFX for editable rich text area -->

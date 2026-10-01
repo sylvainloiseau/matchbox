@@ -1,6 +1,6 @@
 package fr.cnrs.lacito.matchbox.gui.mode.common.lexicon;
 
-import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleExample;
+import fr.cnrs.lacito.matchbox.corpus.capability.Example;
 import javafx.fxml.FXML;
 import javafx.scene.control.TextField;
 
@@ -11,9 +11,9 @@ public class ExampleController {
     
     @FXML private TextField transcriptionField;
     @FXML private TextField translationField;
-    private final SimpleExample example;
+    private final Example example;
     
-    public ExampleController(SimpleExample example) {
+    public ExampleController(Example example) {
         this.example = example;   
     }
 

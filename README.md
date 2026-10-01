@@ -160,6 +160,10 @@ mvn -pl matchbox-gui -am clean package
 
 bash build/assembly/matchbox-distribution-1.0.0-distribution/bin/matchbox
 
+### Grammar plugins
+
+Grammar plugins are jars in the `plugins` directory. Plugins built before version 2 of the grammar API (package `fr.cnrs.lacito.matchbox.language.corpusObject`) are not loaded and must be rebuilt; the log names the incompatible jars.
+
 ### Releases GitHub
 
 A GitHub workflow (`.github/workflows/release.yml`) automatically builds the installers for **Linux**, **Windows** and **macOS** when a **tag** is pushed, for example :

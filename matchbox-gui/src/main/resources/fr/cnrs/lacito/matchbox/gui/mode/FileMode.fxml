@@ -33,38 +33,14 @@
         <org.fxmisc.richtext.InlineCssTextArea fx:id="fileContentCodeArea" VBox.vgrow="ALWAYS" />
     </VBox>
     <VBox style="-fx-border-color: #cccccc;">
-      <TabPane tabClosingPolicy="UNAVAILABLE">
+      <TabPane tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
         <tabs>
-          <Tab text="Interlinear examples">
+          <Tab text="Objects">
             <content>
-              <AnchorPane minHeight="0.0" minWidth="0.0">
-                <children>
-                  <TableView fx:id="igtTableView" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                    <columns>
-                      <TableColumn fx:id="transcriptionCol" prefWidth="200" text="Transcription" />
-                      <TableColumn fx:id="glossCol" prefWidth="200" text="Morphemic glosses" />
-                      <TableColumn fx:id="translationCol" prefWidth="200" text="Translation" />
-                    </columns>
-                  </TableView>
-                </children>
-              </AnchorPane>
-            </content>
-          </Tab>
-          <Tab text="Lexical information">
-            <content>
-              <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                <children>
-                  <ScrollPane prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                    <content>
-                      <AnchorPane minHeight="0.0" minWidth="0.0">
-                        <children>
-                          <VBox fx:id="lexicalInformationBoxes" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
-                        </children>
-                      </AnchorPane>
-                    </content>
-                  </ScrollPane>
-                </children>
-              </AnchorPane>
+              <SplitPane fx:id="objectsSplitPane" dividerPositions="0.55" orientation="VERTICAL">
+                <TabPane fx:id="objectKindTabPane" tabClosingPolicy="UNAVAILABLE" />
+                <ScrollPane fx:id="objectDetailPane" fitToWidth="true" fitToHeight="true" />
+              </SplitPane>
             </content>
           </Tab>
           <Tab text="Session">
@@ -83,9 +59,9 @@
                 <children>
                   <TableView fx:id="errorTableView" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                     <columns>
-                      <TableColumn fx:id="lineColumn" prefWidth="200" text="Transcription" />
-                      <TableColumn fx:id="charPositionColumn" prefWidth="200" text="Morphemic glosses" />
-                      <TableColumn fx:id="messageColumn" prefWidth="200" text="Translation" />
+                      <TableColumn fx:id="lineColumn" prefWidth="60" text="Line" />
+                      <TableColumn fx:id="charPositionColumn" prefWidth="80" text="Position" />
+                      <TableColumn fx:id="messageColumn" prefWidth="600" text="Message" />
                     </columns>
                   </TableView>
                 </children>

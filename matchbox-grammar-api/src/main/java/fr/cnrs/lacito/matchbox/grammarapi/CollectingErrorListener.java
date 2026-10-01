@@ -25,7 +25,7 @@ public class CollectingErrorListener extends BaseErrorListener {
             int charPositionInLine,
             String msg,
             RecognitionException e) {
-        errors.add(new ParseError(filePath, grammarId, line, charPositionInLine, msg, e, offendingSymbol, recognizer));
+        errors.add(new ParseError(filePath, grammarId, line, charPositionInLine, msg));
     }
 
     public List<ParseError> getErrors() {

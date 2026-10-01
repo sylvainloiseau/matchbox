@@ -23,6 +23,14 @@ public class ParseError {
 
         private String grammarId;
 
+        /**
+         * Error without ANTLR objects attached. Prefer this constructor: keeping the recognizer
+         * or the exception keeps the whole parser and its token stream in memory.
+         */
+        public ParseError(Path file, String grammarId, int line, int charPositionInLine, String message) {
+            this(file, grammarId, line, charPositionInLine, message, null, null, null);
+        }
+
         public ParseError(Path file, String grammarId, int line, int charPositionInLine, String message, RecognitionException e, Object offendingSymbol, Recognizer<?,?> recognizer) {
             this.line = line;
             this.charPositionInLine = charPositionInLine;

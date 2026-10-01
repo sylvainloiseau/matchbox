@@ -7,7 +7,12 @@ import fr.cnrs.lacito.matchbox.grammarapi.AbstractGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.CollectingErrorListener;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
-import fr.cnrs.lacito.matchbox.language.corpusObject.*;
+import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
+import fr.cnrs.lacito.matchbox.corpus.simple.SimpleExample;
+import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
+import fr.cnrs.lacito.matchbox.corpus.simple.SimpleLexicalDefinition;
+import fr.cnrs.lacito.matchbox.corpus.simple.SimpleSense;
+import fr.cnrs.lacito.matchbox.grammarapi.Spans;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,8 +21,11 @@ import org.antlr.v4.runtime.CommonTokenStream;
 
 public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
 
-    private final List<CorpusObject> objects = new ArrayList<>();
-    private final List<ParseError> errors = new ArrayList<>();
+    public static final String ID = "notebook-grammar";
+    public static final String KIND_IGT = ID + ":igt";
+    public static final String KIND_ENTRY = ID + ":lexical-entry";
+    public static final String KIND_SENSE = ID + ":sense";
+    public static final String KIND_EXAMPLE = ID + ":example";
 
     public NotebookGrammarPlugin() {
         // Constructor can be used for initialization if needed
@@ -25,7 +33,12 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
 
     @Override
     public String getId() {
-        return "notebook-grammar";
+        return ID;
+    }
+
+    @Override
+    public int getApiVersion() {
+        return API_VERSION;
     }
 
     @Override
@@ -40,6 +53,8 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
 
     @Override
     public ParseResult getResult(Path filePath, String content) {
+        List<CorpusObject> objects = new ArrayList<>();
+        List<ParseError> errors = new ArrayList<>();
         try {
             // Create lexer and parser
             var inputStream = CharStreams.fromString(content);
@@ -65,82 +80,67 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
                 new org.antlr.v4.runtime.tree.ParseTreeWalker();
             walker.walk(listener, tree);
 
-            objects.clear();
-            objects.addAll(
-                listener
-                    .getIGTs()
-                    .stream()
-                    .map(x ->
-                        new SimpleIGT(
-                            new TextCoordinate(
-                                filePath,
-                                x.getStart().getStartIndex(),
-                                x.getStop().getStopIndex(),
-                                x.getStart().getLine(),
-                                x.getStop().getLine()
-                            ),
-                            x.IMB_LINE(0).getText(),
-                            x.IMB_LINE(1).getText(),
-                            x.IMB_QUOTED_LINE().getText()
-                        )
+            // Rules produced by error recovery may lack tokens: such objects are skipped
+            // (the syntax error is reported anyway), the others are kept.
+            for (var x : listener.getIGTs()) {
+                if (x.exception != null || x.IMB_LINE().size() < 2 || x.IMB_QUOTED_LINE() == null) {
+                    continue;
+                }
+                objects.add(
+                    new SimpleIGT(
+                        KIND_IGT,
+                        Spans.of(filePath, x),
+                        x.IMB_LINE(0).getText(),
+                        x.IMB_LINE(1).getText(),
+                        x.IMB_QUOTED_LINE().getText()
                     )
-                    .toList()
-            );
+                );
+            }
 
-            objects.addAll(
-                listener
-                    .getLexicalDefinitions()
-                    .stream()
-                    .map(x -> {
-                        TextCoordinate coordinate = new TextCoordinate(
-                            filePath,
-                            x.getStart().getStartIndex(),
-                            x.getStop().getStopIndex(),
-                            x.getStart().getLine(),
-                            x.getStop().getLine()
-                        );
-                        SimpleLexicalDefinition sld =
-                            new SimpleLexicalDefinition(
-                                coordinate,
-                                x.TXT().getText()
-                            );
-
-                        for (SenseContext sense : x.sense()) {
-                            SimpleSense s = new SimpleSense(
-                                new TextCoordinate(
-                                    filePath,
-                                    sense.getStart().getStartIndex(),
-                                    sense.getStop().getStopIndex(),
-                                    sense.getStart().getLine(),
-                                    sense.getStop().getLine()
-                                ),
-                                sense.TXT_DEF().getText()
-                            );
-                            for (ExampleContext example : sense.example()) {
-                                s.addExample(
-                                    new SimpleExample(
-                                        new TextCoordinate(
-                                            filePath,
-                                            example.getStart().getStartIndex(),
-                                            example.getStop().getStopIndex(),
-                                            example.getStart().getLine(),
-                                            example.getStop().getLine()
-                                        ),
-                                        example.TXT_EX(0).getText(),
-                                        example.TXT_EX(1).getText()
-                                    )
-                                );
-                            }
-                            sld.addSense(s);
+            for (var x : listener.getLexicalDefinitions()) {
+                if (x.exception != null || x.TXT() == null) {
+                    continue;
+                }
+                List<SimpleSense> senses = new ArrayList<>();
+                for (SenseContext sense : x.sense()) {
+                    if (sense.exception != null || sense.TXT_DEF() == null) {
+                        continue;
+                    }
+                    List<SimpleExample> examples = new ArrayList<>();
+                    for (ExampleContext example : sense.example()) {
+                        if (example.exception != null || example.TXT_EX().size() < 2) {
+                            continue;
                         }
-                        return sld;
-                    })
-                    .toList()
-            );
-            errors.clear();
+                        examples.add(
+                            new SimpleExample(
+                                KIND_EXAMPLE,
+                                Spans.of(filePath, example),
+                                example.TXT_EX(0).getText(),
+                                example.TXT_EX(1).getText()
+                            )
+                        );
+                    }
+                    senses.add(
+                        new SimpleSense(
+                            KIND_SENSE,
+                            Spans.of(filePath, sense),
+                            sense.TXT_DEF().getText(),
+                            examples
+                        )
+                    );
+                }
+                objects.add(
+                    new SimpleLexicalDefinition(
+                        KIND_ENTRY,
+                        Spans.of(filePath, x),
+                        x.TXT().getText(),
+                        senses
+                    )
+                );
+            }
             errors.addAll(errorListener.getErrors());
-        } catch (Exception e) {
-            System.err.println("Error parsing text: " + e.getMessage());
+        } catch (RuntimeException e) {
+            errors.add(new ParseError(filePath, getId(), 0, 0, "Internal error of the grammar: " + e));
         }
         return new ParseResult(objects, errors);
     }

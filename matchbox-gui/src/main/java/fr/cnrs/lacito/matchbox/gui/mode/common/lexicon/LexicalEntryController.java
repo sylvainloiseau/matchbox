@@ -10,8 +10,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleLexicalDefinition;
-import fr.cnrs.lacito.matchbox.language.corpusObject.SimpleSense;
+import fr.cnrs.lacito.matchbox.corpus.capability.LexicalEntry;
+import fr.cnrs.lacito.matchbox.corpus.capability.Sense;
 
 /**
  * Controller for displaying a lexical entry with its definitions and examples
@@ -21,9 +21,9 @@ public class LexicalEntryController {
     @FXML private TextField entryWordField;
     @FXML private VBox senseContainer;
     private List<SenseController> senseControllers = new ArrayList<>();
-    private final SimpleLexicalDefinition lexicalDefinition;
+    private final LexicalEntry lexicalDefinition;
 
-    public LexicalEntryController(SimpleLexicalDefinition lexDef) {
+    public LexicalEntryController(LexicalEntry lexDef) {
         if (lexDef == null) throw new IllegalArgumentException("LexicalDefinition cannot be null");
         this.lexicalDefinition = lexDef;
     }
@@ -33,15 +33,15 @@ public class LexicalEntryController {
         entryWordField.setText(lexicalDefinition.getHeadword());
         clearSenses();
         // Add definitions
-        List<SimpleSense> senses = lexicalDefinition.getSenses();
+        List<? extends Sense> senses = lexicalDefinition.getSenses();
         if (senses != null) {
-            for (SimpleSense sense : senses) {
+            for (Sense sense : senses) {
                 addSense(sense);
             }
         }
     }
 
-    public void addSense(SimpleSense sense) {
+    public void addSense(Sense sense) {
         if (sense == null) return;
         try {
             FXMLLoader loader = new FXMLLoader();
