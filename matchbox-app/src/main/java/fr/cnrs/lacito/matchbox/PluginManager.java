@@ -20,6 +20,7 @@ public class PluginManager {
 
     private static final List<GrammarPlugin> plugins = new ArrayList<>();
     private static final List<ClassLoader> pluginClassLoaders = new ArrayList<>();
+    private static final Set<String> loadedPluginClasses = new HashSet<>();
 
     public static final GrammarPlugin getPluginById(String id) {
         return plugins
@@ -37,12 +38,16 @@ public class PluginManager {
 
     public static List<GrammarPlugin> loadPlugins() throws IOException {
         logger.info("Loading plugins...");
+        // Grammars on the application class path: jpackage puts every jar of the
+        // application, plugins included, on the class path.
+        loadProviders(PluginManager.class.getClassLoader(), "application class path");
+
         Path pluginsDir = findPluginsDirectory();
         if (pluginsDir == null) {
             logger.warning(
-                "No plugins directory found. No plugins will be loaded."
+                "No plugins directory found. Only the grammars of the application class path are loaded."
             );
-            return Collections.emptyList();
+            return plugins;
         }
 
         logger.info(
@@ -83,35 +88,56 @@ public class PluginManager {
                 new URL[] { jar.toUri().toURL() },
                 PluginManager.class.getClassLoader()
             );
-            boolean found = false;
-            for (GrammarPlugin plugin : ServiceLoader.load(GrammarPlugin.class, cl)) {
-                if (plugin.getClass().getClassLoader() != cl) {
-                    continue; // provided by the application or another jar
+            if (loadProviders(cl, jar.getFileName().toString())) {
+                pluginClassLoaders.add(cl);
+            }
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Error loading plugin from JAR: " + jar.toAbsolutePath(), e);
+        }
+    }
+
+    /**
+     * Registers the grammars visible from a class loader, skipping those already registered
+     * (a plugin class loader also sees, through its parent, the grammars of the application
+     * class path, and a jar can be both on the class path and in the plugins directory).
+     *
+     * @return true if at least one grammar class was defined by this class loader itself
+     */
+    private static boolean loadProviders(ClassLoader loader, String source) {
+        boolean definedHere = false;
+        Iterator<GrammarPlugin> it = ServiceLoader.load(GrammarPlugin.class, loader).iterator();
+        int failures = 0;
+        while (failures < 100) { // bound the loop if the services file itself is unreadable
+            try {
+                if (!it.hasNext()) {
+                    break;
                 }
-                found = true;
+                GrammarPlugin plugin = it.next();
+                if (plugin.getClass().getClassLoader() == loader) {
+                    definedHere = true;
+                }
+                if (!loadedPluginClasses.add(plugin.getClass().getName())) {
+                    continue;
+                }
                 int version = plugin.getApiVersion();
                 if (version != GrammarPlugin.API_VERSION) {
                     logger.severe(
-                        "Plugin " + plugin.getId() + " in " + jar.getFileName() +
-                            " uses grammar API version " + version + ", expected " +
-                            GrammarPlugin.API_VERSION + "; rebuild it. Skipped."
+                        "Plugin " + plugin.getId() + " (" + source + ") uses grammar API version " +
+                            version + ", expected " + GrammarPlugin.API_VERSION + "; rebuild it. Skipped."
                     );
                     continue;
                 }
                 plugins.add(plugin);
-                logger.info("Loaded plugin: " + plugin.getDisplayName());
+                logger.info("Loaded plugin: " + plugin.getDisplayName() + " (" + source + ")");
+            } catch (ServiceConfigurationError | LinkageError e) {
+                failures++;
+                // e.g. a plugin compiled against an older API (NoClassDefFoundError, AbstractMethodError)
+                logger.log(Level.SEVERE,
+                    "Incompatible plugin (" + source + "): rebuild it against grammar API version " +
+                        GrammarPlugin.API_VERSION + ". Skipped.", e);
             }
-            if (found) {
-                pluginClassLoaders.add(cl);
-            }
-        } catch (ServiceConfigurationError | LinkageError e) {
-            // e.g. a plugin compiled against an older API (NoClassDefFoundError, AbstractMethodError)
-            logger.log(Level.SEVERE,
-                "Incompatible plugin " + jar.getFileName() + ": rebuild it against grammar API version " +
-                    GrammarPlugin.API_VERSION + ". Skipped.", e);
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error loading plugin from JAR: " + jar.toAbsolutePath(), e);
         }
+        return definedHere;
     }
 
     /**

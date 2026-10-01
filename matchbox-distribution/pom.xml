@@ -214,8 +214,31 @@
                   <fileset>
                     <directory>../build/target</directory>
                   </fileset>
+                  <fileset>
+                    <directory>${build.root}/assembly</directory>
+                  </fileset>
                 </filesets>
               </configuration>
+              <executions>
+                <!-- The assembly is a directory that is not emptied between builds: jars
+                     of removed or renamed modules would stay in lib/ and be packaged by
+                     jpackage. Empty it at the start of every build, not only on mvn clean. -->
+                <execution>
+                  <id>clean-assembly</id>
+                  <phase>initialize</phase>
+                  <goals>
+                    <goal>clean</goal>
+                  </goals>
+                  <configuration>
+                    <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                    <filesets>
+                      <fileset>
+                        <directory>${build.root}/assembly</directory>
+                      </fileset>
+                    </filesets>
+                  </configuration>
+                </execution>
+              </executions>
             </plugin>
         <plugin>
             <groupId>org.panteleyev</groupId>
@@ -254,7 +277,10 @@
 
                         <!-- Java options -->
                         <javaOptions>
-                            <javaOption>-Dmatchbox.plugins.dir=plugins</javaOption>
+                            <!-- $APPDIR is expanded by the jpackage launcher to the application
+                                 directory; a relative path would be resolved against the working
+                                 directory, which is / when the app is started from the Finder -->
+                            <javaOption>-Dmatchbox.plugins.dir=$APPDIR/plugins</javaOption>
                         </javaOptions>
 
 
