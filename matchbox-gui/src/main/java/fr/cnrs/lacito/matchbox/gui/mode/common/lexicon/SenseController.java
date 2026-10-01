@@ -52,8 +52,8 @@ public class SenseController {
             exampleControllers.add(controller);
             examplesContainer.getChildren().add(exampleView);
         } catch (IOException e) {
-            e.printStackTrace();
-            System.err.println("Error loading example view: " + e.getMessage());
+            java.util.logging.Logger.getLogger(SenseController.class.getName())
+                .log(java.util.logging.Level.WARNING, "Error loading the example view", e);
         }
     }
 

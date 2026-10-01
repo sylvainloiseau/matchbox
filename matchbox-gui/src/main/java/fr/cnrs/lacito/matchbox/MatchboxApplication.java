@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox;
 
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
+import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
 import fr.cnrs.lacito.matchbox.gui.MainController;
 import fr.cnrs.lacito.matchbox.settings.AppDirectories;
 import fr.cnrs.lacito.matchbox.settings.LoggingSetup;
@@ -33,11 +34,14 @@ public class MatchboxApplication extends Application {
     public void start(Stage primaryStage) throws IOException {
         settings = UserSettings.load(AppDirectories.forCurrentUser());
         try {
-            LoggingSetup.init(settings);
+            ErrorReporter.setLogFile(LoggingSetup.init(settings));
         } catch (IOException e) {
             // the application still works without a log file
             logger.log(Level.WARNING, "Cannot write the log file", e);
         }
+
+        // exceptions that nothing caught are logged and shown
+        ErrorReporter.installUncaughtExceptionHandler();
 
         List<GrammarPlugin> plugins = PluginManager.loadPlugins();
 

@@ -98,7 +98,7 @@ public class SettingsDialog {
 
             stage.showAndWait();
         } catch (Exception ex) {
-            showError("Error loading dialog", ex.getMessage());
+            ErrorReporter.report(parentStage, "Error loading the settings dialog", ex);
         }
     }
 

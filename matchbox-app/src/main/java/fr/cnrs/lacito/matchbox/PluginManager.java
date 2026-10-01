@@ -240,8 +240,7 @@ public class PluginManager {
                 );
             }
         } catch (Exception e) {
-            logger.severe("Unable to find a plugins directory.");
-            e.printStackTrace();
+            logger.log(Level.SEVERE, "Unable to find a plugins directory.", e);
         }
 
         return null;

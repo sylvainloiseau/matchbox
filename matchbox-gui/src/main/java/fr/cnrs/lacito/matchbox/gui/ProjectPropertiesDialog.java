@@ -45,6 +45,8 @@ public class ProjectPropertiesDialog {
     private ObservableList<String> fileSetItems;
     private TextField fileTypeNameField;
     private TextField matchingFilesField;
+    /** Why the regular expression being typed is invalid; hidden when it is valid. */
+    private final Label regexErrorLabel = new Label();
     private ListView<GrammarItem> grammarListView;
     private ObservableList<GrammarItem> grammarItems;
 
@@ -277,8 +279,19 @@ public class ProjectPropertiesDialog {
         regexLabel.setStyle("-fx-font-weight: bold;");
         matchingFilesField = new TextField();
         matchingFilesField.setPromptText("e.g., .*\\\\.md$");
+        regexErrorLabel.setWrapText(true);
+        regexErrorLabel.setStyle("-fx-text-fill: #b00020;");
+        regexErrorLabel.managedProperty().bind(regexErrorLabel.visibleProperty());
+        regexErrorLabel.setVisible(false);
         matchingFilesField.textProperty().addListener((obs, oldVal, newVal) -> {
-            if (currentPattern != null) {
+            if (currentPattern == null) {
+                showRegexProblem(null);
+                return;
+            }
+            // only a valid regular expression is applied to the file type
+            String problem = FileType.checkRegex(newVal);
+            showRegexProblem(problem);
+            if (problem == null) {
                 currentPattern.setRegex(newVal);
             }
         });
@@ -340,11 +353,18 @@ public class ProjectPropertiesDialog {
             fileTypeNameField,
             regexLabel,
             matchingFilesField,
+            regexErrorLabel,
             grammarsLabel,
             grammarListView
         );
 
         return box;
+    }
+
+    private void showRegexProblem(String problem) {
+        regexErrorLabel.setText(problem == null ? "" : problem);
+        regexErrorLabel.setVisible(problem != null);
+        matchingFilesField.setStyle(problem == null ? "" : "-fx-border-color: #b00020;");
     }
 
     private VBox createAssistantSection() {
@@ -464,6 +484,21 @@ public class ProjectPropertiesDialog {
     }
 
     private void handleSave() {
+        // refuse invalid regular expressions: the file type would match no file
+        if (currentPattern != null) {
+            String problem = FileType.checkRegex(matchingFilesField.getText());
+            if (problem != null) {
+                showRegexProblem(problem);
+                showInvalidPattern(currentPattern.getName(), problem);
+                return;
+            }
+        }
+        for (FileType type : project.getFileTypes()) {
+            if (type != currentPattern && !type.isValid()) {
+                showInvalidPattern(type.getName(), FileType.checkRegex(type.getRegex()));
+                return;
+            }
+        }
         project.setName(projectNameField.getText());
         project.setDescription(projectDescriptionArea.getText());
         project.setCloudAssistAllowed(allowCloudAssistCheckBox.isSelected());
@@ -493,6 +528,14 @@ public class ProjectPropertiesDialog {
         }
         saved = true;
         stage.close();
+    }
+
+    private void showInvalidPattern(String fileType, String problem) {
+        Alert alert = new Alert(Alert.AlertType.WARNING, problem);
+        alert.initOwner(stage);
+        alert.setTitle("Project properties");
+        alert.setHeaderText("The pattern of the file type '" + fileType + "' is not a valid regular expression");
+        alert.showAndWait();
     }
 
     private void handleCancel() {

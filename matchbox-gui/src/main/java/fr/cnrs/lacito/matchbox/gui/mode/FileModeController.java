@@ -4,6 +4,7 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
+import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
 import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
 import fr.cnrs.lacito.matchbox.gui.assist.GhostTextController;
 import fr.cnrs.lacito.matchbox.gui.assist.SuggestionPanelController;
@@ -146,11 +147,7 @@ public class FileModeController {
         if (editorController != null) {
             editorController.setProject(project);
         }
-        try {
-            setupFileListView();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
+        setupFileListView();
         project.setApplyExecutor(Platform::runLater);
         saveButton
             .disableProperty()
@@ -273,7 +270,7 @@ public class FileModeController {
         return assist;
     }
 
-    private void setupFileListView() throws Exception {
+    private void setupFileListView() {
         FilteredList<TextDocument> filteredList = new FilteredList<>(
             project.getDerivedFileList()
         );
@@ -526,9 +523,9 @@ public class FileModeController {
     /** Parses the edited file in the background; the views refresh when the results arrive. */
     public void handleParseText() {
         editorController.parseEditedFile().exceptionally(e -> {
-            Platform.runLater(() ->
-                new Alert(Alert.AlertType.ERROR, "Parsing failed: " + e.getMessage()).showAndWait()
-            );
+            Platform.runLater(() -> ErrorReporter.report(
+                fileContentCodeArea.getScene() == null ? null : fileContentCodeArea.getScene().getWindow(),
+                "Parsing failed", e));
             return null;
         });
     }

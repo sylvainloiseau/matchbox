@@ -377,9 +377,7 @@ final class AiModelDialog {
                 }
             }
         } catch (IOException ex) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Cannot store the API key: " + ex.getMessage());
-            alert.initOwner(stage);
-            alert.showAndWait();
+            fr.cnrs.lacito.matchbox.gui.ErrorReporter.report(stage, "Cannot store the API key", ex);
             return false;
         }
         AssistSettingsData old = controller.data();

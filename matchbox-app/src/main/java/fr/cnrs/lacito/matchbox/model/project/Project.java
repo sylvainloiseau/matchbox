@@ -452,7 +452,16 @@ public class Project {
         loadProblems.add(message);
     }
 
-    /** Files or directories of the project definition that could not be read when it was loaded. */
+    /** Records a problem of the project definition, shown to the user after loading. */
+    void recordLoadProblem(String message) {
+        logger.warning(message);
+        loadProblems.add(message);
+    }
+
+    /**
+     * Problems found when the project was loaded: files or directories that could not be read,
+     * file types with an invalid regular expression.
+     */
     public List<String> getLoadProblems() {
         return List.copyOf(loadProblems);
     }

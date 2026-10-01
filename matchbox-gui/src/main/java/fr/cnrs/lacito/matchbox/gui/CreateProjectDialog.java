@@ -63,7 +63,7 @@ public class CreateProjectDialog {
                             projectFile.getAbsolutePath()
                     );
                 } catch (Exception e) {
-                    showError("Error saving project", e.getMessage());
+                    ErrorReporter.report(parentStage, "Error saving project", e);
                 }
             }
         }
@@ -76,10 +76,4 @@ public class CreateProjectDialog {
         alert.showAndWait();
     }
 
-    private void showError(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
-        alert.setContentText(message);
-        alert.showAndWait();
-    }
 }

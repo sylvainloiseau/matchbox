@@ -192,7 +192,8 @@ public class MainController {
         try {
             fileModePane = loader.load();
         } catch (IOException e) {
-            e.printStackTrace();
+            // the main view cannot work without it
+            throw new java.io.UncheckedIOException("Cannot load the file mode view", e);
         }
         return fileModeController;
     }
@@ -211,6 +212,8 @@ public class MainController {
         wireMenuItem();
         wireAssistantMenu();
         switchToFileMode();
+        // problems of the project reopened at startup
+        Platform.runLater(this::reportLoadProblems);
     }
 
     private void wireAssistantMenu() {
@@ -349,7 +352,7 @@ public class MainController {
         try {
             fileModeController.handleOpenDirectory(primaryStage);
         } catch (Exception e) {
-            showError("Error opening directory", e.getMessage());
+            ErrorReporter.report(primaryStage, "Error opening directory", e);
         }
     }
 
@@ -386,7 +389,7 @@ public class MainController {
         try {
             fileModeController.openFileOrDirectory(f);
         } catch (Exception e) {
-            showError("Error opening file", e.getMessage());
+            ErrorReporter.report(primaryStage, "Error opening file", e);
         }
     }
 
@@ -399,7 +402,7 @@ public class MainController {
         try {
             fileModeController.handleSaveCurrentFile();
         } catch (IOException e) {
-            showError("Error saving file", e.getMessage());
+            ErrorReporter.report(primaryStage, "Error saving file", e);
         }
     }
 
@@ -414,14 +417,21 @@ public class MainController {
             settings.recentProjects().add(f.toPath());
             project.parseProject();
             onProjectChangeHook();
-            if (!project.getLoadProblems().isEmpty()) {
-                showError(
-                    "Some files of the project could not be read",
-                    String.join("\n", project.getLoadProblems())
-                );
-            }
+            reportLoadProblems();
         } catch (Exception e) {
-            showError("Error opening project", e.getMessage());
+            ErrorReporter.report(primaryStage, "Error opening project", e);
+        }
+    }
+
+    /** Shows the problems found when the project was loaded (unreadable files, invalid patterns). */
+    private void reportLoadProblems() {
+        if (!project.getLoadProblems().isEmpty()) {
+            ErrorReporter.report(
+                primaryStage,
+                "Some parts of the project could not be loaded",
+                String.join("\n\n", project.getLoadProblems()) +
+                    "\n\nCorrect them in File › Edit project…"
+            );
         }
     }
 
@@ -454,8 +464,9 @@ public class MainController {
         try {
             ProjectXMLSerializer.save(project);
         } catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            // the project stays marked as modified
+            ErrorReporter.report(primaryStage, "Error saving project", e);
+            return;
         }
         project.isProjectDefinitionOutdatedProperty().set(false);
     }
@@ -585,12 +596,6 @@ public class MainController {
         Platform.exit();
     }
 
-    private void showError(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
-        alert.setContentText(message);
-        alert.showAndWait();
-    }
 
     public void setPrimaryStage(Stage stage) {
         this.primaryStage = stage;

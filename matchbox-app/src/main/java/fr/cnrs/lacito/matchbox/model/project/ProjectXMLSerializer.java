@@ -165,7 +165,16 @@ public class ProjectXMLSerializer {
                 regex = regexList.item(0).getTextContent();
             }
 
-            FileType pattern = new FileType(name, regex);
+            FileType pattern = new FileType();
+            pattern.setName(name);
+            String problem = FileType.checkRegex(regex);
+            if (problem == null) {
+                pattern.setRegex(regex);
+            } else {
+                // kept as is, so that it can be corrected in the project properties
+                pattern.setInvalidRegex(regex);
+                project.recordLoadProblem("The file type '" + name + "' matches no file: " + problem);
+            }
 
             // Load grammars for this pattern
             NodeList grammarList = patternElement.getElementsByTagName(

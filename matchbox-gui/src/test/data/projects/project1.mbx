@@ -11,13 +11,13 @@
   </pattern>
   <pattern>
     <name>test</name>
-    <regex>*.txt</regex>
+    <regex>.*\.txt</regex>
     <grammar id="notebook-grammar" rank="0"/>
     <grammar id="notebook-grammar" rank="1"/>
   </pattern>
   <pattern>
     <name>test2</name>
-    <regex>*.conll</regex>
+    <regex>.*\.conll</regex>
     <grammar id="notebook-grammar" rank="0"/>
     <grammar id="notebook-grammar" rank="1"/>
   </pattern>
