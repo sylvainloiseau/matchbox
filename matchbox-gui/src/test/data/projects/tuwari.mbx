@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project>
+  <fileset>
+    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/tuwari.md"/>
+  </fileset>
+  <pattern>
+    <name>All files</name>
+    <regex>.+</regex>
+    <grammar id="notebook-grammar" rank="0"/>
+  </pattern>
+  <pattern>
+    <name>all</name>
+    <regex>.*\.md</regex>
+    <grammar id="conll-grammar" rank="0"/>
+    <grammar id="notebook-grammar" rank="1"/>
+  </pattern>
+</project>
