@@ -1,3 +1,10 @@
+Could you explain me what is the architecture for the GUI for plugin now.
+
+
+I would you like to generate a plan for a new plugin (in the grammars directory). You will look at the corresponding skill for writting plugins. The plugins will contain a grammar
+  for extracting a YAML header at the begining of a file: ie. lines of comma-searated field/value pairs, wrapped between two lines of triple dashes. The plugin will look for a list
+  of field: author, date, title, id.
+
 # Add IA agent support
 
 General idea: You will create a plan for adding IA-agent-based suggestions into the main editor of

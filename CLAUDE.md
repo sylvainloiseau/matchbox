@@ -80,7 +80,17 @@ The project is a **Maven multi-module** repository with the following structure:
 
 #### `matchbox-grammar-fx`
 
-- `ObjectViewFactory<T>`: view and table columns of a type of object, registered by plugins in `META-INF/services`. The GUI (`gui.view.ObjectViewRegistry`) picks the factory of the closest supertype, with built-in factories for the capability interfaces and a generic fallback.
+- `ObjectViewFactory<T>`: view (`createView`) and table columns (`getColumns`, default empty) of a type of object, registered by plugins in `META-INF/services/fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory` (e.g. `ConllSentenceViewFactory`).
+- **Choice of the factory** (`gui.view.ObjectViewRegistry`, matchbox-gui): for an object of class `C`, the factory whose `getType()` is the closest supertype of `C` (breadth-first, `C` itself first), then the highest `getPriority()` (built-in: 0), then plugin factories before built-in ones; otherwise `GenericObjectViewFactory`. If a plugin's `createView` throws or returns `null`, the generic view is shown; a failing column gives an empty cell (logged once per factory). Tables always start with a **Line** column; a factory without columns gets a **Label** column (`getLabel()`).
+- **Built-in factories** (`matchbox-gui/src/main/java/fr/cnrs/lacito/matchbox/gui/view/`, registered in matchbox-gui's `META-INF/services`):
+
+  | Factory | Type | Detail view | Columns |
+  |---|---|---|---|
+  | `GenericObjectViewFactory` | `CorpusObject` (fallback) | Kind and file/line range, then a `TreeView` of the object and its `getChildren()` (`label [kind]`); double-click selects the span in the editor | none (Line + Label) |
+  | `InterlinearSentenceViewFactory` | `InterlinearSentence` | Transcription, glosses, translation, clickable position | Transcription, Morphemic glosses, Translation |
+  | `LexicalEntryViewFactory` | `LexicalEntry` | `LexicalEntryView.fxml` (headword, senses, examples) | Headword, Senses |
+
+- A plugin without a factory: objects implementing `InterlinearSentence` or `LexicalEntry` get the corresponding view; any other object only shows what `CorpusObject` exposes (kind, label, position, children), so give it an informative `getLabel()` and a meaningful `getChildren()` tree. `DependencySentence`, `Sense` and `Example` have no built-in view (tokens/heads of a `DependencySentence` are not shown by the fallback).
 
 #### `grammars/`
 

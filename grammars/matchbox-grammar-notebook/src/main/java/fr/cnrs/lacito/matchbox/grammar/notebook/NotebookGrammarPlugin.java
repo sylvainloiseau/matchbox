@@ -14,9 +14,14 @@ import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleLexicalDefinition;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleSense;
 import fr.cnrs.lacito.matchbox.grammarapi.Spans;
+
+import java.awt.geom.Line2D;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.swing.event.HyperlinkEvent;
+
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 
@@ -52,10 +57,19 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
         return "Grammar for parsing notebook files";
     }
 
-    // TODO: describe the notation for users and AI prompts
     @Override
     public String getFormatDocumentation() {
-        return "";
+        return """This grammar look for two patterns
+
+Both pattern are delimited by at least a blank lines before and after.
+
+- The first one is is a IGT (interlinear glossed text) sentence. It is a group of three Line preceded and followed by a line containing only three columns (:::). The first line contains word, separated by blank and segemented into morphemes by hyphens. The second line contains the exact number of whitespace-separated tokens, each divided in the exact number of hyphen-separated morphemes than their corresponding token on the first line. This line contains a gloss for each morphemes on the first line.
+  - Note that IGT rules allow a equal sign (=) instead of a hyphen (-) for clitic boundaries. In that case, the corresponding morphems gloss in the second line must also have a = sign at the corresponding position.
+
+- The second pattern is a lexical entry definition. It contains a headword between brackets, followed by a definition between curly braces.
+
+""";
+
     }
 
     // TODO: add canonical snippets, each parsing without errors

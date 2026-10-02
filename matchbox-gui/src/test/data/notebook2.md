@@ -9,6 +9,8 @@ zz vv xx
 'this is a new test'
 :::
 
+
+
 <foo> {another definition}
 
 <gaz> {test}
@@ -16,5 +18,7 @@ zz vv xx
 <foo> {yet another definition}
 
 <degobija> {yet another verb form from the Croissant}
+
+<newentry> {hello foo bar}
 
 
