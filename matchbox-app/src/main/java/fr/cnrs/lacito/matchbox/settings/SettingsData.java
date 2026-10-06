@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
  * @param openLastProject    reopen the last project at startup
  * @param logFile            log file chosen by the user, {@code null} for the default location
  * @param assist             settings of the AI assistant
+ * @param allowInvalidViewEdits apply edits made in object views even if they add parse errors
  */
 public record SettingsData(
     Integer version,
@@ -43,7 +44,8 @@ public record SettingsData(
     Integer maxRecentProjects,
     Boolean openLastProject,
     String logFile,
-    AssistSettingsData assist
+    AssistSettingsData assist,
+    Boolean allowInvalidViewEdits
 ) {
 
     public static final int CURRENT_VERSION = 2;
@@ -65,7 +67,8 @@ public record SettingsData(
             10,
             false,
             null,
-            AssistSettingsData.defaults()
+            AssistSettingsData.defaults(),
+            false
         );
     }
 
@@ -95,14 +98,15 @@ public record SettingsData(
             positive(maxRecentProjects, d.maxRecentProjects, "maxRecentProjects", problems),
             openLastProject == null ? d.openLastProject : openLastProject,
             logFile == null || logFile.isBlank() ? null : logFile.strip(),
-            assist == null ? d.assist : assist.validated(problems)
+            assist == null ? d.assist : assist.validated(problems),
+            allowInvalidViewEdits == null ? d.allowInvalidViewEdits : allowInvalidViewEdits
         );
     }
 
     /** Copy with other assistant settings. */
     public SettingsData withAssist(AssistSettingsData newAssist) {
         return new SettingsData(version, charset, igtColor, lexicalColor, morphemeSeparators, fileExtensions,
-            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist);
+            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist, allowInvalidViewEdits);
     }
 
     /** Validated copy, problems ignored. */

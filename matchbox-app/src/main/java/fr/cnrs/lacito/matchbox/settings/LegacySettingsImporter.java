@@ -85,7 +85,7 @@ final class LegacySettingsImporter {
         }
         SettingsData settings = new SettingsData(
             SettingsData.CURRENT_VERSION, charset, igtColor, lexicalColor, separators,
-            extensions, patterns, maxRecentFiles, null, openLastProject, logFile, null
+            extensions, patterns, maxRecentFiles, null, openLastProject, logFile, null, null
         );
         RecentData recent = new RecentData(
             RecentData.CURRENT_VERSION,

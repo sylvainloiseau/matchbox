@@ -6,6 +6,9 @@ import java.util.List;
 /** One sense of a {@link LexicalEntry}: a definition and its examples. */
 public interface Sense extends CorpusObject {
 
+    /** Field name (see {@link fr.cnrs.lacito.matchbox.corpus.HasFields}). */
+    String DEFINITION = "definition";
+
     String getDefinition();
 
     List<? extends Example> getExamples();

@@ -19,7 +19,7 @@ class PluginManagerTest {
         public String getFormatDocumentation() { return ""; }
         public List<GrammarExample> getExamples() { return List.of(); }
         public String getGrammarSource() { return ""; }
-        public ParseResult getResult(Path file, String content) { return ParseResult.empty(); }
+        public ParseResult getResult(fr.cnrs.lacito.matchbox.corpus.TextId file, String content) { return ParseResult.empty(); }
         public int getApiVersion() { return API_VERSION; }
     }
 

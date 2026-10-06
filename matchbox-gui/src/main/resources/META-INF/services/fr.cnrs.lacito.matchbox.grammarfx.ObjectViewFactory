@@ -1,3 +1,4 @@
 fr.cnrs.lacito.matchbox.gui.view.GenericObjectViewFactory
 fr.cnrs.lacito.matchbox.gui.view.InterlinearSentenceViewFactory
 fr.cnrs.lacito.matchbox.gui.view.LexicalEntryViewFactory
+fr.cnrs.lacito.matchbox.gui.view.SectionViewFactory

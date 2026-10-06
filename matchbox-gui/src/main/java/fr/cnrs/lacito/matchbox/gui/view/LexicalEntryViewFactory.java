@@ -23,7 +23,7 @@ public class LexicalEntryViewFactory implements ObjectViewFactory<LexicalEntry> 
     @Override
     public List<ObjectColumn<LexicalEntry>> getColumns() {
         return List.of(
-            new ObjectColumn<>("Headword", LexicalEntry::getHeadword),
+            ObjectColumn.editable("Headword", LexicalEntry.HEADWORD, LexicalEntry::getHeadword),
             new ObjectColumn<>("Senses", e -> e.getSenses().stream()
                 .map(s -> s.getDefinition().strip())
                 .collect(Collectors.joining(" ; ")))

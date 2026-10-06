@@ -3,19 +3,21 @@ package fr.cnrs.lacito.matchbox.grammarapi;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.IntervalSet;
 
-import java.nio.file.Path;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Collects the syntax errors of an ANTLR lexer or parser as {@link Diagnostic}s. */
 public class CollectingErrorListener extends BaseErrorListener {
 
-    private final List<ParseError> errors = new ArrayList<>();
-    private Path filePath;
-    private String grammarId;
+    private final List<Diagnostic> diagnostics = new ArrayList<>();
+    private final TextId text;
+    private final String grammarId;
 
-    public CollectingErrorListener(Path filePath, String id) {
-        this.filePath = filePath;
-        this.grammarId = id;
+    public CollectingErrorListener(TextId text, String grammarId) {
+        this.text = text;
+        this.grammarId = grammarId;
     }
 
     @Override
@@ -38,7 +40,7 @@ public class CollectingErrorListener extends BaseErrorListener {
             // the rejected character is absent at end of input
             stopIndex = Math.min(lexer.getCharIndex(), lexer.getInputStream().size() - 1);
         }
-        errors.add(new ParseError(filePath, grammarId, line, charPositionInLine, msg,
+        diagnostics.add(new Diagnostic(text, grammarId, line, charPositionInLine, msg,
             startIndex, stopIndex, expectedTokens(recognizer, e)));
     }
 
@@ -64,11 +66,11 @@ public class CollectingErrorListener extends BaseErrorListener {
         return names;
     }
 
-    public List<ParseError> getErrors() {
-        return errors;
+    public List<Diagnostic> getDiagnostics() {
+        return diagnostics;
     }
 
     public boolean hasErrors() {
-        return !errors.isEmpty();
+        return !diagnostics.isEmpty();
     }
 }

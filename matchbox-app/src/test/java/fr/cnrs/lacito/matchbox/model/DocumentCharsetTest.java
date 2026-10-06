@@ -13,12 +13,15 @@ import fr.cnrs.lacito.matchbox.model.project.Project;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class DocumentCharsetTest {
+
+    private static final EditOrigin TYPING = EditOrigin.of(EditOrigin.Kind.TYPING, null);
 
     private static final String TEXT = "ŋa éè ʔu\n";
     private static final String LATIN1_TEXT = "café à l'été\n";
@@ -33,7 +36,7 @@ class DocumentCharsetTest {
         public String getFormatDocumentation() { return ""; }
         public List<GrammarExample> getExamples() { return List.of(); }
         public String getGrammarSource() { return ""; }
-        public ParseResult getResult(Path file, String content) { return ParseResult.empty(); }
+        public ParseResult getResult(TextId file, String content) { return ParseResult.empty(); }
         public int getApiVersion() { return API_VERSION; }
     }
 
@@ -42,7 +45,7 @@ class DocumentCharsetTest {
         Path f = Files.writeString(dir.resolve("a.txt"), TEXT, StandardCharsets.UTF_8);
         TextDocument d = new TextDocument(f, StandardCharsets.UTF_8);
         assertEquals(TEXT, d.getCurrentText());
-        d.updateText(TEXT + "ʃ\n");
+        d.replaceAll(TEXT + "ʃ\n", TYPING);
         d.writeFile();
         assertEquals(TEXT + "ʃ\n", Files.readString(f, StandardCharsets.UTF_8));
     }
@@ -53,8 +56,8 @@ class DocumentCharsetTest {
         byte[] original = Files.readAllBytes(f);
         TextDocument d = new TextDocument(f, StandardCharsets.ISO_8859_1);
         assertEquals(LATIN1_TEXT, d.getCurrentText());
-        d.updateText(LATIN1_TEXT + "x");
-        d.updateText(LATIN1_TEXT);
+        d.replaceAll(LATIN1_TEXT + "x", TYPING);
+        d.replaceAll(LATIN1_TEXT, TYPING);
         d.writeFile();
         assertArrayEquals(original, Files.readAllBytes(f), "saved in ISO-8859-1, not converted to UTF-8");
     }
@@ -73,7 +76,7 @@ class DocumentCharsetTest {
     void charactersThatCannotBeSavedAreReported() throws IOException {
         Path f = Files.writeString(dir.resolve("l.txt"), LATIN1_TEXT, StandardCharsets.ISO_8859_1);
         TextDocument d = new TextDocument(f, StandardCharsets.ISO_8859_1);
-        d.updateText("ŋ is not in Latin-1");
+        d.replaceAll("ŋ is not in Latin-1", TYPING);
         IOException e = assertThrows(IOException.class, d::writeFile);
         assertTrue(e.getMessage().contains("cannot be written in ISO-8859-1"), e.getMessage());
         assertEquals(LATIN1_TEXT, Files.readString(f, StandardCharsets.ISO_8859_1), "file unchanged");

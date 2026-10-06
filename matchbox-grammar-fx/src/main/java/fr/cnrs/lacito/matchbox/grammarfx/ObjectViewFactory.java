@@ -34,6 +34,17 @@ public interface ObjectViewFactory<T extends CorpusObject> {
      */
     Node createView(T object, ViewContext context);
 
+    /**
+     * Shows a re-parsed version of the object in a view created by {@link #createView}, keeping
+     * its state (focus, scroll, cell being edited). Called on the JavaFX thread when the object
+     * shown in the detail pane is replaced by a new parse.
+     *
+     * @return false (the default) to have the view rebuilt with {@link #createView}
+     */
+    default boolean updateView(Node view, T object, ViewContext context) {
+        return false;
+    }
+
     /** Columns used when objects of this type are shown in a table. Empty: a single label column. */
     default List<ObjectColumn<T>> getColumns() {
         return List.of();

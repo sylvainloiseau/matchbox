@@ -16,8 +16,10 @@ import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
+import fr.cnrs.lacito.matchbox.corpus.Text;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +29,7 @@ import org.junit.jupiter.api.Test;
 
 class PromptAndServiceTest {
 
-    private static final Path FILE = Path.of("notes.txt");
+    private static final TextId FILE = new TextId(Path.of("notes.txt"));
     private static final List<GrammarPlugin> GRAMMARS = List.of(new BracketGrammar());
 
     /** Answers with the given texts in order, and records the requests. */
@@ -61,7 +63,7 @@ class PromptAndServiceTest {
     }
 
     private static AssistContext context(String text, int caret) {
-        List<ParseError> errors = new BracketGrammar().getResult(FILE, text).errors();
+        List<Diagnostic> errors = new BracketGrammar().getResult(FILE, text).diagnostics();
         return new AssistContext(FILE, text, caret, GRAMMARS, errors,
             PromptPrefix.build(GRAMMARS, List.of(new FewShotExample("lexical entry", "dog [animal]")), false));
     }
@@ -114,8 +116,8 @@ class PromptAndServiceTest {
             new SimpleIGT("g:igt", new TextCoordinate(FILE, 2, 2, 2, 2), "b", "", ""),
             new SimpleIGT("g:igt", new TextCoordinate(FILE, 0, 0, 1, 1), "a", "", ""),
             new SimpleIGT("g:igt", new TextCoordinate(FILE, 4, 4, 3, 3), "c", "", ""));
-        List<ParseError> errors = List.of(new ParseError(FILE, "g", 2, 0, "bad", 2, 2, List.of()));
-        List<FewShotExample> picked = FewShotSelector.select(List.of(new FewShotSelector.ParsedFile(FILE, text, objects, errors)));
+        List<Diagnostic> errors = List.of(new Diagnostic(FILE, "g", 2, 0, "bad", 2, 2, List.of()));
+        List<FewShotExample> picked = FewShotSelector.select(List.of(Text.builder(FILE, text).add("g", objects, errors).build()));
         assertEquals(List.of("a", "c"), picked.stream().map(FewShotExample::text).toList());
     }
 
@@ -156,7 +158,7 @@ class PromptAndServiceTest {
     @Test
     void explanationOffersOnlyAFixThatParses() {
         String text = "a [b\n\nc";
-        ParseError error = context(text, 0).errors().get(0);
+        Diagnostic error = context(text, 0).errors().get(0);
         FakeProvider good = new FakeProvider("{\"explanation\":\"Close the bracket.\",\"original\":\"[b\",\"replacement\":\"[b]\"}");
         Explanation e = service(good).explain(context(text, 0), error).join();
         assertEquals("Close the bracket.", e.text());
@@ -175,7 +177,7 @@ class PromptAndServiceTest {
         String text = "a [b";
         FakeProvider provider = new FakeProvider("{\"explanation\":\"x\",\"original\":\"\",\"replacement\":\"\"}");
         AssistService service = service(provider);
-        ParseError error = context(text, 0).errors().get(0);
+        Diagnostic error = context(text, 0).errors().get(0);
         service.explain(context(text, 0), error).join();
         service.explain(context(text, 0), error).join();
         assertEquals(1, provider.requests.size());

@@ -11,11 +11,11 @@ import fr.cnrs.lacito.matchbox.assist.suggestion.Relocation;
 import fr.cnrs.lacito.matchbox.assist.suggestion.Suggestion;
 import fr.cnrs.lacito.matchbox.assist.suggestion.Suggestion.Source;
 import fr.cnrs.lacito.matchbox.assist.suggestion.Suggestion.Status;
-import fr.cnrs.lacito.matchbox.assist.suggestion.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.assist.suggestion.TokenNames;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -101,7 +101,7 @@ public final class SuggestionPanelController {
         this.editor = editor;
         this.assist = assist;
         buildUi();
-        editor.getCurrentFileErrors().addListener((ListChangeListener<ParseError>) c -> rebuildFromErrors());
+        editor.getCurrentFileErrors().addListener((ListChangeListener<Diagnostic>) c -> rebuildFromErrors());
         editor.userChanges().subscribe(change -> relocateAll(change.getPosition(), change.getRemoved().length(),
             change.getInserted().length()));
     }
@@ -193,15 +193,15 @@ public final class SuggestionPanelController {
         }
         String text = editor.getFileContentArea().getText();
         List<GrammarPlugin> grammars = assist.grammarsFor(current);
-        List<ParseError> errors = editor.getCurrentFileErrors().stream().limit(MAX_ERRORS).toList();
+        List<Diagnostic> errors = editor.getCurrentFileErrors().stream().limit(MAX_ERRORS).toList();
         List<Suggestion> added = new ArrayList<>();
-        for (ParseError error : errors) {
+        for (Diagnostic error : errors) {
             String key = errorKey(error, text);
             String id = "err:" + key;
             if (dismissed.contains(id)) continue;
             int start = PromptBuilder.errorOffset(text, error);
-            int end = error.getStopIndex() >= start ? Math.min(text.length(), error.getStopIndex() + 1) : start;
-            Suggestion s = new Suggestion(id, Source.PARSE_ERROR, start, end, error.getMessage(),
+            int end = error.stopIndex() >= start ? Math.min(text.length(), error.stopIndex() + 1) : start;
+            Suggestion s = new Suggestion(id, Source.PARSE_ERROR, start, end, error.message(),
                 expectedText(grammars, error), List.of(), Optional.of(error), Status.ACTIVE, "");
             Explanation known = explanations.get(key);
             if (known != null) {
@@ -214,26 +214,26 @@ public final class SuggestionPanelController {
         computeGrammarFixes(current, text, grammars, errors, generation);
     }
 
-    private static String expectedText(List<GrammarPlugin> grammars, ParseError error) {
-        if (error.getExpected().isEmpty()) return "";
-        GrammarPlugin g = grammars.stream().filter(x -> x.getId().equals(error.getGrammarId())).findFirst().orElse(null);
-        return "Expected: " + error.getExpected().stream().map(t -> TokenNames.readable(g, t))
+    private static String expectedText(List<GrammarPlugin> grammars, Diagnostic error) {
+        if (error.expected().isEmpty()) return "";
+        GrammarPlugin g = grammars.stream().filter(x -> x.getId().equals(error.grammarId())).findFirst().orElse(null);
+        return "Expected: " + error.expected().stream().map(t -> TokenNames.readable(g, t))
             .collect(Collectors.joining(", "));
     }
 
     /** Identifies an error across parses: grammar, message and text of its line. */
-    private static String errorKey(ParseError error, String text) {
+    private static String errorKey(Diagnostic error, String text) {
         int offset = PromptBuilder.errorOffset(text, error);
         int lineStart = offset == 0 ? 0 : text.lastIndexOf('\n', offset - 1) + 1;
         int lineEnd = text.indexOf('\n', offset);
         String line = text.substring(lineStart, lineEnd < 0 ? text.length() : lineEnd);
-        return error.getGrammarId() + "|" + error.getMessage() + "|" + line;
+        return error.grammarId() + "|" + error.message() + "|" + line;
     }
 
-    private void computeGrammarFixes(Path current, String text, List<GrammarPlugin> grammars, List<ParseError> errors,
+    private void computeGrammarFixes(Path current, String text, List<GrammarPlugin> grammars, List<Diagnostic> errors,
                                      long gen) {
         int n = 0;
-        for (ParseError error : errors) {
+        for (Diagnostic error : errors) {
             if (n++ == MAX_ERRORS_WITH_FIXES) break;
             String key = errorKey(error, text);
             List<GrammarQuickFixes.Fix> candidates = GrammarQuickFixes.candidates(text, error);
@@ -241,13 +241,13 @@ public final class SuggestionPanelController {
                 GrammarQuickFixes.Fix fix = candidates.get(i);
                 String id = "fix:" + key + ":" + fix.title();
                 if (dismissed.contains(id)) continue;
-                FxAssist.onFx(assist.validator().checkAsync(current, text, List.of(fix.edit()), grammars), result -> {
+                FxAssist.onFx(assist.validator().checkAsync(fr.cnrs.lacito.matchbox.corpus.TextId.of(current), text, List.of(fix.edit()), grammars), result -> {
                     if (gen != generation || !result.accepted() || result.fixedErrors() == 0) return;
                     String now = editor.getFileContentArea().getText();
                     Optional<TextEdit> edit = Relocation.find(fix.edit(), now);
                     if (edit.isEmpty() || items.stream().anyMatch(s -> s.id().equals(id))) return;
                     items.add(new Suggestion(id, Source.GRAMMAR_FIX, edit.get().start(), edit.get().end(), fix.title(),
-                        "For: " + error.getMessage(), List.of(edit.get()), Optional.of(error), Status.ACTIVE,
+                        "For: " + error.message(), List.of(edit.get()), Optional.of(error), Status.ACTIVE,
                         result.fixedErrors() > 1 ? "Fixes " + result.fixedErrors() + " errors" : ""));
                 }, error2 -> {});
             }
@@ -356,7 +356,7 @@ public final class SuggestionPanelController {
     }
 
     /** Shows the suggestion of an error (e.g. chosen in the error table) and explains it if asked. */
-    public void showError(ParseError error, boolean explain) {
+    public void showError(Diagnostic error, boolean explain) {
         String text = editor.getFileContentArea().getText();
         String key = errorKey(error, text);
         items.stream()
@@ -373,7 +373,7 @@ public final class SuggestionPanelController {
     /** Explains the error at the cursor. */
     public void explainErrorAtCaret() {
         int caret = editor.getFileContentArea().getCaretPosition();
-        Optional<ParseError> error = editor.errorAt(caret);
+        Optional<Diagnostic> error = editor.errorAt(caret);
         if (error.isEmpty()) {
             setStatus("No parse error at the cursor (parse the file first).");
             return;

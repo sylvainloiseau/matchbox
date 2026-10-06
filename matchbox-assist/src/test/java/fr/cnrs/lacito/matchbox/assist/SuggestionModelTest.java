@@ -6,8 +6,9 @@ import fr.cnrs.lacito.matchbox.assist.suggestion.EditLocator;
 import fr.cnrs.lacito.matchbox.assist.suggestion.GrammarQuickFixes;
 import fr.cnrs.lacito.matchbox.assist.suggestion.Relocation;
 import fr.cnrs.lacito.matchbox.assist.suggestion.Suggestion;
-import fr.cnrs.lacito.matchbox.assist.suggestion.TextEdit;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -15,7 +16,7 @@ import org.junit.jupiter.api.Test;
 
 class SuggestionModelTest {
 
-    private static final Path FILE = Path.of("f.txt");
+    private static final TextId FILE = new TextId(Path.of("f.txt"));
 
     @Test
     void textEditsApplyInAnyOrderAndCheckTheOriginal() {
@@ -72,7 +73,7 @@ class SuggestionModelTest {
     @Test
     void quickFixesInsertLiteralsAndDeleteExtraneousInput() {
         String text = "a [b\nc]";
-        List<ParseError> errors = new BracketGrammar().getResult(FILE, text).errors();
+        List<Diagnostic> errors = new BracketGrammar().getResult(FILE, text).diagnostics();
         List<GrammarQuickFixes.Fix> missing = GrammarQuickFixes.candidates(text, errors.get(0));
         assertEquals(1, missing.size());
         assertEquals("a [b]\nc]", missing.get(0).edit().apply(text));

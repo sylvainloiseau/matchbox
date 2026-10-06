@@ -4,5 +4,9 @@
  * <p>Admission rule: an interface is added here only when an application feature needs it. A new
  * grammar-specific object type does not justify a new interface: it implements
  * {@link fr.cnrs.lacito.matchbox.corpus.CorpusObject} directly.
+ *
+ * <p>{@link fr.cnrs.lacito.matchbox.corpus.capability.TextHeader} gives the properties of a text,
+ * {@link fr.cnrs.lacito.matchbox.corpus.capability.Section} its divisions (title, metadata,
+ * content).
  */
 package fr.cnrs.lacito.matchbox.corpus.capability;

@@ -1,8 +1,56 @@
 # matchbox -- an application for parsing field notes and building a corpus from plain text
 
-Write field notes in plain text with lightweight conventions and parse the files for extracting IGT texts, lexicon entries or other linguistic data without copying them manually into dedicated apps.
+Write field notes in plain text with lightweight conventions and automatically extract  annotated texts, lexical description, or any other corpus component, without copying them manually into dedicated apps.
 
-## Installation
+## Scenario
+
+This app experiments with an alternative way of working with linguistic notes (text, lexicon) using plain text.
+
+The typical workflow for linguists working on a new language is to take notes --
+following idiosyncratic conventions -- and later on to copy data (lexical
+description, texts) into dedicated applications, such as FLEx or ELAN. This
+workflow has the following drawbacks:
+
+- the copy process is lengthy and tedious;
+- due to that, a lot of field notes stay unexploited: there is not enough time to
+  copy everything;
+- once the main material has been extracted, the other pieces of information
+  (context, references to drawings or photos, ideas...) written
+  down in notebooks (manuscript or digital) are not looked at again. Primary
+  linguistic material is separated from contextual material that was considered
+  worth writing during the data session. Even
+  some primary material (tested variants of construction...) can be lost because
+  it does not fit well into the corpus building app;
+- it is not easy to keep the link between a piece of information in a lexical
+  database and the notebook pages it comes from. The timeline is then lost,
+  and often it is difficult to know which is the last version for some pieces of data.
+
+The matchbox application prototype offers a way to experiment with another workflow, which may be useful in some situations. The idea is to write digital notebooks in plain text, using lightweight conventions for interlinear gloss, lexical information, or other pieces of data. Thanks to those conventions the corresponding piece of information can be extracted from the files, aggregated, and converted into other formats for processing. The benefits of this method are:
+
+- The field notes are the primary data; extracted information stays intertwined with the context it was written down in.
+- Nothing is ``copied''. There is no need for a GUI for entering the data piece by piece.
+- Field notebooks can be ordered chronologically so that an earlier version (the form of a lexeme) can be corrected later by a new one that supersedes it. The history of the versions is preserved.
+
+The matchbox application offers several small parsers for matching information
+according to various conventions -- and the list can be extended thanks to a
+plugin system.
+
+For instance, if you write down your field notes using the following format:
+
+```
+<mami> 'pig'
+<jaflo> 'kanu'
+
+:::
+a mio-jaflo-m-wi-j
+1sg down-canoe-top-m.sg-pred
+'I went down in canoe'
+:::
+```
+
+you can further use matchbox to extract the lexical information and add them to a LIFT dictionary; to extract text into a text database or to convert it into flextext (for ingestion by Flex), or Elan, etc. matchbox offers various ways to aggregate the information found into existing dictionaries or text databases.
+
+# Installation
 
 Download the latest release from the [GitHub releases page](https://github.com/sylvainloiseau/matchbox/releases) for your OS.
 
@@ -49,34 +97,6 @@ application opens on a normal double-click.
 > was enough to bypass this warning. Apple removed that Control-click override in macOS 15
 > (Sequoia), so instructions you may find elsewhere telling you to right-click → Open no
 > longer work — use one of the two routes above instead.
-
-
-## Scenario
-
-This app experiments with an alternative way of working with linguistic notes (text, lexicon) using plain text.
-
-The typical workflow with linguistic fieldnotes is to take notes -- following idiosyncratic conventions --, and later on to copy data (lexical description, texts) into dedicated applications, such as Flex or Elan. In doing so:
-
-- the other pieces of information written down in (manuscript or digital) notebooks are not looked at again. Some data are lost because they do not fit well into the app, such as short sentences that are not full text;
-- it is not easy to keep track of the relation between a piece of information in a lexical database and the notebook page it comes from;
-- the copy process is tedious; a lot of fieldnote data stays unexploited because there is not enough time to copy everything.
-
-The matchbox application experiments with another workflow, which may be useful in some situations. The idea is to write digital notebooks in plain text, using lightweight conventions for delimiting interlinear gloss or lexical information, that make it possible to parse the text files and to automatically extract pieces of information that could be gathered into a corpus and a lexicon. The matchbox application offers several small parsers for matching information according to various conventions.
-
-For instance, if you write down your field notes using the following format:
-
-```
-<mami> 'pig'
-<jaflo> 'kanu'
-
-:::
-a mio-jaflo-m-wi-j
-1sg down-canoe-top-m.sg-pred
-'I went down in canoe'
-:::
-```
-
-you can further use matchbox to extract the lexical information and add them to a LIFT dictionary; to extract text into a text database or to convert it into flextext (for ingestion by Flex), or Elan, etc. matchbox offers various ways to aggregate the information found into existing dictionaries or text databases.
 
 ## Existing parser
 

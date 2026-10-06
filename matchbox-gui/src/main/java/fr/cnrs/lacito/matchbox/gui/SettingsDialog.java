@@ -64,6 +64,9 @@ public class SettingsDialog {
     @FXML
     private CheckBox openLastProjectCheckBox;
 
+    @FXML
+    private CheckBox allowInvalidViewEditsCheckBox;
+
     public SettingsDialog(
         UserSettings settings,
         Stage parentStage
@@ -117,6 +120,7 @@ public class SettingsDialog {
         recentFilesLimitField.setText(String.valueOf(current.maxRecentFiles()));
         recentProjectsLimitField.setText(String.valueOf(current.maxRecentProjects()));
         openLastProjectCheckBox.setSelected(current.openLastProject());
+        allowInvalidViewEditsCheckBox.setSelected(current.allowInvalidViewEdits());
 
         okButton.setOnAction(e -> {
             try {
@@ -148,7 +152,8 @@ public class SettingsDialog {
             positiveInt(recentProjectsLimitField.getText(), "Maximum number of recent projects"),
             openLastProjectCheckBox.isSelected(),
             current.logFile(),
-            current.assist()
+            current.assist(),
+            allowInvalidViewEditsCheckBox.isSelected()
         );
     }
 

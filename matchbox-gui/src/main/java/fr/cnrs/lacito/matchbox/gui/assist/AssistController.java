@@ -14,7 +14,10 @@ import fr.cnrs.lacito.matchbox.assist.provider.ProviderFactory;
 import fr.cnrs.lacito.matchbox.assist.provider.ProviderKind;
 import fr.cnrs.lacito.matchbox.assist.validation.EditValidator;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchbox.model.Corpus;
+import fr.cnrs.lacito.matchbox.corpus.Corpus;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.Text;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.settings.AssistSettingsData;
 import fr.cnrs.lacito.matchbox.settings.UserSettings;
@@ -216,9 +219,10 @@ public final class AssistController {
     public AssistContext context(Path file, String text, int caret) {
         List<GrammarPlugin> grammars = project == null ? List.of() : project.getGrammarsForFile(file);
         PromptPrefix prefix = prefixes.get(grammars, examples(), data().includeGrammarSource());
-        List<fr.cnrs.lacito.matchbox.grammarapi.ParseError> errors =
-            project == null ? List.of() : project.getCorpus().errorsFor(file);
-        return new AssistContext(file, text, caret, grammars, errors, prefix);
+        TextId id = TextId.of(file);
+        List<Diagnostic> errors = project == null ? List.of()
+            : project.getCorpus().text(id).map(Text::diagnostics).orElse(List.of());
+        return new AssistContext(id, text, caret, grammars, errors, prefix);
     }
 
     public List<GrammarPlugin> grammarsFor(Path file) {
@@ -233,12 +237,7 @@ public final class AssistController {
     }
 
     private static List<FewShotExample> selectExamples(Corpus corpus) {
-        List<FewShotSelector.ParsedFile> files = new ArrayList<>();
-        for (Path f : corpus.files()) {
-            corpus.parsedText(f).ifPresent(text ->
-                files.add(new FewShotSelector.ParsedFile(f, text, corpus.objectsFor(f), corpus.errorsFor(f))));
-        }
-        return FewShotSelector.select(files);
+        return FewShotSelector.select(corpus.texts());
     }
 
     /** Chooses the project examples again (e.g. after the notes were corrected). */

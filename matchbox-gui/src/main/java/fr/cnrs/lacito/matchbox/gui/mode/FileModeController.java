@@ -1,10 +1,16 @@
 package fr.cnrs.lacito.matchbox.gui.mode;
 
+import fr.cnrs.lacito.matchbox.corpus.Corpus;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
+import fr.cnrs.lacito.matchbox.corpus.CorpusView;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
+import fr.cnrs.lacito.matchbox.gui.UnsavedChangesDialog;
+import fr.cnrs.lacito.matchbox.gui.edit.ViewEditService;
 import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
 import fr.cnrs.lacito.matchbox.gui.assist.GhostTextController;
 import fr.cnrs.lacito.matchbox.gui.assist.SuggestionPanelController;
@@ -12,7 +18,6 @@ import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
 import fr.cnrs.lacito.matchbox.gui.view.Kinds;
 import fr.cnrs.lacito.matchbox.gui.view.ObjectViewRegistry;
 import fr.cnrs.lacito.matchbox.settings.UserSettings;
-import fr.cnrs.lacito.matchbox.model.Corpus;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
 
@@ -24,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.scene.Node;
 import javafx.collections.ListChangeListener;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -97,20 +104,20 @@ public class FileModeController {
     private Label assistMessageLabel;
 
     @FXML
-    private TableView<ParseError> errorTableView;
+    private TableView<Diagnostic> errorTableView;
 
     @FXML
-    private TableColumn<ParseError, Number> lineColumn;
+    private TableColumn<Diagnostic, Number> lineColumn;
 
     @FXML
     private TableColumn<
-        ParseError,
+        Diagnostic,
         Number
     > charPositionColumn;
 
     @FXML
     private TableColumn<
-        ParseError,
+        Diagnostic,
         String
     > messageColumn;
 
@@ -122,10 +129,14 @@ public class FileModeController {
     private final AssistController assist;
     private GhostTextController ghostText;
     private SuggestionPanelController suggestionPanel;
+    private ViewEditService viewEdits;
 
     private static final KeyCombination NEXT_SUGGESTION = new KeyCodeCombination(KeyCode.F8);
     private static final KeyCombination PREVIOUS_SUGGESTION = new KeyCodeCombination(KeyCode.F8, KeyCombination.SHIFT_DOWN);
     private static final KeyCombination APPLY_SUGGESTION = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.ALT_DOWN);
+    private static final KeyCombination UNDO = new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN);
+    private static final KeyCombination REDO = new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
+    private static final KeyCombination REDO_ALT = new KeyCodeCombination(KeyCode.Y, KeyCombination.SHORTCUT_DOWN);
 
     /** One tab per kind of top-level object of the current file, in order of appearance. */
     private final Map<String, Tab> tabsByKind = new LinkedHashMap<>();
@@ -178,6 +189,7 @@ public class FileModeController {
             settings
         );
         this.viewRegistry = ObjectViewRegistry.load();
+        this.viewEdits = new ViewEditService(() -> project, editorController, settings);
         setupObjectsTab();
         setupErrorTab();
         setupAssistant();
@@ -303,20 +315,18 @@ public class FileModeController {
                             boolean empty
                         ) {
                             super.updateItem(item, empty);
+                            textProperty().unbind();
+                            styleProperty().unbind();
                             if (empty || item == null) {
                                 setText(null);
+                                setStyle("");
                             } else {
-                                setText(item.getFilePath().toString());
-                                item.getCouldBeWrittenBooleanProperty().addListener(
-                                    (obs, oldValue, newValue) -> {
-                                        if (newValue) {
-                                            setStyle("-fx-font-style: italic;");
-                                            setStyle("-fx-font-shape: bold;");
-                                        } else {
-                                            setStyle("font-style: normal;");
-                                        }
-                                    }
-                                );
+                                // unsaved documents (possibly changed by a view) are marked
+                                String path = item.getFilePath().toString();
+                                var dirty = item.getCouldBeWrittenBooleanProperty();
+                                textProperty().bind(Bindings.when(dirty).then("* " + path).otherwise(path));
+                                styleProperty().bind(Bindings.when(dirty)
+                                    .then("-fx-font-weight: bold; -fx-font-style: italic;").otherwise(""));
                             }
                         }
                     };
@@ -328,15 +338,7 @@ public class FileModeController {
             .selectedItemProperty()
             .addListener((obs, oldVal, newVal) -> {
                 if (newVal != null) {
-                    try {
-                        System.out.println(
-                            "Selected file in file list view: " +
-                                newVal.toString()
-                        );
-                        editorController.selectEditedFile(newVal.getFilePath());
-                    } catch (Exception ex) {
-                        throw ex;
-                    }
+                    editorController.selectEditedFile(newVal.getFilePath());
                 } else {
                     editorController.clearEditor();
                 }
@@ -345,15 +347,15 @@ public class FileModeController {
 
     private void setupErrorTab() {
         lineColumn.setCellValueFactory(cellData ->
-            new SimpleIntegerProperty(cellData.getValue().getLine())
+            new SimpleIntegerProperty(cellData.getValue().line())
         );
         charPositionColumn.setCellValueFactory(cellData ->
             new SimpleIntegerProperty(
-                cellData.getValue().getCharPositionInLine()
+                cellData.getValue().column()
             )
         );
         messageColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getMessage())
+            new SimpleStringProperty(cellData.getValue().message())
         );
 
         errorTableView
@@ -368,7 +370,7 @@ public class FileModeController {
 
         MenuItem explain = new MenuItem("Explain");
         explain.setOnAction(e -> {
-            ParseError error = errorTableView.getSelectionModel().getSelectedItem();
+            Diagnostic error = errorTableView.getSelectionModel().getSelectedItem();
             if (error != null) {
                 setSuggestionPanelVisible(true);
                 suggestionPanel.showError(error, true);
@@ -376,7 +378,7 @@ public class FileModeController {
         });
         MenuItem show = new MenuItem("Show in suggestions panel");
         show.setOnAction(e -> {
-            ParseError error = errorTableView.getSelectionModel().getSelectedItem();
+            Diagnostic error = errorTableView.getSelectionModel().getSelectedItem();
             if (error != null) {
                 setSuggestionPanelVisible(true);
                 suggestionPanel.showError(error, false);
@@ -423,7 +425,7 @@ public class FileModeController {
             TableView<CorpusObject> table = (TableView<CorpusObject>) tab.getContent();
             Class<?> type = objects.get(0).getClass();
             if (!type.equals(table.getUserData())) {
-                table.getColumns().setAll(viewRegistry.columnsFor(type));
+                table.getColumns().setAll(viewRegistry.columnsFor(type, viewContext, assistMessageLabel::setText));
                 table.setUserData(type);
             }
             table.getItems().setAll(objects);
@@ -440,6 +442,19 @@ public class FileModeController {
     private Tab createKindTab(String kind) {
         TableView<CorpusObject> table = new TableView<>();
         table.setPlaceholder(new Label("No objects"));
+        // columns showing a field can be edited (Enter writes the value in the text)
+        table.setEditable(true);
+        table.addEventHandler(KeyEvent.KEY_PRESSED, e -> {
+            CorpusObject selected = table.getSelectionModel().getSelectedItem();
+            if (selected == null || table.getEditingCell() != null) return;
+            if (UNDO.match(e)) {
+                viewContext.undo(selected);
+                e.consume();
+            } else if (REDO.match(e) || REDO_ALT.match(e)) {
+                viewContext.redo(selected);
+                e.consume();
+            }
+        });
         table.getSelectionModel().selectedItemProperty().addListener((obs, oldObject, newObject) -> {
             if (newObject != null && !propagatingSelection) {
                 editorController.selectedObjectProperty().set(newObject);
@@ -481,7 +496,12 @@ public class FileModeController {
             displayedObject = object;
             return;
         }
+        CorpusObject previous = displayedObject;
         displayedObject = object;
+        // a re-parsed version of the displayed object: let its view update itself (keeps focus, edits)
+        if (object != null && viewRegistry.updateView(objectDetailPane.getContent(), previous, object, viewContext)) {
+            return;
+        }
         objectDetailPane.setContent(object == null ? null : viewRegistry.createView(object, viewContext));
     }
 
@@ -496,16 +516,17 @@ public class FileModeController {
     private final ViewContext viewContext = new ViewContext() {
         @Override
         public void selectInEditor(TextCoordinate span) {
-            if (span == null) return;
-            if (!Objects.equals(span.path(), editorController.getSelectedFilePath())) {
-                project.getDerivedFileList().stream()
-                    .filter(d -> d.getFilePath().equals(span.path()))
-                    .findFirst()
-                    .ifPresent(d -> fileListView.getSelectionModel().select(d));
+            if (span == null || project == null) return;
+            if (!isDisplayed(span)) {
+                project.document(span.text()).ifPresent(d -> fileListView.getSelectionModel().select(d));
             }
-            if (Objects.equals(span.path(), editorController.getSelectedFilePath())) {
+            if (isDisplayed(span)) {
                 editorController.selectInEditor(span);
             }
+        }
+
+        private boolean isDisplayed(TextCoordinate span) {
+            return editorController.getSelectedDocument().map(d -> d.getId().equals(span.text())).orElse(false);
         }
 
         @Override
@@ -517,6 +538,36 @@ public class FileModeController {
         @Override
         public String highlightColor(CorpusObject object) {
             return editorController.getHighlightStyles().colorFor(object);
+        }
+
+        @Override
+        public CorpusView corpus() {
+            return corpus;
+        }
+
+        @Override
+        public boolean canEdit(CorpusObject object) {
+            return viewEdits.canEdit(object);
+        }
+
+        @Override
+        public EditOutcome setField(CorpusObject object, String fieldName, String value) {
+            return viewEdits.setField(object, fieldName, value);
+        }
+
+        @Override
+        public EditOutcome applyEdits(CorpusObject object, List<TextEdit> edits) {
+            return viewEdits.applyEdits(object, edits);
+        }
+
+        @Override
+        public boolean undo(CorpusObject object) {
+            return viewEdits.undo(object);
+        }
+
+        @Override
+        public boolean redo(CorpusObject object) {
+            return viewEdits.redo(object);
         }
     };
 
@@ -538,7 +589,7 @@ public class FileModeController {
         TextDocument selected = fileListView
             .getSelectionModel()
             .getSelectedItem();
-        if (selected != null) {
+        if (selected != null && UnsavedChangesDialog.confirm(window(), List.of(selected), "closing the file")) {
             project.removeFile(selected.getFilePath());
             if (!project.getDerivedFileList().isEmpty()) {
                 fileListView.getSelectionModel().select(0);
@@ -585,5 +636,21 @@ public class FileModeController {
 
     public void handleSaveCurrentFile() throws IOException {
         editorController.saveEditedFile();
+    }
+
+    /** Saves every document with unsaved changes (some may have been changed by views only). */
+    public void handleSaveAll() throws IOException {
+        if (project != null) {
+            project.saveAll();
+        }
+    }
+
+    private javafx.stage.Window window() {
+        return fileContentCodeArea.getScene() == null ? null : fileContentCodeArea.getScene().getWindow();
+    }
+
+    /** Stops the background threads of the view editing service. */
+    public void shutdown() {
+        viewEdits.close();
     }
 }

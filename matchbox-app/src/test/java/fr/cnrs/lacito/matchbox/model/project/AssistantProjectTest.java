@@ -2,11 +2,11 @@ package fr.cnrs.lacito.matchbox.model.project;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
+import fr.cnrs.lacito.matchbox.corpus.Text;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -41,13 +41,14 @@ class AssistantProjectTest {
     }
 
     @Test
-    void corpusKeepsTheParsedText() {
-        var corpus = emptyProject().getCorpus();
-        Path f = dir.resolve("a.txt");
-        corpus.setResults(f, Map.of("g", ParseResult.empty()), "text");
-        assertEquals("text", corpus.parsedText(f).orElseThrow());
-        assertEquals(List.of(f), corpus.files());
-        corpus.removeFile(f);
-        assertTrue(corpus.parsedText(f).isEmpty());
+    void corpusKeepsTheParsedText() throws Exception {
+        Project p = Project.createDefaultProject(List.of(new ProjectParseTest.WholeTextGrammar()));
+        Path f = Files.writeString(dir.resolve("a.txt"), "text");
+        p.addFile(f);
+        TextId id = TextId.of(f);
+        assertEquals("text", p.getCorpus().text(id).orElseThrow().content());
+        assertEquals(List.of(id), p.getCorpus().texts().stream().map(Text::id).toList());
+        p.removeFile(f);
+        assertTrue(p.getCorpus().text(id).isEmpty());
     }
 }

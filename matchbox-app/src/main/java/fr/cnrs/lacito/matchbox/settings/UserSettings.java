@@ -55,6 +55,7 @@ public final class UserSettings implements AutoCloseable {
     private final IntegerProperty maxRecentFiles = new SimpleIntegerProperty();
     private final IntegerProperty maxRecentProjects = new SimpleIntegerProperty();
     private final BooleanProperty openLastProject = new SimpleBooleanProperty();
+    private final BooleanProperty allowInvalidViewEdits = new SimpleBooleanProperty();
     private String logFile;
     private final ObjectProperty<AssistSettingsData> assist = new SimpleObjectProperty<>();
     private final RecentItems recentFiles = new RecentItems(maxRecentFiles);
@@ -86,7 +87,8 @@ public final class UserSettings implements AutoCloseable {
         updating = false;
 
         for (Observable o : List.<Observable>of(charset, igtColor, lexicalColor, morphemeSeparators,
-                fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, assist)) {
+                fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, assist,
+                allowInvalidViewEdits)) {
             o.addListener(obs -> settingsChanged());
         }
         recentFiles.items().addListener((Observable obs) -> recentChanged());
@@ -171,6 +173,8 @@ public final class UserSettings implements AutoCloseable {
     public IntegerProperty maxRecentFilesProperty() { return maxRecentFiles; }
     public IntegerProperty maxRecentProjectsProperty() { return maxRecentProjects; }
     public BooleanProperty openLastProjectProperty() { return openLastProject; }
+    /** Apply edits made in object views even if they add parse errors (default: refused). */
+    public BooleanProperty allowInvalidViewEditsProperty() { return allowInvalidViewEdits; }
     /** Settings of the AI assistant (an immutable value: set a modified copy to change them). */
     public ObjectProperty<AssistSettingsData> assistProperty() { return assist; }
     public RecentItems recentFiles() { return recentFiles; }
@@ -213,7 +217,8 @@ public final class UserSettings implements AutoCloseable {
             maxRecentProjects.get(),
             openLastProject.get(),
             logFile,
-            assist.get()
+            assist.get(),
+            allowInvalidViewEdits.get()
         );
     }
 
@@ -240,6 +245,7 @@ public final class UserSettings implements AutoCloseable {
         openLastProject.set(d.openLastProject());
         logFile = d.logFile();
         assist.set(d.assist());
+        allowInvalidViewEdits.set(d.allowInvalidViewEdits());
     }
 
     // ------------------------------------------------------------------

@@ -6,24 +6,32 @@ import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookLexer;
 import fr.cnrs.lacito.matchbox.grammarapi.AbstractGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.CollectingErrorListener;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.grammarapi.EditProposal;
+import fr.cnrs.lacito.matchbox.grammarapi.ObjectEditor;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.Field;
+import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
+import fr.cnrs.lacito.matchbox.corpus.capability.Example;
+import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearSentence;
+import fr.cnrs.lacito.matchbox.corpus.capability.LexicalEntry;
+import fr.cnrs.lacito.matchbox.corpus.capability.Sense;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleExample;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleLexicalDefinition;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleSense;
 import fr.cnrs.lacito.matchbox.grammarapi.Spans;
 
-import java.awt.geom.Line2D;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.swing.event.HyperlinkEvent;
+import java.util.Map;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.TerminalNode;
 
 public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
 
@@ -59,7 +67,8 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
 
     @Override
     public String getFormatDocumentation() {
-        return """This grammar look for two patterns
+        return """
+This grammar look for two patterns
 
 Both pattern are delimited by at least a blank lines before and after.
 
@@ -85,9 +94,9 @@ Both pattern are delimited by at least a blank lines before and after.
     }
 
     @Override
-    public ParseResult getResult(Path filePath, String content) {
+    public ParseResult getResult(TextId filePath, String content) {
         List<CorpusObject> objects = new ArrayList<>();
-        List<ParseError> errors = new ArrayList<>();
+        List<Diagnostic> errors = new ArrayList<>();
         try {
             // Create lexer and parser
             var inputStream = CharStreams.fromString(content);
@@ -119,13 +128,23 @@ Both pattern are delimited by at least a blank lines before and after.
                 if (x.exception != null || x.IMB_LINE().size() < 2 || x.IMB_QUOTED_LINE() == null) {
                     continue;
                 }
+                Token quoted = x.IMB_QUOTED_LINE().getSymbol();
                 objects.add(
                     new SimpleIGT(
                         KIND_IGT,
                         Spans.of(filePath, x),
                         x.IMB_LINE(0).getText(),
                         x.IMB_LINE(1).getText(),
-                        x.IMB_QUOTED_LINE().getText()
+                        x.IMB_QUOTED_LINE().getText(),
+                        List.of(
+                            field(filePath, InterlinearSentence.TRANSCRIPTION, x.IMB_LINE(0)),
+                            field(filePath, InterlinearSentence.MORPHEMES, x.IMB_LINE(1)),
+                            // the translation without its quotes
+                            new Field(InterlinearSentence.FREE_TRANSLATION,
+                                quoted.getText().substring(1, quoted.getText().length() - 1),
+                                new TextCoordinate(filePath, quoted.getStartIndex() + 1, quoted.getStopIndex() - 1,
+                                    quoted.getLine(), quoted.getLine()))
+                        )
                     )
                 );
             }
@@ -149,7 +168,11 @@ Both pattern are delimited by at least a blank lines before and after.
                                 KIND_EXAMPLE,
                                 Spans.of(filePath, example),
                                 example.TXT_EX(0).getText(),
-                                example.TXT_EX(1).getText()
+                                example.TXT_EX(1).getText(),
+                                List.of(
+                                    field(filePath, Example.TRANSCRIPTION, example.TXT_EX(0)),
+                                    field(filePath, Example.TRANSLATION, example.TXT_EX(1))
+                                )
                             )
                         );
                     }
@@ -158,7 +181,8 @@ Both pattern are delimited by at least a blank lines before and after.
                             KIND_SENSE,
                             Spans.of(filePath, sense),
                             sense.TXT_DEF().getText(),
-                            examples
+                            examples,
+                            List.of(field(filePath, Sense.DEFINITION, sense.TXT_DEF()))
                         )
                     );
                 }
@@ -167,14 +191,50 @@ Both pattern are delimited by at least a blank lines before and after.
                         KIND_ENTRY,
                         Spans.of(filePath, x),
                         x.TXT().getText(),
-                        senses
+                        senses,
+                        List.of(field(filePath, LexicalEntry.HEADWORD, x.TXT()))
                     )
                 );
             }
-            errors.addAll(errorListener.getErrors());
+            errors.addAll(errorListener.getDiagnostics());
         } catch (RuntimeException e) {
-            errors.add(new ParseError(filePath, getId(), 0, 0, "Internal error of the grammar: " + e));
+            errors.add(Diagnostic.at(filePath, getId(), 0, 0, "Internal error of the grammar: " + e));
         }
         return new ParseResult(objects, errors);
+    }
+
+    private static Field field(TextId text, String name, TerminalNode node) {
+        return new Field(name, node.getText(), Spans.of(text, node.getSymbol()));
+    }
+
+    /** Characters that would end each field in this notation. */
+    private static final Map<String, String> FORBIDDEN = Map.of(
+        LexicalEntry.HEADWORD, ">{}/",
+        Sense.DEFINITION, "}«",
+        Example.TRANSCRIPTION, "/«»}",
+        Example.TRANSLATION, "/«»}"
+    );
+
+    /** Refuses values that would change the structure of the notation, then writes them verbatim. */
+    private static final ObjectEditor EDITOR = (object, fieldName, value, content) -> {
+        String forbidden = object instanceof InterlinearSentence ? "" : FORBIDDEN.getOrDefault(fieldName, "");
+        for (char c : forbidden.toCharArray()) {
+            if (value.indexOf(c) >= 0) {
+                return new EditProposal.Refused("The character " + c + " is not allowed here");
+            }
+        }
+        if (value.isBlank()) {
+            return new EditProposal.Refused("The value cannot be empty");
+        }
+        if (object instanceof InterlinearSentence && !fieldName.equals(InterlinearSentence.FREE_TRANSLATION)
+            && (value.startsWith("'") || value.strip().equals(":::"))) {
+            return new EditProposal.Refused("A line of an IGT cannot start with ' or be :::");
+        }
+        return ObjectEditor.VERBATIM.setField(object, fieldName, value, content);
+    };
+
+    @Override
+    public ObjectEditor getObjectEditor() {
+        return EDITOR;
     }
 }

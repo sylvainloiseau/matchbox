@@ -17,6 +17,7 @@ import fr.cnrs.lacito.matchbox.assist.provider.ProviderKind;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -79,9 +80,9 @@ class ProviderTest {
     }
 
     private static ChatRequest request(boolean schema) {
-        AssistContext ctx = new AssistContext(Path.of("f.txt"), "a [b\n", 4, List.of(new BracketGrammar()), List.of(),
+        AssistContext ctx = new AssistContext(new TextId(Path.of("f.txt")), "a [b\n", 4, List.of(new BracketGrammar()), List.of(),
             PromptPrefix.build(List.of(new BracketGrammar()), List.of(), false));
-        return schema ? PromptBuilder.explain(ctx, new BracketGrammar().getResult(Path.of("f.txt"), "a [b\n").errors().get(0), "French")
+        return schema ? PromptBuilder.explain(ctx, new BracketGrammar().getResult(new TextId(Path.of("f.txt")), "a [b\n").diagnostics().get(0), "French")
             : PromptBuilder.complete(ctx, 4000, 1000, 15);
     }
 

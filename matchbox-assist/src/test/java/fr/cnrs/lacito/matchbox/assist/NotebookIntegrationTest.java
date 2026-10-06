@@ -3,11 +3,12 @@ package fr.cnrs.lacito.matchbox.assist;
 import static org.junit.jupiter.api.Assertions.*;
 
 import fr.cnrs.lacito.matchbox.assist.suggestion.GrammarQuickFixes;
-import fr.cnrs.lacito.matchbox.assist.suggestion.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.assist.validation.EditValidator;
 import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,20 +17,20 @@ import org.junit.jupiter.api.Test;
 /** The quick fixes and the validator with the notebook grammar. */
 class NotebookIntegrationTest {
 
-    private static final Path FILE = Path.of("notes.txt");
+    private static final TextId FILE = new TextId(Path.of("notes.txt"));
     private static final List<GrammarPlugin> GRAMMARS = List.of(new NotebookGrammarPlugin());
 
     @Test
     void quickFixCandidatesAreCheckedWithTheRealGrammar() {
         String text = "<jaflo> {canoe}\n\n:::\na mio\n:::\n";
-        List<ParseError> errors = GRAMMARS.get(0).getResult(FILE, text).errors();
+        List<Diagnostic> errors = GRAMMARS.get(0).getResult(FILE, text).diagnostics();
         assertFalse(errors.isEmpty());
         try (EditValidator validator = new EditValidator()) {
             List<String> report = new ArrayList<>();
-            for (ParseError e : errors) {
+            for (Diagnostic e : errors) {
                 for (GrammarQuickFixes.Fix fix : GrammarQuickFixes.candidates(text, e)) {
                     EditValidator.Result r = validator.check(FILE, text, List.of(fix.edit()), GRAMMARS);
-                    report.add(e.getMessage() + " -> " + fix.title() + ": " + r);
+                    report.add(e.message() + " -> " + fix.title() + ": " + r);
                     // never accepted if it adds errors
                     if (r.accepted()) {
                         assertTrue(r.errorsAfter() <= r.errorsBefore(), report::toString);
@@ -43,8 +44,8 @@ class NotebookIntegrationTest {
     @Test
     void unicodeLiteralsOfTheGrammarAreOfferedAsInsertions() {
         String text = "<jaflo> {canoe\n";
-        ParseError eof = GRAMMARS.get(0).getResult(FILE, text).errors().stream()
-            .filter(e -> e.getMessage().startsWith("mismatched input '<EOF>'")).findFirst().orElseThrow();
+        Diagnostic eof = GRAMMARS.get(0).getResult(FILE, text).diagnostics().stream()
+            .filter(e -> e.message().startsWith("mismatched input '<EOF>'")).findFirst().orElseThrow();
         assertTrue(GrammarQuickFixes.candidates(text, eof).stream().anyMatch(f -> f.title().equals("Insert '\u00AB'")),
             () -> GrammarQuickFixes.candidates(text, eof).toString());
     }

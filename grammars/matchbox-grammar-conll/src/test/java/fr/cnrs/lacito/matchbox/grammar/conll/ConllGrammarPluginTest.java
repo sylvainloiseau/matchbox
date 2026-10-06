@@ -10,6 +10,7 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.nio.file.Path;
 import fr.cnrs.lacito.matchbox.corpus.capability.DependencySentence;
 import java.util.List;
@@ -19,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 class ConllGrammarPluginTest {
 
-    private static final Path FILE = Path.of("sample.conllu");
+    private static final TextId FILE = new TextId(Path.of("sample.conllu"));
 
     private String text;
     private ParseResult result;
@@ -34,7 +35,7 @@ class ConllGrammarPluginTest {
 
     @Test
     void extractsOneObjectPerSentence() {
-        assertTrue(result.errors().isEmpty(), () -> "errors: " + result.errors());
+        assertTrue(result.diagnostics().isEmpty(), () -> "errors: " + result.diagnostics());
         List<CorpusObject> sentences = result.objects();
         assertEquals(2, sentences.size());
         assertSpansValid(sentences, text);

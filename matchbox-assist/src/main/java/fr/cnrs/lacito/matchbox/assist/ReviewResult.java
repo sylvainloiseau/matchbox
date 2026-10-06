@@ -1,6 +1,6 @@
 package fr.cnrs.lacito.matchbox.assist;
 
-import fr.cnrs.lacito.matchbox.assist.suggestion.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import java.util.List;
 
 /**

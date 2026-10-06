@@ -2,8 +2,9 @@ package fr.cnrs.lacito.matchbox.assist;
 
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,8 +23,8 @@ public class BracketGrammar implements GrammarPlugin {
     public String getGrammarSource() { return "grammar Brackets;"; }
     public int getApiVersion() { return API_VERSION; }
 
-    public ParseResult getResult(Path file, String content) {
-        List<ParseError> errors = new ArrayList<>();
+    public ParseResult getResult(TextId file, String content) {
+        List<Diagnostic> errors = new ArrayList<>();
         int lineStart = 0;
         int line = 1;
         for (String l : content.split("\n", -1)) {
@@ -33,7 +34,7 @@ public class BracketGrammar implements GrammarPlugin {
                 if (c == '[') depth++;
                 if (c == ']') {
                     if (depth == 0) {
-                        errors.add(new ParseError(file, getId(), line, i, "extraneous input ']' expecting <EOF>",
+                        errors.add(new Diagnostic(file, getId(), line, i, "extraneous input ']' expecting <EOF>",
                             lineStart + i, lineStart + i, List.of("<EOF>")));
                     } else {
                         depth--;
@@ -41,7 +42,7 @@ public class BracketGrammar implements GrammarPlugin {
                 }
             }
             if (depth > 0) {
-                errors.add(new ParseError(file, getId(), line, l.length(), "missing ']' at '\\n'",
+                errors.add(new Diagnostic(file, getId(), line, l.length(), "missing ']' at '\\n'",
                     lineStart + l.length(), lineStart + l.length(), List.of("']'")));
             }
             lineStart += l.length() + 1;

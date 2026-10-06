@@ -22,7 +22,7 @@ import java.util.List;
  */
 public interface CorpusObject {
 
-    /** Span in the source file, used for highlighting and navigation. */
+    /** Span in the text, used for highlighting and navigation. */
     TextCoordinate getTextCoordinate();
 
     /** Namespaced, stable type id: {@code "<grammarId>:<name>"}, e.g. {@code "notebook-grammar:igt"}. */

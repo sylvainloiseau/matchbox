@@ -1,106 +1,113 @@
 package fr.cnrs.lacito.matchbox.gui.mode.fileMode;
 
 import fr.cnrs.lacito.matchbox.assist.prompt.PromptBuilder;
-import fr.cnrs.lacito.matchbox.assist.suggestion.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.Corpus;
+import fr.cnrs.lacito.matchbox.corpus.CorpusListener;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.Text;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import fr.cnrs.lacito.matchbox.gui.view.HighlightStyles;
-import fr.cnrs.lacito.matchbox.model.Corpus;
+import fr.cnrs.lacito.matchbox.model.DocumentChange;
+import fr.cnrs.lacito.matchbox.model.DocumentListener;
+import fr.cnrs.lacito.matchbox.model.EditOrigin;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
+import fr.cnrs.lacito.matchbox.model.TextHistory;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
+import java.util.logging.Logger;
 import javafx.application.Platform;
 import javafx.beans.binding.BooleanExpression;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCombination;
 import org.fxmisc.richtext.InlineCssTextArea;
 import org.fxmisc.richtext.MultiChangeBuilder;
 import org.fxmisc.richtext.model.PlainTextChange;
-import org.fxmisc.richtext.model.TextChange;
 import org.fxmisc.richtext.util.UndoUtils;
-import org.fxmisc.undo.UndoManagerFactory;
+import org.fxmisc.wellbehaved.event.EventPattern;
+import org.fxmisc.wellbehaved.event.InputMap;
+import org.fxmisc.wellbehaved.event.Nodes;
 import org.reactfx.EventStream;
 
 /**
- * Controller for managing filePath editing and parsing
+ * Shows one {@link TextDocument} in the code area and keeps both in sync.
+ *
+ * <p>The document owns the text: the user's typing is forwarded to it at once (one change per
+ * keystroke, paste…), and the changes made by others (views, assistant, search, undo) are mirrored
+ * in the code area. The undo history is the document's ({@link TextHistory}), so it survives a
+ * change of file and contains the changes made while the document was not displayed.
  */
 public class EditorController {
 
-    private InlineCssTextArea textArea;
-    private Path selectedFilePath;
-    private long lastParseTime;
-    private static final long PARSE_DELAY_MS = 500;
+    private static final Logger logger = Logger.getLogger(EditorController.class.getName());
+
+    private final InlineCssTextArea textArea;
+    private TextDocument document;
     private Corpus corpus;
     private Project project;
 
     private final HighlightStyles highlightStyles;
-    private SimpleBooleanProperty currentTextCouldBeWrittenDownProperty =
-        new SimpleBooleanProperty(false);
-    private SimpleBooleanProperty currentTextCouldBeReparsedProperty =
-        new SimpleBooleanProperty(false);
-    private SimpleBooleanProperty closableProperty = new SimpleBooleanProperty(
-        false
-    );
-
-    private final ChangeListener<? super String> changeListener;
+    private final SimpleBooleanProperty currentTextCouldBeWrittenDownProperty = new SimpleBooleanProperty(false);
+    private final SimpleBooleanProperty currentTextCouldBeReparsedProperty = new SimpleBooleanProperty(false);
+    private final SimpleBooleanProperty closableProperty = new SimpleBooleanProperty(false);
+    private final SimpleBooleanProperty undoAvailable = new SimpleBooleanProperty(false);
+    private final SimpleBooleanProperty redoAvailable = new SimpleBooleanProperty(false);
 
     /**
      * True while provisional text (an inline suggestion shown in grey) is inserted or removed:
-     * such changes must not reach the model, the undo history or the suggestion anchors.
+     * such changes must not reach the document, the undo history or the suggestion anchors.
      */
     private boolean ghostOperation;
+    /** True while a change of the document is copied into the code area (not forwarded back). */
+    private boolean mirroring;
     /** Removes the provisional text, if any; set by the inline suggestion controller. */
     private Runnable ghostDismisser = () -> {};
     /** Style of the temporary highlight of a suggestion's range. */
     private static final String PREVIEW_STYLE = "-rtfx-background-color: #ffd8a8;";
-    private final Consumer<Path> corpusListener = this::onCorpusFileChanged;
+    private final CorpusListener corpusListener = (id, before, after) -> onCorpusTextChanged(id);
+    private final DocumentListener mirror = this::mirror;
 
     /** Top-level corpus objects of the current file, grammars in rank order. */
-    private final ObservableList<CorpusObject> currentFileObjects =
-        FXCollections.observableArrayList();
-    private final ObservableList<ParseError> currentFileErrors =
-        FXCollections.observableArrayList();
-    /** Object selected in the editor, a table or a view (may be a nested object). */
-    private final ObjectProperty<CorpusObject> selectedObject =
-        new SimpleObjectProperty<>();
+    private final ObservableList<CorpusObject> currentFileObjects = FXCollections.observableArrayList();
+    private final ObservableList<Diagnostic> currentFileErrors = FXCollections.observableArrayList();
+    /** Object selected in the editor, a table or a view (may be a nested object, of any file). */
+    private final ObjectProperty<CorpusObject> selectedObject = new SimpleObjectProperty<>();
+    /** Text and offset of the last change made by a view, to re-select the edited object. */
+    private TextId lastEditText;
+    private int lastEditOffset = -1;
 
     public EditorController(
         InlineCssTextArea codeArea,
         UserSettings settings
     ) {
-        this.changeListener = (obs, oldText, newText) -> {
-            if (ghostOperation) return;
-            long currentTime = System.currentTimeMillis();
-            if (currentTime - lastParseTime > PARSE_DELAY_MS) {
-                lastParseTime = currentTime;
-                project.updateFileContent(newText, selectedFilePath);
-            }
-        };
         this.textArea = codeArea;
-        // the default undo manager, except for the changes of provisional text
-        this.textArea.setUndoManager(UndoManagerFactory.unlimitedHistoryFactory().createMultiChangeUM(
-            textArea.multiPlainChanges().filter(changes -> !ghostOperation),
-            TextChange::invert,
-            UndoUtils.applyMultiPlainTextChange(textArea),
-            TextChange::mergeWith,
-            TextChange::isIdentity,
-            UndoUtils.DEFAULT_PREVENT_MERGE_DELAY
+        // the undo history is the document's
+        this.textArea.setUndoManager(UndoUtils.noOpUndoManager());
+        Nodes.addInputMap(textArea, InputMap.sequence(
+            InputMap.consume(EventPattern.keyPressed(KeyCode.Z, KeyCombination.SHORTCUT_DOWN), e -> undo()),
+            InputMap.consume(EventPattern.keyPressed(KeyCode.Z, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN), e -> redo()),
+            InputMap.consume(EventPattern.keyPressed(KeyCode.Y, KeyCombination.SHORTCUT_DOWN), e -> redo())
         ));
+        // typing → document
+        this.textArea.multiPlainChanges()
+            .filter(changes -> !ghostOperation && !mirroring && document != null)
+            .subscribe(this::forward);
 
-        this.lastParseTime = 0;
         this.highlightStyles = new HighlightStyles(settings);
         // show colour changes made in the settings immediately
         settings.igtColorProperty().addListener((obs, o, n) -> highlightText());
@@ -112,11 +119,12 @@ public class EditorController {
 
     public void setProject(Project project) {
         if (this.corpus != null) {
-            this.corpus.removeFileListener(corpusListener);
+            this.corpus.removeListener(corpusListener);
         }
+        clearEditor();
         this.project = project;
         this.corpus = project.getCorpus();
-        this.corpus.addFileListener(corpusListener);
+        this.corpus.addListener(corpusListener);
     }
 
     public HighlightStyles getHighlightStyles() {
@@ -124,54 +132,143 @@ public class EditorController {
     }
 
     // ------------------------------------------------------------------
+    // Synchronisation with the document
+    // ------------------------------------------------------------------
+
+    /** Sends the user's changes to the document. */
+    private void forward(List<PlainTextChange> changes) {
+        List<TextEdit> edits = new ArrayList<>();
+        for (PlainTextChange c : changes) {
+            edits.add(toEdit(c));
+        }
+        if (!document.applySequential(edits, EditOrigin.of(EditOrigin.Kind.TYPING, this))) {
+            logger.warning("The editor and the document of " + document.getFilePath() + " differ: resynchronised");
+            resync();
+        }
+    }
+
+    /** A change of the code area as an edit of the text before it. */
+    static TextEdit toEdit(PlainTextChange c) {
+        return new TextEdit(c.getPosition(), c.getPosition() + c.getRemoved().length(), c.getRemoved(), c.getInserted());
+    }
+
+    /** Copies into the code area a change of the document made by someone else. */
+    private void mirror(DocumentChange change) {
+        if (change.origin().source() == this || change.document() != document) {
+            return;
+        }
+        // provisional text would shift the offsets
+        dismissGhost();
+        List<TextEdit> edits = change.edits();
+        mirroring = true;
+        try {
+            MultiChangeBuilder<String, String, String> multi = textArea.createMultiChange(edits.size());
+            // in reverse order, so that the offsets of the next edits stay valid
+            for (int i = edits.size() - 1; i >= 0; i--) {
+                TextEdit e = edits.get(i);
+                multi.replaceTextAbsolutely(e.start(), e.end(), e.replacement());
+            }
+            multi.commit();
+        } finally {
+            mirroring = false;
+        }
+        if (textArea.getLength() != document.getCurrentText().length()) {
+            logger.warning("The editor and the document of " + document.getFilePath() + " differ: resynchronised");
+            resync();
+        }
+    }
+
+    /** Replaces the text of the code area by the document's. */
+    private void resync() {
+        mirroring = true;
+        try {
+            int caret = textArea.getCaretPosition();
+            textArea.replaceText(document.getCurrentText());
+            textArea.moveTo(Math.min(caret, textArea.getLength()));
+        } finally {
+            mirroring = false;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Corpus objects of the current file
     // ------------------------------------------------------------------
 
-    private void onCorpusFileChanged(Path file) {
-        if (file.equals(selectedFilePath)) {
+    private void onCorpusTextChanged(TextId id) {
+        if (document != null && id.equals(document.getId())) {
             refreshFromCorpus();
+        } else {
+            // the selected object may belong to a text that is not displayed (edited by a view)
+            CorpusObject previous = selectedObject.get();
+            if (previous != null && previous.getTextCoordinate().text().equals(id)
+                && corpus.textOf(previous).isEmpty()) {
+                selectedObject.set(findSuccessor(previous).orElse(null));
+            }
         }
+    }
+
+    private Optional<Text> displayedText() {
+        return document == null || corpus == null ? Optional.empty() : corpus.text(document.getId());
     }
 
     /** Reloads objects and errors of the current file and keeps the selection if possible. */
     private void refreshFromCorpus() {
         CorpusObject previous = selectedObject.get();
-        currentFileObjects.setAll(corpus.objectsFor(selectedFilePath));
-        currentFileErrors.setAll(corpus.errorsFor(selectedFilePath));
+        Optional<Text> text = displayedText();
+        currentFileObjects.setAll(text.map(Text::objects).orElse(List.of()));
+        currentFileErrors.setAll(text.map(Text::diagnostics).orElse(List.of()));
         highlightText();
-        selectedObject.set(previous == null ? null : findSuccessor(previous).orElse(null));
+        if (previous != null && corpus.textOf(previous).isEmpty()) {
+            selectedObject.set(findSuccessor(previous).orElse(null));
+        }
+    }
+
+    /** Records where a view changed a text, so that the edited object is selected again. */
+    public void rememberEdit(TextId text, int offset) {
+        this.lastEditText = text;
+        this.lastEditOffset = offset;
     }
 
     /**
      * After a re-parse all objects are new instances: find the object that replaces
-     * {@code previous}. Preferably an object of the same kind and label (the closest one to the
-     * previous position, which may have moved if text was inserted before it), otherwise the
-     * object of the same kind containing the previous start offset.
+     * {@code previous}. After a view edit, the object of the same kind containing the edit;
+     * otherwise preferably an object of the same kind and label (the closest one to the previous
+     * position, which may have moved if text was inserted before it), otherwise the object of the
+     * same kind containing the previous start offset.
      */
     private Optional<CorpusObject> findSuccessor(CorpusObject previous) {
-        if (!Objects.equals(previous.getTextCoordinate().path(), selectedFilePath)) {
+        TextId id = previous.getTextCoordinate().text();
+        Optional<Text> text = corpus.text(id);
+        if (text.isEmpty()) {
             return Optional.empty();
         }
         int start = previous.getTextCoordinate().startIndex();
-        List<CorpusObject> sameKind = corpus.flatten(selectedFilePath)
+        List<CorpusObject> sameKind = text.get().flatten()
             .filter(o -> o.getKind().equals(previous.getKind()))
             .toList();
-        return sameKind.stream()
-            .filter(o -> Objects.equals(o.getLabel(), previous.getLabel()))
-            .min(Comparator.comparingInt(o -> Math.abs(o.getTextCoordinate().startIndex() - start)))
+        Optional<CorpusObject> edited = Optional.empty();
+        if (id.equals(lastEditText) && lastEditOffset >= 0) {
+            edited = sameKind.stream()
+                .filter(o -> o.getTextCoordinate().contains(lastEditOffset)
+                    || o.getTextCoordinate().stopIndex() + 1 == lastEditOffset)
+                .reduce((a, b) -> b);
+        }
+        return edited
+            .or(() -> sameKind.stream()
+                .filter(o -> Objects.equals(o.getLabel(), previous.getLabel()))
+                .min(Comparator.comparingInt(o -> Math.abs(o.getTextCoordinate().startIndex() - start))))
             .or(() -> sameKind.stream().filter(o -> o.getTextCoordinate().contains(start)).findFirst());
     }
 
     private void handleCodeAreaClick() {
         dismissGhost();
-        if (selectedFilePath == null || corpus == null) return;
         int caretPosition = textArea.getCaretPosition();
-        corpus.objectAt(selectedFilePath, caretPosition).ifPresent(selectedObject::set);
+        displayedText().flatMap(t -> t.objectAt(caretPosition)).ifPresent(selectedObject::set);
     }
 
     /** Highlights every corpus object of the file: grammars in rank order, parents before children. */
     public void highlightText() {
-        if (textArea == null || selectedFilePath == null || corpus == null) {
+        if (textArea == null || document == null || corpus == null) {
             return;
         }
         // spans refer to the real text: remove provisional text first
@@ -180,7 +277,7 @@ public class EditorController {
         if (length > 0) {
             textArea.clearStyle(0, length);
         }
-        corpus.flatten(selectedFilePath).forEach(o -> {
+        displayedText().ifPresent(text -> text.flatten().forEach(o -> {
             String color = highlightStyles.colorFor(o);
             TextCoordinate span = o.getTextCoordinate();
             // spans refer to the parsed text; the editor text may have changed since
@@ -191,7 +288,7 @@ public class EditorController {
                     "-rtfx-background-color: " + color + ";"
                 );
             }
-        });
+        }));
     }
 
     // ------------------------------------------------------------------
@@ -201,7 +298,7 @@ public class EditorController {
     /** Selects a span of the current file. */
     public void selectInEditor(TextCoordinate span) {
         if (span == null) return;
-        if (!Objects.equals(span.path(), selectedFilePath)) {
+        if (document == null || !span.text().equals(document.getId())) {
             throw new IllegalArgumentException(
                 "The span does not belong to the current file: " + span
             );
@@ -209,21 +306,21 @@ public class EditorController {
         selectRangeInEditor(span.startIndex(), span.stopIndex());
     }
 
-    public void selectLinesInEditor(ParseError error) {
-        if (error.getStartIndex() >= 0) {
-            selectRangeInEditor(error.getStartIndex(), Math.max(error.getStartIndex(), error.getStopIndex()));
+    public void selectLinesInEditor(Diagnostic error) {
+        if (error.startIndex() >= 0) {
+            selectRangeInEditor(error.startIndex(), Math.max(error.startIndex(), error.stopIndex()));
             return;
         }
         String text = textArea.getText();
         // ANTLR lines are 1-based; line 0 is used for errors without position
-        int line = Math.max(1, error.getLine());
+        int line = Math.max(1, error.line());
         int lineStart = 0;
         for (int i = 1; i < line && lineStart >= 0; i++) {
             int newline = text.indexOf('\n', lineStart);
             lineStart = newline < 0 ? -1 : newline + 1;
         }
         if (lineStart < 0) return;
-        int start = Math.min(text.length(), lineStart + Math.max(0, error.getCharPositionInLine()));
+        int start = Math.min(text.length(), lineStart + Math.max(0, error.column()));
         selectRangeInEditor(start, start);
     }
 
@@ -247,41 +344,54 @@ public class EditorController {
 
     public void selectEditedFile(Path filePath) {
         clearEditor();
-        this.selectedFilePath = filePath;
-        TextDocument document = project.getParsedText(selectedFilePath);
-        textArea.replaceText(document.getCurrentText());
-        // undoing must not go back to the text of the previous file
-        textArea.getUndoManager().forgetHistory();
+        TextDocument selected = project.getParsedText(filePath);
+        this.document = selected;
+        resync();
+        textArea.moveTo(0);
         textArea.setEditable(true);
+        selected.addChangeListener(mirror);
         refreshFromCorpus();
 
-        this.textArea.textProperty().addListener(changeListener);
-        currentTextCouldBeWrittenDownProperty.bind(
-            document.getCouldBeWrittenBooleanProperty()
-        );
-        currentTextCouldBeReparsedProperty.bind(
-            document.getCouldBeReparsedBooleanProperty()
-        );
+        currentTextCouldBeWrittenDownProperty.bind(selected.getCouldBeWrittenBooleanProperty());
+        currentTextCouldBeReparsedProperty.bind(selected.getCouldBeReparsedBooleanProperty());
+        project.history(selected.getId()).ifPresent(h -> {
+            undoAvailable.bind(h.undoAvailableProperty());
+            redoAvailable.bind(h.redoAvailableProperty());
+        });
         closableProperty.set(true);
     }
 
     public Path getSelectedFilePath() {
-        return selectedFilePath;
+        return document == null ? null : document.getFilePath();
+    }
+
+    /** The displayed document, if any. */
+    public Optional<TextDocument> getSelectedDocument() {
+        return Optional.ofNullable(document);
     }
 
     public void clearEditor() {
         dismissGhost();
+        if (document != null) {
+            document.removeChangeListener(mirror);
+        }
+        this.document = null;
         currentTextCouldBeWrittenDownProperty.unbind();
         currentTextCouldBeWrittenDownProperty.set(false);
         currentTextCouldBeReparsedProperty.unbind();
         currentTextCouldBeReparsedProperty.set(false);
+        undoAvailable.unbind();
+        undoAvailable.set(false);
+        redoAvailable.unbind();
+        redoAvailable.set(false);
         closableProperty.set(false);
-        this.selectedFilePath = null;
-        this.textArea.textProperty().removeListener(changeListener);
-        if (textArea != null) {
+        mirroring = true;
+        try {
             textArea.clear();
-            textArea.setEditable(false);
+        } finally {
+            mirroring = false;
         }
+        textArea.setEditable(false);
         this.selectedObject.set(null);
         this.currentFileObjects.clear();
         this.currentFileErrors.clear();
@@ -299,39 +409,57 @@ public class EditorController {
         return currentTextCouldBeReparsedProperty;
     }
 
+    public BooleanExpression undoAvailableProperty() {
+        return undoAvailable;
+    }
+
+    public BooleanExpression redoAvailableProperty() {
+        return redoAvailable;
+    }
+
+    /** Undoes the last change of the displayed document. */
+    public void undo() {
+        dismissGhost();
+        if (document != null) {
+            project.history(document.getId()).ifPresent(TextHistory::undo);
+        }
+    }
+
+    /** Applies again the last undone change of the displayed document. */
+    public void redo() {
+        dismissGhost();
+        if (document != null) {
+            project.history(document.getId()).ifPresent(TextHistory::redo);
+        }
+    }
+
     public void saveEditedFile() throws IOException {
-        if (selectedFilePath == null) {
+        if (document == null) {
             throw new IOException("No file is currently being edited.");
         }
         dismissGhost();
-        TextDocument text = project.getParsedText(selectedFilePath);
-        // the text area pushes its text at most every PARSE_DELAY_MS
-        text.updateText(textArea.getText());
-        if (!text.getCouldBeWritten()) {
-            return;
+        if (document.getCouldBeWritten()) {
+            document.writeFile();
         }
-        project.saveFile(selectedFilePath, textArea.getText());
     }
 
     /**
-     * Parses the current editor text in the background; the views are refreshed when the
-     * results are applied.
+     * Parses the current document in the background; the views are refreshed when the results
+     * are applied.
      */
     public CompletableFuture<Void> parseEditedFile() {
-        if (selectedFilePath == null) {
+        if (document == null) {
             return CompletableFuture.completedFuture(null);
         }
         dismissGhost();
-        // the text area pushes its text at most every PARSE_DELAY_MS: push the latest text
-        project.updateFileContent(textArea.getText(), selectedFilePath);
-        return project.parseInBackground(selectedFilePath);
+        return project.parseInBackground(document.getFilePath());
     }
 
     public ObservableList<CorpusObject> getCurrentFileObjects() {
         return this.currentFileObjects;
     }
 
-    public ObservableList<ParseError> getCurrentFileErrors() {
+    public ObservableList<Diagnostic> getCurrentFileErrors() {
         return this.currentFileErrors;
     }
 
@@ -347,7 +475,7 @@ public class EditorController {
     // Assistant
     // ------------------------------------------------------------------
 
-    /** Runs a change of provisional text: it reaches neither the model, nor the undo history. */
+    /** Runs a change of provisional text: it reaches neither the document, nor the undo history. */
     public void runGhostOperation(Runnable change) {
         boolean previous = ghostOperation;
         ghostOperation = true;
@@ -373,46 +501,45 @@ public class EditorController {
         }
     }
 
-    /** Changes of the real text (provisional text excluded). */
+    /** Changes of the real text shown (provisional text excluded), whoever made them. */
     public EventStream<PlainTextChange> userChanges() {
         return textArea.plainTextChanges().filter(change -> !ghostOperation);
     }
 
-    /** The real text of the editor (provisional text removed). */
+    /** The text of the displayed document (without provisional text). */
     public String currentText() {
         dismissGhost();
-        return textArea.getText();
+        return document == null ? textArea.getText() : document.getCurrentText();
     }
 
     public boolean isEditing() {
-        return selectedFilePath != null;
+        return document != null;
     }
 
     /**
-     * Applies edits as one undoable change, if the text still holds what they expect.
+     * Applies edits of an AI suggestion to the displayed document, as one undoable change, if the
+     * text still holds what they expect.
      *
      * @return false if the text changed and the edits no longer apply
      */
     public boolean applyEdits(List<TextEdit> edits) {
-        if (selectedFilePath == null || edits.isEmpty()) return false;
+        if (document == null || edits.isEmpty()) return false;
         dismissGhost();
-        String text = textArea.getText();
-        if (!edits.stream().allMatch(e -> e.matches(text))) {
+        if (!document.applyEdits(edits, EditOrigin.of(EditOrigin.Kind.ASSIST, "assistant"))) {
             return false;
         }
-        textArea.getUndoManager().preventMerge();
-        // in reverse order, so that the offsets of the next edits stay valid
-        List<TextEdit> sorted = edits.stream().sorted(Comparator.comparingInt(TextEdit::start).reversed()).toList();
-        MultiChangeBuilder<String, String, String> change = textArea.createMultiChange(sorted.size());
-        for (TextEdit e : sorted) {
-            change.replaceTextAbsolutely(e.start(), e.end(), e.replacement());
-        }
-        change.commit();
-        textArea.getUndoManager().preventMerge();
-        TextEdit first = sorted.get(sorted.size() - 1);
-        textArea.moveTo(Math.min(textArea.getLength(), first.start() + first.replacement().length()));
+        TextEdit first = edits.stream().min(Comparator.comparingInt(TextEdit::start)).orElseThrow();
+        int shift = edits.stream().filter(e -> e.start() < first.start()).mapToInt(TextEdit::delta).sum();
+        textArea.moveTo(Math.min(textArea.getLength(), first.start() + shift + first.replacement().length()));
         textArea.requestFollowCaret();
         return true;
+    }
+
+    /** Applies search-and-replace edits to the displayed document, as one undoable change. */
+    public boolean applySearchEdits(List<TextEdit> edits) {
+        if (document == null || edits.isEmpty()) return false;
+        dismissGhost();
+        return document.applyEdits(edits, EditOrigin.of(EditOrigin.Kind.SEARCH, "search"));
     }
 
     /** Highlights a range temporarily (e.g. while the pointer is over a suggestion). */
@@ -431,11 +558,11 @@ public class EditorController {
     }
 
     /** The parse error at an offset (its span contains it, or it is on the same line). */
-    public Optional<ParseError> errorAt(int offset) {
+    public Optional<Diagnostic> errorAt(int offset) {
         String text = textArea.getText();
         int line = lineOf(text, offset);
         return currentFileErrors.stream()
-            .filter(e -> e.span().map(sp -> sp.contains(offset)).orElse(false) || e.getLine() == line)
+            .filter(e -> e.span().map(sp -> sp.contains(offset)).orElse(false) || e.line() == line)
             .min(Comparator.comparingInt(e -> Math.abs(PromptBuilder.errorOffset(text, e) - offset)));
     }
 

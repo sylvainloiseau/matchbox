@@ -15,6 +15,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -111,11 +112,40 @@ public class ObjectViewRegistry {
     }
 
     /**
-     * Table columns for objects of the given class: a line column, then the factory's columns,
-     * or a label column if the factory has none.
+     * Shows a re-parsed version of {@code object} in {@code view}, if the factory supports it.
+     *
+     * @return false if the view must be rebuilt
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
+    public boolean updateView(Node view, CorpusObject previous, CorpusObject object, ViewContext context) {
+        ObjectViewFactory factory = factoryFor(object.getClass());
+        if (view == null || previous == null || factory == fallback || factory != factoryFor(previous.getClass())
+            || !previous.getKind().equals(object.getKind())) {
+            return false;
+        }
+        try {
+            return factory.updateView(view, object, context);
+        } catch (RuntimeException | LinkageError e) {
+            report(factory, "updateView", e);
+            return false;
+        }
+    }
+
+    /** Read-only table columns for objects of the given class. */
     public List<TableColumn<CorpusObject, String>> columnsFor(Class<?> type) {
+        return columnsFor(type, null, message -> {});
+    }
+
+    /**
+     * Table columns for objects of the given class: a line column, then the factory's columns,
+     * or a label column if the factory has none. Columns showing a field are editable when a
+     * context is given.
+     *
+     * @param context used to write edited cells; {@code null}: read-only columns
+     * @param status  receives the message of a refused edit (empty when an edit is applied)
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public List<TableColumn<CorpusObject, String>> columnsFor(Class<?> type, ViewContext context, Consumer<String> status) {
         ObjectViewFactory factory = factoryFor(type);
         List<ObjectColumn<CorpusObject>> specs;
         try {
@@ -130,12 +160,23 @@ public class ObjectViewRegistry {
             new ObjectColumn<>("Line", o -> String.valueOf(o.getTextCoordinate().startLine()))
         );
         line.setPrefWidth(50);
+        line.setEditable(false);
         columns.add(line);
         if (specs == null || specs.isEmpty()) {
-            columns.add(column(factory, new ObjectColumn<>("Label", CorpusObject::getLabel)));
+            TableColumn<CorpusObject, String> label = column(factory, new ObjectColumn<>("Label", CorpusObject::getLabel));
+            label.setEditable(false);
+            columns.add(label);
         } else {
             for (ObjectColumn<CorpusObject> spec : specs) {
-                columns.add(column(factory, spec));
+                TableColumn<CorpusObject, String> column = column(factory, spec);
+                if (context != null && spec.field().isPresent()) {
+                    String field = spec.field().get();
+                    column.setEditable(true);
+                    column.setCellFactory(c -> new FieldCell(field, context, status));
+                } else {
+                    column.setEditable(false);
+                }
+                columns.add(column);
             }
         }
         return columns;

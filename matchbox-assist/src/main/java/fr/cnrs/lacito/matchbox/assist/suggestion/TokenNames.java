@@ -21,7 +21,7 @@ public final class TokenNames {
 
     private TokenNames() {}
 
-    /** The readable name of a token as given by {@code ParseError.getExpected()}, or the token itself. */
+    /** The readable name of a token as given by {@code Diagnostic.getExpected()}, or the token itself. */
     public static String readable(GrammarPlugin grammar, String token) {
         if (grammar == null) {
             return token;

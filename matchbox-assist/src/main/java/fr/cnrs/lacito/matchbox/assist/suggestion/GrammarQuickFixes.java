@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox.assist.suggestion;
 
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,13 +20,13 @@ public final class GrammarQuickFixes {
     /** A candidate correction: a title and its edit. */
     public record Fix(String title, TextEdit edit) {}
 
-    public static List<Fix> candidates(String text, ParseError error) {
+    public static List<Fix> candidates(String text, Diagnostic error) {
         List<Fix> fixes = new ArrayList<>();
-        int start = error.getStartIndex();
+        int start = error.startIndex();
         if (start < 0 || start > text.length()) {
             return fixes;
         }
-        String message = error.getMessage() == null ? "" : error.getMessage();
+        String message = error.message() == null ? "" : error.message();
         boolean missing = message.startsWith("missing ");
         boolean mismatched = message.startsWith("mismatched input");
         boolean extraneous = message.startsWith("extraneous input");
@@ -33,7 +34,7 @@ public final class GrammarQuickFixes {
 
         if (missing || mismatched || extraneous) {
             int n = 0;
-            for (String token : error.getExpected()) {
+            for (String token : error.expected()) {
                 if (n == MAX_INSERTIONS) break;
                 String literal = literal(token);
                 if (literal != null && !literal.isEmpty()) {
@@ -42,7 +43,7 @@ public final class GrammarQuickFixes {
                 }
             }
         }
-        int stop = error.getStopIndex();
+        int stop = error.stopIndex();
         if ((extraneous || mismatched || lexer) && stop >= start && stop < text.length()) {
             String offending = text.substring(start, stop + 1);
             fixes.add(new Fix("Delete " + display(offending), TextEdit.replace(text, start, stop + 1, "")));

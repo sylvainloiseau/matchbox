@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox.assist.suggestion;
 
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,7 +22,7 @@ import java.util.Optional;
  * @param note        remark shown with the suggestion (e.g. why a fix was rejected), may be empty
  */
 public record Suggestion(String id, Source source, int start, int end, String title, String detail,
-                         List<TextEdit> edits, Optional<ParseError> error, Status status, String note) {
+                         List<TextEdit> edits, Optional<Diagnostic> error, Status status, String note) {
 
     public enum Source {
         PARSE_ERROR("Error"),

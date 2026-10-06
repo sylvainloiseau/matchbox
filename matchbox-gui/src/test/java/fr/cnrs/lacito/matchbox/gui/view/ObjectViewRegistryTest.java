@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
+import fr.cnrs.lacito.matchbox.corpus.simple.SimpleSection;
+import java.nio.file.Path;
 import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearSentence;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleSense;
@@ -20,7 +23,7 @@ class ObjectViewRegistryTest {
 
     /** A grammar-specific type, unknown to the application. */
     static final class CustomObject implements CorpusObject {
-        public TextCoordinate getTextCoordinate() { return new TextCoordinate(null, 0, 0, 1, 1); }
+        public TextCoordinate getTextCoordinate() { return new TextCoordinate(new TextId(Path.of("x")), 0, 0, 1, 1); }
         public String getKind() { return "custom:thing"; }
     }
 
@@ -50,6 +53,13 @@ class ObjectViewRegistryTest {
         assertSame(igt, r.factoryFor(SimpleIGT.class));
         assertSame(generic, r.factoryFor(SimpleSense.class));
         assertSame(generic, r.factoryFor(CustomObject.class));
+    }
+
+    @Test
+    void sectionsGetTheSectionView() {
+        var generic = new GenericObjectViewFactory();
+        var section = new SectionViewFactory();
+        assertSame(section, registry(generic, section).factoryFor(SimpleSection.class));
     }
 
     @Test

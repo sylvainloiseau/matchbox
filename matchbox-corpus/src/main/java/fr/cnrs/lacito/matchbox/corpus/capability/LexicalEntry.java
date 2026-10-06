@@ -6,6 +6,9 @@ import java.util.List;
 /** A dictionary entry: a headword and its senses. */
 public interface LexicalEntry extends CorpusObject {
 
+    /** Field name (see {@link fr.cnrs.lacito.matchbox.corpus.HasFields}). */
+    String HEADWORD = "headword";
+
     String getHeadword();
 
     List<? extends Sense> getSenses();

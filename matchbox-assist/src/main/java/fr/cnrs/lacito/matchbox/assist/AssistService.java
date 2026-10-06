@@ -8,9 +8,9 @@ import fr.cnrs.lacito.matchbox.assist.provider.ChatRequest;
 import fr.cnrs.lacito.matchbox.assist.provider.ChatResponse;
 import fr.cnrs.lacito.matchbox.assist.provider.CompletionProvider;
 import fr.cnrs.lacito.matchbox.assist.suggestion.EditLocator;
-import fr.cnrs.lacito.matchbox.assist.suggestion.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.assist.validation.EditValidator;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -121,7 +121,7 @@ public final class AssistService {
     // Explanation
     // ------------------------------------------------------------------
 
-    public CompletableFuture<Explanation> explain(AssistContext ctx, ParseError error) {
+    public CompletableFuture<Explanation> explain(AssistContext ctx, Diagnostic error) {
         String key = explanationKey(ctx, error);
         Explanation cached = explanations.get(key);
         if (cached != null) {
@@ -159,12 +159,12 @@ public final class AssistService {
         });
     }
 
-    private static String explanationKey(AssistContext ctx, ParseError error) {
+    private static String explanationKey(AssistContext ctx, Diagnostic error) {
         String text = ctx.text();
         int offset = PromptBuilder.errorOffset(text, error);
         int from = Math.max(0, offset - 600);
         int to = Math.min(text.length(), offset + 600);
-        return error.getGrammarId() + "|" + error.getMessage() + "|" + text.substring(from, to).hashCode() + "|" +
+        return error.grammarId() + "|" + error.message() + "|" + text.substring(from, to).hashCode() + "|" +
             ctx.prefix().key();
     }
 

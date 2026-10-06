@@ -42,6 +42,14 @@ public final class CorpusAssertions {
         }
     }
 
+    /** Checks that every object (top-level or nested) of {@code objects} belongs to {@code text}. */
+    public static void assertOwnedBy(Text text, List<? extends CorpusObject> objects) {
+        for (CorpusObject o : objects) {
+            assertTrue(text.owns(o), () -> o + " does not belong to " + text);
+            assertOwnedBy(text, o.getChildren());
+        }
+    }
+
     public static void assertSpanValid(TextCoordinate span, String text) {
         assertTrue(span.startIndex() >= 0, "negative start: " + span);
         assertTrue(span.stopIndex() >= span.startIndex(), "inverted span: " + span);

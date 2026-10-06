@@ -4,12 +4,12 @@ import fr.cnrs.lacito.matchbox.grammar.conll.ConllLexer;
 import fr.cnrs.lacito.matchbox.grammarapi.AbstractGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.CollectingErrorListener;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleDependencyTree;
 import fr.cnrs.lacito.matchbox.grammarapi.Spans;
-import java.nio.file.Path;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,7 +42,7 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
     );
 
     /** Builds a tree from the terminals of a sentence rule (header, comments, token lines). */
-    static SimpleDependencyTree toTree(Path filePath, ConllParser.SentenceContext ctx) {
+    static SimpleDependencyTree toTree(TextId filePath, ConllParser.SentenceContext ctx) {
         Map<String, String> metadata = new LinkedHashMap<>();
         List<Map<String, String>> tokens = new ArrayList<>();
         List<Integer> heads = new ArrayList<>();
@@ -152,7 +152,8 @@ The fields must additionally meet the following constraints:
         return List.of(
             new GrammarExample(
                 "Typical sentence in conll format",
-                """# sent_id = 1
+                """
+# sent_id = 1
 # text = They buy and sell books.
 1   They     they    PRON    PRP    Case=Nom|Number=Plur               2   nsubj   2:nsubj|4:nsubj   _
 2   buy      buy     VERB    VBP    Number=Plur|Person=3|Tense=Pres    0   root    0:root            _
@@ -162,7 +163,8 @@ The fields must additionally meet the following constraints:
 6   .        .       PUNCT   .      _                                  2   punct   2:punct           _"""),
             new GrammarExample(
                 "Typical sentence in conll format",
-                """# newdoc id = mf920901-001
+                """
+# newdoc id = mf920901-001
 # newpar id = mf920901-001-p1
 # sent_id = mf920901-001-p1s1A
 # text = Slovenská ústava: pro i proti
@@ -183,9 +185,9 @@ The fields must additionally meet the following constraints:
     }
 
     @Override
-    public ParseResult getResult(Path filePath, String content) {
+    public ParseResult getResult(TextId filePath, String content) {
         List<CorpusObject> objects = new ArrayList<>();
-        List<ParseError> errors = new ArrayList<>();
+        List<Diagnostic> errors = new ArrayList<>();
         try {
             // Create lexer and parser
             var inputStream = CharStreams.fromString(content);
@@ -215,9 +217,9 @@ The fields must additionally meet the following constraints:
                 objects.add(toTree(filePath, x));
             }
 
-            errors.addAll(errorListener.getErrors());
+            errors.addAll(errorListener.getDiagnostics());
         } catch (RuntimeException e) {
-            errors.add(new ParseError(filePath, getId(), 0, 0, "Internal error of the grammar: " + e));
+            errors.add(Diagnostic.at(filePath, getId(), 0, 0, "Internal error of the grammar: " + e));
         }
         return new ParseResult(objects, errors);
     }

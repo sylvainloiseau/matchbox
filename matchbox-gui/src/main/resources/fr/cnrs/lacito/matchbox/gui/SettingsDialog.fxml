@@ -107,6 +107,14 @@
                                     style="-fx-font-weight: bold;"
                                 />
                 <CheckBox fx:id="openLastProjectCheckBox" />
+                <Label
+                                    text="Edits in object views"
+                                    style="-fx-font-weight: bold;"
+                                />
+                <CheckBox
+                                    fx:id="allowInvalidViewEditsCheckBox"
+                                    text="Apply edits that add parse errors (by default they are refused)"
+                                />
               </children>
             </VBox>
           </content>

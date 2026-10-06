@@ -1,5 +1,9 @@
 package fr.cnrs.lacito.matchbox.gui;
 
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Predicate;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -14,14 +18,20 @@ import javafx.stage.Window;
 import org.fxmisc.richtext.InlineCssTextArea;
 
 /**
- * Small search/replace dialog operating on a provided CodeArea.
+ * Small search/replace dialog operating on a provided CodeArea. Replacements are written to the
+ * displayed document through {@code replacer} (one undoable change per action).
  */
 public class SearchDialog extends Stage {
 
     private final InlineCssTextArea codeArea;
+    private final Predicate<List<TextEdit>> replacer;
 
-    public SearchDialog(InlineCssTextArea codeArea, Window owner) {
+    /**
+     * @param replacer applies edits of the displayed text; false if they could not be applied
+     */
+    public SearchDialog(InlineCssTextArea codeArea, Predicate<List<TextEdit>> replacer, Window owner) {
         this.codeArea = codeArea;
+        this.replacer = replacer;
         initOwner(owner);
         initModality(Modality.WINDOW_MODAL);
         setTitle("Search / Replace");
@@ -91,7 +101,8 @@ public class SearchDialog extends Stage {
         if (selected != null && selected.equals(term)) {
             int start = codeArea.getSelection().getStart();
             int end = codeArea.getSelection().getEnd();
-            codeArea.replaceText(start, end, replacement == null ? "" : replacement);
+            replacer.test(List.of(TextEdit.replace(codeArea.getText(), start, end,
+                replacement == null ? "" : replacement)));
             // codeArea.positionCaret(start + (replacement == null ? 0 : replacement.length()));
         }
         // search next occurrence after current caret
@@ -101,11 +112,12 @@ public class SearchDialog extends Stage {
     private void doReplaceAll(String term, String replacement) {
         if (term == null || term.isEmpty()) return;
         String text = codeArea.getText();
-        String replaced = text.replace(term, replacement == null ? "" : replacement);
-        if (!replaced.equals(text)) {
-            int caret = codeArea.getCaretPosition();
-            codeArea.replaceText(replaced);
-            // codeArea.positionCaret(Math.min(caret, replaced.length()));
+        List<TextEdit> edits = new ArrayList<>();
+        for (int i = text.indexOf(term); i >= 0; i = text.indexOf(term, i + term.length())) {
+            edits.add(TextEdit.replace(text, i, i + term.length(), replacement == null ? "" : replacement));
+        }
+        if (!edits.isEmpty()) {
+            replacer.test(edits);
         }
     }
 }

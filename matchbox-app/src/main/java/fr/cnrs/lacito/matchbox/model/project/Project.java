@@ -1,11 +1,16 @@
 package fr.cnrs.lacito.matchbox.model.project;
 
+import fr.cnrs.lacito.matchbox.corpus.Corpus;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.Text;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
-import fr.cnrs.lacito.matchbox.model.Corpus;
+import fr.cnrs.lacito.matchbox.model.DocumentChange;
+import fr.cnrs.lacito.matchbox.model.DocumentListener;
 import fr.cnrs.lacito.matchbox.model.DocumentOptions;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
+import fr.cnrs.lacito.matchbox.model.TextHistory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,6 +23,8 @@ import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import javafx.beans.property.ReadOnlyBooleanProperty;
+import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
@@ -67,6 +74,15 @@ public class Project {
     private ObservableMap<Path, TextDocument> textDocumentByPath =
         FXCollections.observableHashMap();
 
+    /** The same documents, by text id (spans and corpus texts refer to documents by id). */
+    private final Map<TextId, TextDocument> documentById = new HashMap<>();
+    /** Undo history of each document, kept as long as the document is in the project. */
+    private final Map<TextId, TextHistory> historyById = new HashMap<>();
+    /** Parses a document after a change that does not come from typing (view, assistant, undo…). */
+    private final DocumentListener reparseOnChange = this::onDocumentChanged;
+    private final ReadOnlyBooleanWrapper anyDocumentDirty = new ReadOnlyBooleanWrapper(false);
+    private final javafx.beans.value.ChangeListener<Boolean> dirtyListener = (obs, o, n) -> updateAnyDocumentDirty();
+
     /**
      * Derived from textDocumentByPath. used by #parseProject
      */
@@ -104,11 +120,25 @@ public class Project {
                     ? extends TextDocument
                 > change
             ) -> {
-                if (change.wasAdded()) {
-                    derivedFileList.add(change.getValueAdded());
-                } else if (change.wasRemoved()) {
-                    derivedFileList.remove(change.getValueRemoved());
+                if (change.wasRemoved()) {
+                    TextDocument removed = change.getValueRemoved();
+                    derivedFileList.remove(removed);
+                    documentById.remove(removed.getId());
+                    TextHistory history = historyById.remove(removed.getId());
+                    if (history != null) history.dispose();
+                    removed.removeChangeListener(reparseOnChange);
+                    removed.getCouldBeWrittenBooleanProperty().removeListener(dirtyListener);
+                    corpus.remove(removed.getId());
                 }
+                if (change.wasAdded()) {
+                    TextDocument added = change.getValueAdded();
+                    derivedFileList.add(added);
+                    documentById.put(added.getId(), added);
+                    historyById.put(added.getId(), new TextHistory(added));
+                    added.addChangeListener(reparseOnChange);
+                    added.getCouldBeWrittenBooleanProperty().addListener(dirtyListener);
+                }
+                updateAnyDocumentDirty();
             }
         );
     }
@@ -179,12 +209,29 @@ public class Project {
     /** Parses a document synchronously and applies the results on the calling thread. */
     public void parseTextObject(TextDocument document) {
         ParseRun run = computeParse(
-            document.getFilePath(),
+            document.getId(),
             document.getCurrentText(),
             document.getVersion(),
             getGrammarsForFile(document.getFilePath())
         );
         applyParse(document, run);
+    }
+
+    /** Parses a document in the background. */
+    public CompletableFuture<Void> parseInBackground(TextId id) {
+        return document(id)
+            .map(d -> parseInBackground(d.getFilePath()))
+            .orElseGet(() -> CompletableFuture.completedFuture(null));
+    }
+
+    private void onDocumentChanged(DocumentChange change) {
+        // typing is parsed on demand; other changes must refresh the views at once
+        if (!change.origin().isTyping()) {
+            parseInBackground(change.document().getFilePath()).exceptionally(e -> {
+                logger.log(Level.WARNING, "Parsing failed after a change of " + change.document().getFilePath(), e);
+                return null;
+            });
+        }
     }
 
     /**
@@ -197,9 +244,10 @@ public class Project {
         // snapshot on the calling thread
         String text = document.getCurrentText();
         long version = document.getVersion();
+        TextId id = document.getId();
         List<GrammarPlugin> grammars = getGrammarsForFile(filePath);
         return CompletableFuture
-            .supplyAsync(() -> computeParse(filePath, text, version, grammars), parserExecutor())
+            .supplyAsync(() -> computeParse(id, text, version, grammars), parserExecutor())
             .thenAcceptAsync(run -> {
                 if (textDocumentByPath.get(filePath) == document && document.getVersion() == run.version()) {
                     applyParse(document, run);
@@ -228,35 +276,36 @@ public class Project {
         return List.copyOf(grammars.values());
     }
 
-    /** Results of one parse of a file. */
-    private record ParseRun(String text, long version, Map<String, ParseResult> results) {}
+    /** Result of one parse of a document. */
+    private record ParseRun(Text text, long version) {}
 
-    /** Runs the grammars; thread-safe, does not touch observable state. */
-    private static ParseRun computeParse(Path filePath, String text, long version, List<GrammarPlugin> grammars) {
-        Map<String, ParseResult> results = new LinkedHashMap<>();
+    /**
+     * Runs the grammars and validates their results; thread-safe, does not touch observable
+     * state.
+     */
+    private static ParseRun computeParse(TextId id, String text, long version, List<GrammarPlugin> grammars) {
+        Text.Builder builder = Text.builder(id, text);
         for (GrammarPlugin plugin : grammars) {
             ParseResult result;
             try {
-                result = plugin.getResult(filePath, text);
+                result = plugin.getResult(id, text);
                 if (result == null) {
                     throw new IllegalStateException("getResult returned null");
                 }
             } catch (RuntimeException | LinkageError e) {
-                logger.log(Level.WARNING, "Grammar " + plugin.getId() + " failed on " + filePath, e);
+                logger.log(Level.WARNING, "Grammar " + plugin.getId() + " failed on " + id, e);
                 result = new ParseResult(List.of(), List.of(
-                    new ParseError(filePath, plugin.getId(), 0, 0, "Internal error of the grammar: " + e)
+                    Diagnostic.at(id, plugin.getId(), 0, 0, "Internal error of the grammar: " + e)
                 ));
             }
-            results.put(plugin.getId(), result);
+            builder.add(plugin.getId(), result.objects(), result.diagnostics());
         }
-        return new ParseRun(text, version, results);
+        return new ParseRun(builder.build(), version);
     }
 
     private void applyParse(TextDocument document, ParseRun run) {
-        corpus.setResults(document.getFilePath(), run.results(), run.text());
-        if (document.getVersion() == run.version()) {
-            document.markParsed();
-        }
+        corpus.put(run.text());
+        document.markParsed(run.version());
     }
 
     private synchronized ExecutorService parserExecutor() {
@@ -396,9 +445,28 @@ public class Project {
         );
     }
 
-    public void updateFileContent(String fileContent, Path filePath) {
-        TextDocument text = getParsedText(filePath);
-        text.updateText(fileContent);
+    /** The document of a text, if it is in the project. */
+    public Optional<TextDocument> document(TextId id) {
+        return Optional.ofNullable(documentById.get(id));
+    }
+
+    /** Undo history of a document of the project. */
+    public Optional<TextHistory> history(TextId id) {
+        return Optional.ofNullable(historyById.get(id));
+    }
+
+    /** Documents with unsaved changes, in file list order. */
+    public List<TextDocument> getDirtyDocuments() {
+        return derivedFileList.stream().filter(TextDocument::getCouldBeWritten).toList();
+    }
+
+    /** True while at least one document has unsaved changes. */
+    public ReadOnlyBooleanProperty anyDocumentDirtyProperty() {
+        return anyDocumentDirty.getReadOnlyProperty();
+    }
+
+    private void updateAnyDocumentDirty() {
+        anyDocumentDirty.set(derivedFileList.stream().anyMatch(TextDocument::getCouldBeWritten));
     }
 
     public void removeFile(String filePath) {
@@ -408,7 +476,6 @@ public class Project {
     public void removeFile(Path selected) {
         filesAndDirectories.remove(selected);
         textDocumentByPath.remove(selected);
-        corpus.removeFile(selected);
         this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
@@ -477,7 +544,6 @@ public class Project {
             Collections.emptyList()
         )) {
             textDocumentByPath.remove(p);
-            corpus.removeFile(p);
         }
         this.isProjectDefinitionOutdatedProperty().set(true);
     }
@@ -486,10 +552,16 @@ public class Project {
         removeDirectory(Path.of(dirPath));
     }
 
-    public void saveFile(Path editedFilePath, String text) throws IOException {
-        TextDocument textParser = getParsedText(editedFilePath);
-        textParser.updateText(text);
-        textParser.writeFile();
+    /** Writes the document of a file. */
+    public void saveFile(Path editedFilePath) throws IOException {
+        getParsedText(editedFilePath).writeFile();
+    }
+
+    /** Writes every document with unsaved changes; stops at the first failure. */
+    public void saveAll() throws IOException {
+        for (TextDocument d : getDirtyDocuments()) {
+            d.writeFile();
+        }
     }
 
     // ------------------------

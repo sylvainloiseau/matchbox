@@ -57,7 +57,7 @@ public class GenericObjectViewFactory implements ObjectViewFactory<CorpusObject>
     }
 
     static String position(TextCoordinate span) {
-        String file = span.path() == null || span.path().getFileName() == null ? "" : span.path().getFileName() + ", ";
+        String file = span.text().displayName() + ", ";
         return span.startLine() == span.endLine()
             ? file + "line " + span.startLine()
             : file + "lines " + span.startLine() + "–" + span.endLine();

@@ -113,6 +113,11 @@
                     text="_Save current file"
                 />
                <MenuItem
+                    fx:id="saveAllFilesMenuItem"
+                    onAction="#handleSaveAllFiles"
+                    text="Save all files"
+                />
+               <MenuItem
                     fx:id="closeFileMenuItem"
                     mnemonicParsing="true"
                     onAction="#handleCloseFile"

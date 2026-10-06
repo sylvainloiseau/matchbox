@@ -70,6 +70,12 @@ public class MatchboxApplication extends Application {
         // Create scene and set up stage
         Scene scene = new Scene((Parent) root, 1200, 800);
         primaryStage.setScene(scene);
+        // unsaved files (possibly changed by object views only) are not lost silently
+        primaryStage.setOnCloseRequest(e -> {
+            if (!mainController.confirmQuit()) {
+                e.consume();
+            }
+        });
         primaryStage.setTitle("Notebook Application");
         primaryStage.show();
 

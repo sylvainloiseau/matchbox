@@ -69,6 +69,9 @@ public class MainController {
     private MenuItem saveCurrentFileMenuItem;
 
     @FXML
+    private MenuItem saveAllFilesMenuItem;
+
+    @FXML
     private MenuItem openProjectMenuItem;
 
     @FXML
@@ -170,7 +173,16 @@ public class MainController {
         };
     }
 
+    /** "Save all files" is enabled while a document of the project has unsaved changes. */
+    private void bindSaveAll() {
+        if (saveAllFilesMenuItem != null && project != null) {
+            saveAllFilesMenuItem.disableProperty().unbind();
+            saveAllFilesMenuItem.disableProperty().bind(project.anyDocumentDirtyProperty().not());
+        }
+    }
+
     private void onProjectChangeHook() {
+        bindSaveAll();
         saveProjectMenuItem
             .disableProperty()
             .bind(project.fileProperty().isNotNull());
@@ -265,23 +277,20 @@ public class MainController {
     /** Stops the assistant's background threads. */
     public void shutdown() {
         assist.close();
+        fileModeController.shutdown();
     }
 
     private void switchToFileMode() {
         viewPane.getChildren().clear();
         viewPane.getChildren().add(fileModePane);
-        // bind undo/redo to CodeArea's undo/redo availability
-        if (undoMenuItem != null && fileContentCodeArea != null) {
+        // undo/redo use the history of the displayed document
+        if (undoMenuItem != null) {
             undoMenuItem.disableProperty().unbind();
-            undoMenuItem
-                .disableProperty()
-                .bind(fileContentCodeArea.undoAvailableProperty());
+            undoMenuItem.disableProperty().bind(editorController.undoAvailableProperty().not());
         }
-        if (redoMenuItem != null && fileContentCodeArea != null) {
+        if (redoMenuItem != null) {
             redoMenuItem.disableProperty().unbind();
-            redoMenuItem
-                .disableProperty()
-                .bind(fileContentCodeArea.redoAvailableProperty());
+            redoMenuItem.disableProperty().bind(editorController.redoAvailableProperty().not());
         }
         // enable search only when the code area has focus
         if (searchMenuItem != null && fileContentCodeArea != null) {
@@ -302,30 +311,22 @@ public class MainController {
         closeFileMenuItem
             .disableProperty()
             .bind(editorController.getClosableProperty().not());
+        bindSaveAll();
     }
 
     public void handleUndoMenuItem() {
-        editorController.dismissGhost();
-        if (
-            fileContentCodeArea != null && fileContentCodeArea.isUndoAvailable()
-        ) {
-            fileContentCodeArea.undo();
-        }
+        editorController.undo();
     }
 
     public void handleRedoMenuItem() {
-        editorController.dismissGhost();
-        if (
-            fileContentCodeArea != null && fileContentCodeArea.isRedoAvailable()
-        ) {
-            fileContentCodeArea.redo();
-        }
+        editorController.redo();
     }
 
     public void handleSearchMenuItem() {
         // Show search dialog bound to current code area
         SearchDialog dialog = new SearchDialog(
             fileContentCodeArea,
+            editorController::applySearchEdits,
             primaryStage
         );
         dialog.show();
@@ -406,11 +407,34 @@ public class MainController {
         }
     }
 
+    /** Saves every file with unsaved changes, displayed or not. */
+    public void handleSaveAllFiles() {
+        try {
+            fileModeController.handleSaveAll();
+        } catch (IOException e) {
+            ErrorReporter.report(primaryStage, "Error saving files", e);
+        }
+    }
+
+    /** Asks what to do with unsaved files before they are dropped; false to cancel. */
+    private boolean confirmDropDocuments(String action) {
+        return project == null
+            || UnsavedChangesDialog.confirm(primaryStage, List.copyOf(project.getDerivedFileList()), action);
+    }
+
+    /** Called when the main window is about to close: false keeps it open. */
+    public boolean confirmQuit() {
+        return confirmDropDocuments("quitting");
+    }
+
     // ---------------------------------------------
     // Project
     // ---------------------------------------------
 
     private void openProject(File f) {
+        if (!confirmDropDocuments("opening another project")) {
+            return;
+        }
         try {
             this.project = Project.loadProject(this.plugins, f, settings.documentOptions());
             fileModeController.setProject(project);
@@ -493,6 +517,9 @@ public class MainController {
     }
 
     public void handleCloseCurrentProject() {
+        if (!confirmDropDocuments("closing the project")) {
+            return;
+        }
         if (project.isProjectDefinitionOutdatedProperty().get()) {
             ButtonType ok = new ButtonType("foo", ButtonBar.ButtonData.OK_DONE);
             ButtonType no = new ButtonType("bar", ButtonBar.ButtonData.NO);
@@ -515,6 +542,7 @@ public class MainController {
         }
         //project.close();
         this.project = Project.createDefaultProject(plugins, settings.documentOptions());
+        fileModeController.setProject(project);
         onProjectChangeHook();
     }
 
@@ -593,7 +621,9 @@ public class MainController {
     }
 
     public void handleQuit() {
-        Platform.exit();
+        if (confirmQuit()) {
+            Platform.exit();
+        }
     }
 
 

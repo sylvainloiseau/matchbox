@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleExample;
@@ -17,6 +17,7 @@ import fr.cnrs.lacito.matchbox.corpus.simple.SimpleSense;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,7 @@ import org.junit.jupiter.api.Test;
 
 class NotebookGrammarPluginTest {
 
-    private static final Path FILE = Path.of("sample.txt");
+    private static final TextId FILE = new TextId(Path.of("sample.txt"));
 
     private String text;
     private ParseResult result;
@@ -43,12 +44,12 @@ class NotebookGrammarPluginTest {
 
     @Test
     void parsesWithoutErrors() {
-        assertTrue(result.errors().isEmpty(), () -> "errors: " + result.errors());
+        assertTrue(result.diagnostics().isEmpty(), () -> "errors: " + result.diagnostics());
         assertEquals(3, result.objects().size());
         assertSpansNested(result.objects(), text);
         assertKindsPrefixed(result.objects(), NotebookGrammarPlugin.ID);
         for (CorpusObject o : result.objects()) {
-            assertEquals(FILE, o.getTextCoordinate().path());
+            assertEquals(FILE, o.getTextCoordinate().text());
         }
     }
 
@@ -107,7 +108,7 @@ class NotebookGrammarPluginTest {
     void incompleteIgtIsSkippedOtherObjectsKept() {
         String partial = "<jaflo> {canoe}\n\n:::\na mio\n:::\n";
         ParseResult r = new NotebookGrammarPlugin().getResult(FILE, partial);
-        assertTrue(!r.errors().isEmpty());
+        assertTrue(!r.diagnostics().isEmpty());
         assertEquals(1, objectsOf(r, SimpleLexicalDefinition.class).size());
         assertTrue(objectsOf(r, SimpleIGT.class).isEmpty());
     }
@@ -116,14 +117,14 @@ class NotebookGrammarPluginTest {
     void errorsAreLocatedByOffsetsWithExpectedTokens() {
         String partial = "<jaflo> {canoe}\n\n:::\na mio\n:::\n";
         ParseResult r = new NotebookGrammarPlugin().getResult(FILE, partial);
-        assertTrue(!r.errors().isEmpty());
-        for (ParseError e : r.errors()) {
-            assertTrue(e.getStartIndex() >= 0 && e.getStartIndex() <= partial.length(), () -> "start: " + e);
-            assertTrue(e.getStopIndex() >= e.getStartIndex() - 1 && e.getStopIndex() < partial.length(), () -> "stop: " + e);
+        assertTrue(!r.diagnostics().isEmpty());
+        for (Diagnostic e : r.diagnostics()) {
+            assertTrue(e.startIndex() >= 0 && e.startIndex() <= partial.length(), () -> "start: " + e);
+            assertTrue(e.stopIndex() >= e.startIndex() - 1 && e.stopIndex() < partial.length(), () -> "stop: " + e);
             e.span().ifPresent(span -> assertTrue(span.isValidFor(partial.length()), () -> "span: " + span));
         }
-        assertTrue(r.errors().stream().anyMatch(e -> !e.getExpected().isEmpty()),
-            () -> "no expected tokens: " + r.errors());
+        assertTrue(r.diagnostics().stream().anyMatch(e -> !e.expected().isEmpty()),
+            () -> "no expected tokens: " + r.diagnostics());
     }
 
     private static <T> List<T> objectsOf(ParseResult r, Class<T> type) {

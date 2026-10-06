@@ -8,7 +8,7 @@ import fr.cnrs.lacito.matchbox.assist.provider.ChatRequest.Effort;
 import fr.cnrs.lacito.matchbox.assist.provider.ChatRequest.OutputSchema;
 import fr.cnrs.lacito.matchbox.assist.suggestion.TokenNames;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseError;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -50,7 +50,7 @@ public final class PromptBuilder {
             %s
             <text>
             %s%s%s
-            </text>""".formatted(CURSOR, maxLines, ctx.file().getFileName(), errorsNear(ctx, caret, 5),
+            </text>""".formatted(CURSOR, maxLines, ctx.file().displayName(), errorsNear(ctx, caret, 5),
                 text.substring(from, caret), CURSOR, text.substring(caret, to));
         return new ChatRequest("complete", ctx.prefix().blocks(), user, 2048, Effort.LOW, Optional.empty());
     }
@@ -59,15 +59,15 @@ public final class PromptBuilder {
     // Explanation of a parse error
     // ------------------------------------------------------------------
 
-    public static ChatRequest explain(AssistContext ctx, ParseError error, String language) {
+    public static ChatRequest explain(AssistContext ctx, Diagnostic error, String language) {
         String text = ctx.text();
         int offset = errorOffset(text, error);
         int line = lineOf(text, offset);
         int from = lineStart(text, Math.max(1, line - ERROR_CONTEXT_LINES));
         int to = lineEndAfter(text, lineStart(text, line + ERROR_CONTEXT_LINES));
         GrammarPlugin grammar = grammarOf(ctx, error);
-        String expected = error.getExpected().isEmpty() ? "unknown"
-            : error.getExpected().stream().map(t -> TokenNames.readable(grammar, t)).collect(Collectors.joining(", "));
+        String expected = error.expected().isEmpty() ? "unknown"
+            : error.expected().stream().map(t -> TokenNames.readable(grammar, t)).collect(Collectors.joining(", "));
         String user = """
             Task: explain a parse error to the author, in %s.
 
@@ -85,8 +85,8 @@ public final class PromptBuilder {
             - "original" and "replacement": a minimal correction, as an exact passage of the text \
             (without the marker) and its corrected version; use empty strings if the correction \
             needs information that only the author has.""".formatted(
-                language, grammar == null ? error.getGrammarId() : grammar.getDisplayName(), error.getMessage(),
-                error.getLine(), error.getCharPositionInLine(), expected, ERROR_MARK,
+                language, grammar == null ? error.grammarId() : grammar.getDisplayName(), error.message(),
+                error.line(), error.column(), expected, ERROR_MARK,
                 text.substring(from, offset), ERROR_MARK, text.substring(offset, Math.max(offset, to)));
         return new ChatRequest("explain", ctx.prefix().blocks(), user, 4096, Effort.LOW,
             Optional.of(new OutputSchema("explanation", explanationSchema())));
@@ -168,30 +168,30 @@ public final class PromptBuilder {
         return schema;
     }
 
-    static GrammarPlugin grammarOf(AssistContext ctx, ParseError error) {
-        return ctx.grammars().stream().filter(g -> g.getId().equals(error.getGrammarId())).findFirst().orElse(null);
+    static GrammarPlugin grammarOf(AssistContext ctx, Diagnostic error) {
+        return ctx.grammars().stream().filter(g -> g.getId().equals(error.grammarId())).findFirst().orElse(null);
     }
 
     /** Offset of an error: its start index, or computed from its line and column. */
-    public static int errorOffset(String text, ParseError error) {
-        if (error.getStartIndex() >= 0) {
-            return Math.min(error.getStartIndex(), text.length());
+    public static int errorOffset(String text, Diagnostic error) {
+        if (error.startIndex() >= 0) {
+            return Math.min(error.startIndex(), text.length());
         }
-        int start = lineStart(text, Math.max(1, error.getLine()));
-        return Math.min(text.length(), start + Math.max(0, error.getCharPositionInLine()));
+        int start = lineStart(text, Math.max(1, error.line()));
+        return Math.min(text.length(), start + Math.max(0, error.column()));
     }
 
     private static String errorsNear(AssistContext ctx, int offset, int lines) {
         int line = lineOf(ctx.text(), offset);
-        List<ParseError> near = ctx.errors().stream()
-            .filter(e -> Math.abs(e.getLine() - line) <= lines)
+        List<Diagnostic> near = ctx.errors().stream()
+            .filter(e -> Math.abs(e.line() - line) <= lines)
             .limit(5)
             .toList();
         return describeErrors(ctx, near, "Parse errors near the cursor (the block may simply be unfinished):");
     }
 
     private static String errorsIn(AssistContext ctx, int start, int end) {
-        List<ParseError> in = ctx.errors().stream()
+        List<Diagnostic> in = ctx.errors().stream()
             .filter(e -> {
                 int o = errorOffset(ctx.text(), e);
                 return o >= start && o <= end;
@@ -201,14 +201,14 @@ public final class PromptBuilder {
         return describeErrors(ctx, in, "Parse errors in the passage:");
     }
 
-    private static String describeErrors(AssistContext ctx, List<ParseError> errors, String header) {
+    private static String describeErrors(AssistContext ctx, List<Diagnostic> errors, String header) {
         if (errors.isEmpty()) {
             return "";
         }
         StringBuilder b = new StringBuilder(header).append('\n');
-        for (ParseError e : errors) {
-            b.append("- line ").append(e.getLine()).append(", column ").append(e.getCharPositionInLine())
-                .append(": ").append(e.getMessage()).append('\n');
+        for (Diagnostic e : errors) {
+            b.append("- line ").append(e.line()).append(", column ").append(e.column())
+                .append(": ").append(e.message()).append('\n');
         }
         return b.toString();
     }

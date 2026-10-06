@@ -32,8 +32,8 @@ The project is a **Maven multi-module** repository with the following structure:
 | `grammars/`                    | Contains submodules for ANTLR grammars (e.g., `matchbox-grammar-notebook`, `matchbox-grammar-lex`). |
 | `matchbox-app`                 | Main application logic (excluding grammars).                                                |
 | `matchbox-distribution`        | Packaging and distribution logic (e.g., assembly scripts).                                  |
-| `matchbox-corpus`              | Corpus objects produced by grammars: `CorpusObject` interface, capability interfaces, `Simple*` implementations (no JavaFX). |
-| `matchbox-grammar-api`         | Defines the contract for grammars (`GrammarPlugin`, `ParseResult`, `ParseError`, `Spans`), no JavaFX. |
+| `matchbox-corpus`              | The corpus: `Corpus` (texts of a project), `Text` (one parse of a text), `TextId`, `TextCoordinate`, `Diagnostic`, `TextEdit`, `CorpusObject`, capability interfaces, `Simple*` implementations (no JavaFX, no ANTLR). |
+| `matchbox-grammar-api`         | Defines the contract for grammars (`GrammarPlugin`, `ParseResult`, `ObjectEditor`, `CollectingErrorListener`, `Spans`), no JavaFX. |
 | `matchbox-assist`              | AI assistant without JavaFX: providers (Anthropic, OpenAI-compatible/Ollama), prompts, grammar validation of suggested edits, suggestion model (see `AI_SUGGESTIONS_PLAN.md`). |
 | `matchbox-grammar-fx`          | Optional JavaFX contract for plugins that provide views of their objects (`ObjectViewFactory`, `ObjectColumn`, `ViewContext`). |
 | `matchbox-gui`                 | JavaFX GUI code (MVC pattern).                                                              |
@@ -57,6 +57,7 @@ The project is a **Maven multi-module** repository with the following structure:
 #### `matchbox-app`
 
 - Contains core application logic (e.g., project management, file handling). This logic is common to various application interfaces (GUI, command line...)
+- `model.TextDocument` **owns the text of a file**: every change goes through `applyEdits(edits, EditOrigin)` (typing forwarded by the editor, views, assistant, search, undo) and is sent to listeners as a `DocumentChange`; `couldBeWritten` is computed (text ≠ saved text). `model.TextHistory`: undo/redo per document, kept while the document is in the project (consecutive typing merged, one step per view edit). `Project`: `document(TextId)`, `history(TextId)`, `getDirtyDocuments()`, `anyDocumentDirtyProperty()`, `saveAll()`; parses a document at once after a change that does not come from typing.
 - **Entry point**: `fr.cnrs.lacito.matchbox.MatchboxApplication` (JavaFX main class).
 
 #### `matchbox-gui`
@@ -68,19 +69,24 @@ The project is a **Maven multi-module** repository with the following structure:
 
 #### `matchbox-corpus`
 
-- `fr.cnrs.lacito.matchbox.corpus`: `CorpusObject` (interface: `getTextCoordinate()`, `getKind()`, `getLabel()`, `getChildren()`) and `TextCoordinate` (stop index inclusive).
-- `fr.cnrs.lacito.matchbox.corpus.capability`: concepts the application works with (`LexicalEntry`, `Sense`, `Example`, `InterlinearSentence`, `DependencySentence`). **Admission rule**: an interface is added here only when an application feature (lexicon mode, export, cross-linking, search) needs it; a grammar-specific type implements `CorpusObject` in its own module.
+- `fr.cnrs.lacito.matchbox.corpus`: `CorpusObject` (interface: `getTextCoordinate()`, `getKind()`, `getLabel()`, `getChildren()`) and `TextCoordinate(TextId text, …)` (stop index inclusive; empty span `stopIndex = startIndex - 1`, used only for fields).
+  - `TextId`: identity of a text (`TextId.of(path)` normalises the path), known before parsing and given to the grammar.
+  - `Text`: immutable snapshot of one parse of a text (content, objects and `Diagnostic`s per grammar in rank order); lookups `objectAt`, `flatten`, `objectsOf`, `grammarIdOf`, `parentOf`, `owns`, header `properties()`, `sections()`, `enclosingSections(o)` (sections of any grammar enclosing an object), `metadataOf(o)` (text properties overridden by enclosing sections). Built with `Text.builder(id, content).add(grammarId, objects, diagnostics)`, which drops objects with invalid spans (fields included) and reports them.
+  - `Corpus` (implements the read-only `CorpusView`): one `Text` per `TextId`, replaced copy-on-write (consistent reads from any thread), `CorpusListener(id, before, after)`; `textOf(object)` finds the text of an object (empty for an object of an outdated parse).
+  - `Field`, `HasFields`: named values of an object with the span of their raw text, which makes the object editable; `TextEdit` (replacement of a range, `replace(content, span, value)`, `inverse()`).
+- `fr.cnrs.lacito.matchbox.corpus.capability`: concepts the application works with (`LexicalEntry`, `Sense`, `Example`, `InterlinearSentence`, `DependencySentence`, `Section` (title, own metadata, content with subsections), `TextHeader` (properties of the whole text)). **Admission rule**: an interface is added here only when an application feature (lexicon mode, export, cross-linking, search) needs it; a grammar-specific type implements `CorpusObject` in its own module.
 - `fr.cnrs.lacito.matchbox.corpus.simple`: immutable reference implementations that grammars may reuse.
 
 #### `matchbox-grammar-api`
 
-- `GrammarPlugin`: `getId()` (stable, stored in .mbx files), `getDisplayName()`, `getDisplayDescription()`, `getResult(Path, String)` (re-entrant, thread-safe, runs off the JavaFX thread), `getApiVersion()` (implemented in each plugin as `return API_VERSION;`).
-- `ParseResult` (record of top-level objects and errors), `ParseError`, `CollectingErrorListener`, `Spans.of(path, ctx)`.
+- `GrammarPlugin` (`API_VERSION = 3`): `getId()` (stable, stored in .mbx files), `getDisplayName()`, `getDisplayDescription()`, `getResult(TextId, String)` (re-entrant, thread-safe, runs off the JavaFX thread), `getApiVersion()` (implemented in each plugin as `return API_VERSION;`), `getObjectEditor()` (default `ObjectEditor.VERBATIM`).
+- `ParseResult` (record of top-level objects and `Diagnostic`s), `CollectingErrorListener(TextId, grammarId)`, `Spans.of(text, ctx)` / `Spans.of(text, token)`.
+- `ObjectEditor`: turns a new value of a field into `TextEdit`s in the grammar's notation, or refuses it (`EditProposal.Edits` / `EditProposal.Refused`).
 - Object kinds are `"<grammar id>:<name>"`.
 
 #### `matchbox-grammar-fx`
 
-- `ObjectViewFactory<T>`: view (`createView`) and table columns (`getColumns`, default empty) of a type of object, registered by plugins in `META-INF/services/fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory` (e.g. `ConllSentenceViewFactory`).
+- `ObjectViewFactory<T>`: view (`createView`), in-place refresh after a re-parse (`updateView`, default false: rebuilt) and table columns (`getColumns`, default empty; `ObjectColumn.editable(title, field, value)` for an editable column) of a type of object, registered by plugins in `META-INF/services/fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory` (e.g. `ConllSentenceViewFactory`).
 - **Choice of the factory** (`gui.view.ObjectViewRegistry`, matchbox-gui): for an object of class `C`, the factory whose `getType()` is the closest supertype of `C` (breadth-first, `C` itself first), then the highest `getPriority()` (built-in: 0), then plugin factories before built-in ones; otherwise `GenericObjectViewFactory`. If a plugin's `createView` throws or returns `null`, the generic view is shown; a failing column gives an empty cell (logged once per factory). Tables always start with a **Line** column; a factory without columns gets a **Label** column (`getLabel()`).
 - **Built-in factories** (`matchbox-gui/src/main/java/fr/cnrs/lacito/matchbox/gui/view/`, registered in matchbox-gui's `META-INF/services`):
 
@@ -88,9 +94,13 @@ The project is a **Maven multi-module** repository with the following structure:
   |---|---|---|---|
   | `GenericObjectViewFactory` | `CorpusObject` (fallback) | Kind and file/line range, then a `TreeView` of the object and its `getChildren()` (`label [kind]`); double-click selects the span in the editor | none (Line + Label) |
   | `InterlinearSentenceViewFactory` | `InterlinearSentence` | Transcription, glosses, translation, clickable position | Transcription, Morphemic glosses, Translation |
-  | `LexicalEntryViewFactory` | `LexicalEntry` | `LexicalEntryView.fxml` (headword, senses, examples) | Headword, Senses |
+  | `LexicalEntryViewFactory` | `LexicalEntry` | `LexicalEntryView.fxml` (headword, senses, examples) | Headword (editable), Senses |
+  | `SectionViewFactory` | `Section` | Title, position, breadcrumb of enclosing sections, own and inherited metadata, summary, outline of the content (objects of other grammars included) | Title (editable), Metadata, Content |
 
-- A plugin without a factory: objects implementing `InterlinearSentence` or `LexicalEntry` get the corresponding view; any other object only shows what `CorpusObject` exposes (kind, label, position, children), so give it an informative `getLabel()` and a meaningful `getChildren()` tree. `DependencySentence`, `Sense` and `Example` have no built-in view (tokens/heads of a `DependencySentence` are not shown by the fallback).
+  `InterlinearSentenceViewFactory` edits the three lines in its detail view and table (when the object `HasFields`).
+- **Editable views**: a view never changes a corpus object; it asks `ViewContext` for text edits (`canEdit`, `setField`, `applyEdits`, `undo`, `redo`), which return an `EditOutcome` (`Applied`, `Stale`, `Refused`, `Invalid`, `NotEditable`). `gui.edit.ViewEditService` applies them to the object's `TextDocument` (displayed or not) as one undoable change, after `ViewEditPlanner` has relocated them in the current text and, unless the `allowInvalidViewEdits` setting is on, refused those adding parse errors (`EditValidator`); the project then parses the document and the views are refreshed. `ViewContext.corpus()` gives the texts (object's text, sections, metadata).
+
+- A plugin without a factory: objects implementing `InterlinearSentence`, `LexicalEntry` or `Section` get the corresponding view; any other object only shows what `CorpusObject` exposes (kind, label, position, children), so give it an informative `getLabel()` and a meaningful `getChildren()` tree. `DependencySentence`, `Sense` and `Example` have no built-in view (tokens/heads of a `DependencySentence` are not shown by the fallback).
 
 #### `grammars/`
 
@@ -160,6 +170,8 @@ The project is a **Maven multi-module** repository with the following structure:
 
 - **Package structure**: `fr.cnrs.lacito.matchbox.*` (e.g., `fr.cnrs.lacito.matchbox.gui`, `fr.cnrs.lacito.matchbox.corpus`, `fr.cnrs.lacito.matchbox.grammarapi`, `fr.cnrs.lacito.matchbox.grammarfx`).
 - **Corpus objects** are immutable, keep no reference to ANTLR objects, and a child's span lies inside its parent's span.
+- **References point down**: `Corpus` → `Text` → `CorpusObject` → `TextCoordinate` → `TextId`. Objects hold no reference to their text or corpus; go up with `CorpusView.textOf(object)`, and pass a `CorpusView` to code that needs the corpus.
+- **Every change of a text goes through its `TextDocument`** (`applyEdits` with an `EditOrigin`); the editor only mirrors the displayed document. Views propose `TextEdit`s through `ViewContext`, never mutate objects.
 - **Threading**: parsing runs on a background thread (`Project.parseInBackground`); results are applied to `Corpus` on the JavaFX thread (`Project.setApplyExecutor(Platform::runLater)`).
 - **Plugin dependencies** on matchbox modules and JavaFX use the `provided` scope.
 - **User settings**: `fr.cnrs.lacito.matchbox.settings.UserSettings` (observable properties, saved automatically); never read or write settings files directly (see §9).
@@ -181,8 +193,8 @@ The project is a **Maven multi-module** repository with the following structure:
 
 ## 8. Testing Strategy
 
-- **Unit tests**: JUnit 5 (declared in the root pom), in `src/test/java/` of each module: grammar tests (`grammars/*`), `Corpus` and `Project` parsing (`matchbox-app`), view registry (`matchbox-gui`). Run with `mvn test`.
-- **Grammar tests**: parse sample inputs from `src/test/resources/`; the `matchbox-corpus` test-jar provides `CorpusAssertions` (`assertSpansNested`, `assertKindsPrefixed`).
+- **Unit tests**: JUnit 5 (declared in the root pom), in `src/test/java/` of each module: `Corpus`, `Text`, sections, `TextEdit` (`matchbox-corpus`), grammar tests and field editing (`grammars/*`), `TextDocument`/`TextHistory` and `Project` parsing (`matchbox-app`), view registry, `ViewEditPlanner`, `SectionViewFactory` (`matchbox-gui`). Run with `mvn test` (use `mvn clean install` after API changes: incremental builds can keep stale classes).
+- **Grammar tests**: parse sample inputs from `src/test/resources/`; the `matchbox-corpus` test-jar provides `CorpusAssertions` (`assertSpansNested`, `assertKindsPrefixed`, `assertOwnedBy`).
 
 ---
 
@@ -280,7 +292,10 @@ Managed by `fr.cnrs.lacito.matchbox.settings` (matchbox-app):
 | `NotebookListener`            | `grammars/matchbox-grammar-notebook` | ANTLR listener for the "notebook" grammar.                                  |
 | `GrammarPlugin` (interface)   | `matchbox-grammar-api`     | Contract for grammars (`getId()`, `getResult()`, `getApiVersion()`).                        |
 | `CorpusObject` (interface)    | `matchbox-corpus`          | Anything a grammar extracts and anchors to a span of a text.                                |
-| `Corpus`                      | `matchbox-app`             | Objects and errors per file and grammar; generic queries (`objectsOf`, `objectAt`, `flatten`). |
+| `Corpus`, `CorpusView`        | `matchbox-corpus`          | The texts of a project, one `Text` snapshot per `TextId`; `textOf(object)`, `objectsOf(type)`. |
+| `Text`                        | `matchbox-corpus`          | One parse of a text: objects and diagnostics per grammar, lookups, header properties, sections, metadata. |
+| `TextDocument`, `TextHistory` | `matchbox-app`             | Owner of a file's text (all changes, dirty state) and its undo history.                     |
+| `ViewEditService`             | `matchbox-gui`             | Applies the edits requested by object views to the documents.                               |
 | `ObjectViewFactory`           | `matchbox-grammar-fx`      | Optional plugin-provided view of a type of corpus object.                                   |
 | `ObjectViewRegistry`          | `matchbox-gui`             | Chooses the view factory of an object.                                                      |
 

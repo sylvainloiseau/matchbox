@@ -1,7 +1,7 @@
 package fr.cnrs.lacito.matchbox.grammarapi;
 
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
-import java.nio.file.Path;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 
@@ -11,7 +11,7 @@ public final class Spans {
     private Spans() {}
 
     /** Span covered by a rule, from its first to its last token (inclusive). */
-    public static TextCoordinate of(Path file, ParserRuleContext ctx) {
+    public static TextCoordinate of(TextId text, ParserRuleContext ctx) {
         Token start = ctx.getStart();
         Token stop = ctx.getStop() != null ? ctx.getStop() : start;
         if (stop.getStopIndex() < start.getStartIndex()) {
@@ -19,11 +19,16 @@ public final class Spans {
             stop = start;
         }
         return new TextCoordinate(
-            file,
+            text,
             start.getStartIndex(),
             stop.getStopIndex(),
             start.getLine(),
             stop.getLine()
         );
+    }
+
+    /** Span of one token. */
+    public static TextCoordinate of(TextId text, Token token) {
+        return new TextCoordinate(text, token.getStartIndex(), token.getStopIndex(), token.getLine(), token.getLine());
     }
 }
