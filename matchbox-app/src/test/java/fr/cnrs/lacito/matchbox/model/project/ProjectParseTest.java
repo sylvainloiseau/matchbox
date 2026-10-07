@@ -169,8 +169,11 @@ class ProjectParseTest {
         WholeTextGrammar media = new WholeTextGrammar() {
             public String getId() { return Project.MEDIAREF_PLUGIN_ID; }
         };
-        Project with = Project.createDefaultProject(List.of(new WholeTextGrammar(), media));
-        assertEquals(List.of(Project.DEFAULT_PLUGIN_ID, Project.MEDIAREF_PLUGIN_ID),
+        WholeTextGrammar tags = new WholeTextGrammar() {
+            public String getId() { return Project.TAG_PLUGIN_ID; }
+        };
+        Project with = Project.createDefaultProject(List.of(new WholeTextGrammar(), media, tags));
+        assertEquals(List.of(Project.DEFAULT_PLUGIN_ID, Project.MEDIAREF_PLUGIN_ID, Project.TAG_PLUGIN_ID),
             with.getGrammarsForFile(Path.of("notes.txt")).stream().map(g -> g.getId()).toList());
     }
 }

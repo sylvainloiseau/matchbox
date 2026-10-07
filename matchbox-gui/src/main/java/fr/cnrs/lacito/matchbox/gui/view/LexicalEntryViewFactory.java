@@ -4,6 +4,7 @@ import fr.cnrs.lacito.matchbox.corpus.capability.LexicalEntry;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectColumn;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
+import fr.cnrs.lacito.matchbox.grammarfx.tags.TagBadges;
 import fr.cnrs.lacito.matchbox.gui.mode.common.lexicon.LexicalEntryController;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -37,7 +38,15 @@ public class LexicalEntryViewFactory implements ObjectViewFactory<LexicalEntry> 
                 "/fr/cnrs/lacito/matchbox/gui/mode/common/lexicon/LexicalEntryView.fxml"
             ));
             loader.setController(new LexicalEntryController(entry));
-            return loader.load();
+            Node view = loader.load();
+            // tags of the entry and of its senses
+            javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(6, view);
+            TagBadges.of(entry, context).ifPresent(box.getChildren()::add);
+            for (var sense : entry.getSenses()) {
+                TagBadges.of(sense, context).ifPresent(tags -> box.getChildren().add(new javafx.scene.layout.VBox(2,
+                    new javafx.scene.control.Label("Sense \"" + sense.getDefinition().strip() + "\""), tags)));
+            }
+            return box;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

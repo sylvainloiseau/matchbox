@@ -22,6 +22,7 @@
         <module>grammars/matchbox-grammar-conll</module>
         <module>grammars/matchbox-grammar-markdownheading</module>
         <module>grammars/matchbox-grammar-mediaref</module>
+        <module>grammars/matchbox-grammar-tag</module>
         <module>matchbox-corpus</module>
         <module>matchbox-gui</module>
         <module>matchbox-grammar-api</module>

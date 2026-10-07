@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox.corpus;
 
 import fr.cnrs.lacito.matchbox.corpus.capability.Section;
+import fr.cnrs.lacito.matchbox.corpus.capability.Tag;
 import fr.cnrs.lacito.matchbox.corpus.capability.TextHeader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +42,8 @@ public final class Text {
     private final Map<CorpusObject, CorpusObject> parentOf = new IdentityHashMap<>();
     private final List<Section> sections;
     private final Map<String, String> properties;
+    /** Targets of the tags, computed on first use. */
+    private volatile TagAttachment tagAttachment;
 
     private Text(TextId id, String content, Map<String, List<CorpusObject>> objectsByGrammar,
                  Map<String, List<Diagnostic>> diagnosticsByGrammar) {
@@ -205,6 +208,39 @@ public final class Text {
             result.putAll(s.getMetadata());
         }
         return Collections.unmodifiableMap(result);
+    }
+
+    // ------------------------------------------------------------------
+    // Tags
+    // ------------------------------------------------------------------
+
+    private TagAttachment tags() {
+        TagAttachment t = tagAttachment;
+        if (t == null) {
+            t = new TagAttachment(content, objectsByGrammar);
+            tagAttachment = t;
+        }
+        return t;
+    }
+
+    /**
+     * The object a tag applies to: the object on the line just above it, else just below it (no
+     * blank line in between, lines made only of tags skipped, the outermost object, inside the object
+     * containing the tag), else the innermost object containing it; empty when it applies to the
+     * whole text.
+     */
+    public Optional<CorpusObject> targetOf(Tag tag) {
+        return tags().target(tag);
+    }
+
+    /** Tags applying directly to an object. */
+    public List<Tag> tagsOf(CorpusObject object) {
+        return tags().tagsOf(object);
+    }
+
+    /** Tags applying to the whole text (in no object and next to none). */
+    public List<Tag> textTags() {
+        return tags().textTags();
     }
 
     @Override

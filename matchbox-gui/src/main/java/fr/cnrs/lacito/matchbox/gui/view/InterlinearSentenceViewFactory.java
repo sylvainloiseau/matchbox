@@ -7,6 +7,7 @@ import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectColumn;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
+import fr.cnrs.lacito.matchbox.grammarfx.tags.TagBadges;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ public class InterlinearSentenceViewFactory implements ObjectViewFactory<Interli
         InterlinearSentence sentence;
         final Map<String, TextField> editors = new LinkedHashMap<>();
         final Label position = new Label();
+        final javafx.scene.layout.VBox tags = new javafx.scene.layout.VBox();
     }
 
     @Override
@@ -65,6 +67,8 @@ public class InterlinearSentenceViewFactory implements ObjectViewFactory<Interli
         state.position.setStyle("-fx-text-fill: #777777;");
         state.position.setOnMouseClicked(e -> context.selectInEditor(state.sentence.getTextCoordinate()));
         grid.add(state.position, 1, 3);
+        grid.add(state.tags, 1, 4);
+        showTags(state, igt, context);
         grid.getProperties().put(STATE, state);
         return grid;
     }
@@ -78,6 +82,7 @@ public class InterlinearSentenceViewFactory implements ObjectViewFactory<Interli
         }
         state.sentence = igt;
         state.position.setText(GenericObjectViewFactory.position(igt.getTextCoordinate()));
+        showTags(state, igt, context);
         state.editors.forEach((field, editor) -> {
             if (!editor.isFocused()) {
                 editor.setText(rawValue(igt, field));
@@ -85,6 +90,10 @@ public class InterlinearSentenceViewFactory implements ObjectViewFactory<Interli
             }
         });
         return true;
+    }
+
+    private static void showTags(State state, InterlinearSentence igt, ViewContext context) {
+        state.tags.getChildren().setAll(TagBadges.of(igt, context).map(List::of).orElse(List.of()));
     }
 
     private static void addRow(GridPane grid, int row, String title, String field,

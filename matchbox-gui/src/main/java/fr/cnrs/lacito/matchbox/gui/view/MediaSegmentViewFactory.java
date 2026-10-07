@@ -8,6 +8,7 @@ import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectColumn;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
+import fr.cnrs.lacito.matchbox.grammarfx.tags.TagBadges;
 import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayerBox;
 import fr.cnrs.lacito.matchbox.grammarfx.media.MediaResolver;
 import fr.cnrs.lacito.matchbox.grammarfx.metadata.MediaPaths;
@@ -148,6 +149,7 @@ public class MediaSegmentViewFactory implements ObjectViewFactory<MediaSegment> 
 
         root.getChildren().setAll(new HBox(10, title, position), mediaLine, player,
             times(segment, context, editable, box, state, message), message);
+        TagBadges.of(segment, context).ifPresent(tags -> root.getChildren().add(1, tags));
     }
 
     /** Start, end and duration, with nudges and "set from the player position", or "whole file" and "mark a segment". */

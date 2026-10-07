@@ -149,7 +149,7 @@ public class ObjectViewRegistry {
         ObjectViewFactory factory = factoryFor(type);
         List<ObjectColumn<CorpusObject>> specs;
         try {
-            specs = factory.getColumns();
+            specs = context == null ? factory.getColumns() : factory.getColumns(context);
         } catch (RuntimeException | LinkageError e) {
             report(factory, "getColumns", e);
             specs = List.of();

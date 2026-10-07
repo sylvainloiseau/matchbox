@@ -4,6 +4,7 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
+import fr.cnrs.lacito.matchbox.grammarfx.tags.TagBadges;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.TreeCell;
@@ -42,7 +43,9 @@ public class GenericObjectViewFactory implements ObjectViewFactory<CorpusObject>
             }
         });
         VBox.setVgrow(tree, Priority.ALWAYS);
-        VBox box = new VBox(6, header, tree);
+        VBox box = new VBox(6, header);
+        TagBadges.of(object, context).ifPresent(box.getChildren()::add);
+        box.getChildren().add(tree);
         box.setStyle("-fx-padding: 6;");
         return box;
     }

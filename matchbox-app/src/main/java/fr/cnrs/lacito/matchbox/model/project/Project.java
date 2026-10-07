@@ -43,6 +43,8 @@ public class Project {
     public static final String MARKDOWN_HEADING_PLUGIN_ID = "markdown-heading-grammar";
     /** Grammar of media markers (@media lines), applied to all files of new projects when installed. */
     public static final String MEDIAREF_PLUGIN_ID = "mediaref-grammar";
+    /** Grammar of inline tags (#"keyword"), applied to all files of new projects when installed. */
+    public static final String TAG_PLUGIN_ID = "tag-grammar";
     private String name;
     private String description;
 
@@ -191,6 +193,11 @@ public class Project {
         // media markers may appear in any note
         plugins.stream()
             .filter(p -> p.getId().equals(MEDIAREF_PLUGIN_ID))
+            .findFirst()
+            .ifPresent(fileType::addGrammar);
+        // so may tags
+        plugins.stream()
+            .filter(p -> p.getId().equals(TAG_PLUGIN_ID))
             .findFirst()
             .ifPresent(fileType::addGrammar);
         project.fileTypes.add(fileType);

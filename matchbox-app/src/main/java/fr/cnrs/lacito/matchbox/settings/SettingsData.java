@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
  * @param logFile            log file chosen by the user, {@code null} for the default location
  * @param assist             settings of the AI assistant
  * @param allowInvalidViewEdits apply edits made in object views even if they add parse errors
+ * @param tagColor           highlight colour of tags (CSS colour)
  */
 public record SettingsData(
     Integer version,
@@ -45,7 +46,8 @@ public record SettingsData(
     Boolean openLastProject,
     String logFile,
     AssistSettingsData assist,
-    Boolean allowInvalidViewEdits
+    Boolean allowInvalidViewEdits,
+    String tagColor
 ) {
 
     public static final int CURRENT_VERSION = 2;
@@ -68,7 +70,8 @@ public record SettingsData(
             false,
             null,
             AssistSettingsData.defaults(),
-            false
+            false,
+            "#ffd6e8"
         );
     }
 
@@ -99,14 +102,15 @@ public record SettingsData(
             openLastProject == null ? d.openLastProject : openLastProject,
             logFile == null || logFile.isBlank() ? null : logFile.strip(),
             assist == null ? d.assist : assist.validated(problems),
-            allowInvalidViewEdits == null ? d.allowInvalidViewEdits : allowInvalidViewEdits
+            allowInvalidViewEdits == null ? d.allowInvalidViewEdits : allowInvalidViewEdits,
+            color(tagColor, d.tagColor, "tagColor", problems)
         );
     }
 
     /** Copy with other assistant settings. */
     public SettingsData withAssist(AssistSettingsData newAssist) {
         return new SettingsData(version, charset, igtColor, lexicalColor, morphemeSeparators, fileExtensions,
-            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist, allowInvalidViewEdits);
+            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist, allowInvalidViewEdits, tagColor);
     }
 
     /** Validated copy, problems ignored. */

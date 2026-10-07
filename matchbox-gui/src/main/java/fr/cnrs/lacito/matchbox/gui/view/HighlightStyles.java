@@ -4,6 +4,7 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearSentence;
 import fr.cnrs.lacito.matchbox.corpus.capability.LexicalEntry;
 import fr.cnrs.lacito.matchbox.corpus.capability.Sense;
+import fr.cnrs.lacito.matchbox.corpus.capability.Tag;
 import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.util.List;
 import javafx.scene.paint.Color;
@@ -33,6 +34,9 @@ public class HighlightStyles {
         }
         if (object instanceof LexicalEntry) {
             return validOr(settings.lexicalColorProperty().get(), object);
+        }
+        if (object instanceof Tag) {
+            return validOr(settings.tagColorProperty().get(), object);
         }
         if (object instanceof Sense) {
             return null;

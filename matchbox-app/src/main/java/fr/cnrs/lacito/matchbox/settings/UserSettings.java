@@ -56,6 +56,7 @@ public final class UserSettings implements AutoCloseable {
     private final IntegerProperty maxRecentProjects = new SimpleIntegerProperty();
     private final BooleanProperty openLastProject = new SimpleBooleanProperty();
     private final BooleanProperty allowInvalidViewEdits = new SimpleBooleanProperty();
+    private final StringProperty tagColor = new SimpleStringProperty();
     private String logFile;
     private final ObjectProperty<AssistSettingsData> assist = new SimpleObjectProperty<>();
     private final RecentItems recentFiles = new RecentItems(maxRecentFiles);
@@ -88,7 +89,7 @@ public final class UserSettings implements AutoCloseable {
 
         for (Observable o : List.<Observable>of(charset, igtColor, lexicalColor, morphemeSeparators,
                 fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, assist,
-                allowInvalidViewEdits)) {
+                allowInvalidViewEdits, tagColor)) {
             o.addListener(obs -> settingsChanged());
         }
         recentFiles.items().addListener((Observable obs) -> recentChanged());
@@ -166,6 +167,7 @@ public final class UserSettings implements AutoCloseable {
     public ObjectProperty<Charset> charsetProperty() { return charset; }
     public StringProperty igtColorProperty() { return igtColor; }
     public StringProperty lexicalColorProperty() { return lexicalColor; }
+    public StringProperty tagColorProperty() { return tagColor; }
     public StringProperty morphemeSeparatorsProperty() { return morphemeSeparators; }
     /** Normalised extensions (lower case, without dot); empty means all files. */
     public ObservableList<String> fileExtensions() { return fileExtensions; }
@@ -218,7 +220,8 @@ public final class UserSettings implements AutoCloseable {
             openLastProject.get(),
             logFile,
             assist.get(),
-            allowInvalidViewEdits.get()
+            allowInvalidViewEdits.get(),
+            tagColor.get()
         );
     }
 
@@ -246,6 +249,7 @@ public final class UserSettings implements AutoCloseable {
         logFile = d.logFile();
         assist.set(d.assist());
         allowInvalidViewEdits.set(d.allowInvalidViewEdits());
+        tagColor.set(d.tagColor());
     }
 
     // ------------------------------------------------------------------

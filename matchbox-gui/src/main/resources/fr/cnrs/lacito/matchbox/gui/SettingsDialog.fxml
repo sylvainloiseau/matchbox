@@ -39,6 +39,20 @@
                     <ColorPicker fx:id="lexicalColorPicker" />
                   </children>
                 </HBox>
+                <HBox spacing="10.0" style="-fx-padding: 5 0 0 0;">
+                  <children>
+                    <Label
+                                            text="tag"
+                                            style="-fx-font-weight: bold;"
+                                        />
+                    <Rectangle
+                                            fx:id="tagColorPreview"
+                                            width="24.0"
+                                            height="16.0"
+                                        />
+                    <ColorPicker fx:id="tagColorPicker" />
+                  </children>
+                </HBox>
               </children>
             </VBox>
           </content>

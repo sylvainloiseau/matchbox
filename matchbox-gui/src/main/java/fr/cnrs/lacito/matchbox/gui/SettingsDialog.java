@@ -38,6 +38,12 @@ public class SettingsDialog {
     private ColorPicker lexicalColorPicker;
 
     @FXML
+    private Rectangle tagColorPreview;
+
+    @FXML
+    private ColorPicker tagColorPicker;
+
+    @FXML
     private TextField separatorsField;
 
     @FXML
@@ -108,6 +114,7 @@ public class SettingsDialog {
     private void initFromSettings(SettingsData current) {
         initColor(igtColorPicker, igtColorPreview, current.igtColor());
         initColor(lexicalColorPicker, lexicalColorPreview, current.lexicalColor());
+        initColor(tagColorPicker, tagColorPreview, current.tagColor());
 
         separatorsField.setText(current.morphemeSeparators());
 
@@ -153,7 +160,8 @@ public class SettingsDialog {
             openLastProjectCheckBox.isSelected(),
             current.logFile(),
             current.assist(),
-            allowInvalidViewEditsCheckBox.isSelected()
+            allowInvalidViewEditsCheckBox.isSelected(),
+            toHex(tagColorPicker.getValue())
         );
     }
 

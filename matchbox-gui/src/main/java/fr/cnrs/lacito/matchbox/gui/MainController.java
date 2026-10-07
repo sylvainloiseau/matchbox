@@ -162,11 +162,14 @@ public class MainController {
                 Toggle toggle,
                 Toggle new_toggle
             ) {
-                if (
-                    ((ToggleButton) viewToggleGroup.getSelectedToggle()).equals(
-                        fileModeToggleButton
-                    )
-                ) {
+                // clicking the selected button deselects it: keep a view selected
+                if (new_toggle == null) {
+                    if (toggle != null) {
+                        viewToggleGroup.selectToggle(toggle);
+                    }
+                    return;
+                }
+                if (new_toggle == fileModeToggleButton) {
                     switchToFileMode();
                 }
             }

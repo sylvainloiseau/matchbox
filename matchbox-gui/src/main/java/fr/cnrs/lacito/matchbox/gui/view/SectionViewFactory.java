@@ -7,6 +7,7 @@ import fr.cnrs.lacito.matchbox.corpus.capability.Section;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectColumn;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
+import fr.cnrs.lacito.matchbox.grammarfx.tags.TagBadges;
 import fr.cnrs.lacito.matchbox.grammarfx.metadata.MetadataPane;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,6 +58,7 @@ public class SectionViewFactory implements ObjectViewFactory<Section> {
         final VBox breadcrumb = new VBox();
         final Label summary = new Label();
         final VBox outline = new VBox();
+        final VBox tags = new VBox();
         MetadataPane metadata;
     }
 
@@ -72,7 +74,7 @@ public class SectionViewFactory implements ObjectViewFactory<Section> {
         state.metadata = new MetadataPane(section, section.getMetadata(), inherited(section, context),
             Section::metadataField, context);
         VBox box = new VBox(6, new HBox(10, state.title, state.position), state.breadcrumb, state.metadata,
-            state.summary, state.outline);
+            state.tags, state.summary, state.outline);
         box.setStyle("-fx-padding: 8;");
         box.getProperties().put(STATE, state);
         fill(state, section, context);
@@ -104,6 +106,7 @@ public class SectionViewFactory implements ObjectViewFactory<Section> {
         TreeView<CorpusObject> outline = outline(content, context);
         VBox.setVgrow(outline, Priority.ALWAYS);
         state.outline.getChildren().setAll(outline);
+        state.tags.getChildren().setAll(TagBadges.of(section, context).map(List::of).orElse(List.of()));
     }
 
     /** Enclosing sections as links, outermost first; empty for a top-level section. */

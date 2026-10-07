@@ -72,7 +72,7 @@ class UserSettingsTest {
         try (UserSettings s = load(60_000)) {
             SettingsData edited = s.snapshot();
             SettingsData changed = new SettingsData(edited.version(), "ISO-8859-1", "bad colour!", edited.lexicalColor(),
-                edited.morphemeSeparators(), List.of(".XML", "txt"), List.of(), 0, 3, true, edited.logFile(), edited.assist(), edited.allowInvalidViewEdits());
+                edited.morphemeSeparators(), List.of(".XML", "txt"), List.of(), 0, 3, true, edited.logFile(), edited.assist(), edited.allowInvalidViewEdits(), edited.tagColor());
             s.apply(changed);
             assertEquals(StandardCharsets.ISO_8859_1, s.charsetProperty().get());
             assertEquals(SettingsData.defaults().igtColor(), s.igtColorProperty().get());

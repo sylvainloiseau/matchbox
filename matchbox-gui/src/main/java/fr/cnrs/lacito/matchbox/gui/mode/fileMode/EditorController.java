@@ -145,6 +145,7 @@ public class EditorController {
         // show colour changes made in the settings immediately
         settings.igtColorProperty().addListener((obs, o, n) -> highlightText());
         settings.lexicalColorProperty().addListener((obs, o, n) -> highlightText());
+        settings.tagColorProperty().addListener((obs, o, n) -> highlightText());
         clearEditor();
 
         this.textArea.setOnMouseClicked(e -> handleCodeAreaClick());
@@ -475,7 +476,11 @@ public class EditorController {
         if (length > 0) {
             textArea.clearStyle(0, length);
         }
-        displayedText().ifPresent(text -> text.flatten().forEach(o -> {
+        // tags last: a tag inside an IGT or an entry stays visible
+        displayedText().ifPresent(text -> java.util.stream.Stream.concat(
+            text.flatten().filter(o -> !(o instanceof fr.cnrs.lacito.matchbox.corpus.capability.Tag)),
+            text.flatten().filter(o -> o instanceof fr.cnrs.lacito.matchbox.corpus.capability.Tag)
+        ).forEach(o -> {
             String color = highlightStyles.colorFor(o);
             TextCoordinate span = o.getTextCoordinate();
             // spans refer to the parsed text; the editor text may have changed since

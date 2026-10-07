@@ -71,6 +71,23 @@ class ObjectViewRegistryTest {
     }
 
     @Test
+    void tagsGetThePluginViewAndColumnsWithContext() {
+        var generic = new GenericObjectViewFactory();
+        var tags = new fr.cnrs.lacito.matchbox.grammar.tag.TagViewFactory();
+        var r = registry(generic, tags);
+        assertSame(tags, r.factoryFor(fr.cnrs.lacito.matchbox.corpus.simple.SimpleTag.class));
+        // without context: Line, Tag, Path; with a context: Applies to as well
+        assertEquals(3, r.columnsFor(fr.cnrs.lacito.matchbox.corpus.simple.SimpleTag.class).size());
+        ViewContext context = new ViewContext() {
+            public void selectInEditor(TextCoordinate span) {}
+            public void select(CorpusObject object) {}
+            public String highlightColor(CorpusObject object) { return null; }
+            public fr.cnrs.lacito.matchbox.corpus.CorpusView corpus() { return new fr.cnrs.lacito.matchbox.corpus.Corpus(); }
+        };
+        assertEquals(4, r.columnsFor(fr.cnrs.lacito.matchbox.corpus.simple.SimpleTag.class, context, m -> {}).size());
+    }
+
+    @Test
     void sectionsGetTheSectionView() {
         var generic = new GenericObjectViewFactory();
         var section = new SectionViewFactory();

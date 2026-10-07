@@ -169,6 +169,24 @@ The `mediaref-grammar` plugin reads one-line media markers, in any note:
   plays the segment at the caret, or the nearest one above it in the same section. The view of a
   marker lets you edit its times (±100 ms, or from the player position), file and caption.
 
+### Tags
+
+The `tag-grammar` plugin reads inline tags, anywhere in a line, several per line:
+
+```
+'I went down in canoe' #"verb/motion"
+#"to check" #“elicitation”
+```
+
+- `#` followed by a keyword between straight or curly quotes; `/` separates levels
+  (`verb/motion`). Tags in fenced code blocks are ignored.
+- A tag applies to the object (IGT, entry, media marker…) on the line just above it, else just below
+  it (no blank line in between; lines containing only tags are skipped), else to the object it is
+  written in (a sense, a section), else to the whole text. The view of an object shows its tags.
+- The Tag tab of the objects table lists the tags; editing a cell renames that tag in the text.
+- Avoid tags in the transcription and gloss lines of an IGT (they break the alignment) and in YAML
+  metadata values (` #` starts a YAML comment there).
+
 ## Create parser for new conventions
 
 ## 

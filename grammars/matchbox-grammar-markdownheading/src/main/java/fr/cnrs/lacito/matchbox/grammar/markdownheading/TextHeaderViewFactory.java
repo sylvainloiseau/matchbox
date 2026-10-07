@@ -6,6 +6,7 @@ import fr.cnrs.lacito.matchbox.grammarfx.ObjectColumn;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.grammarfx.media.MediaResolver;
+import fr.cnrs.lacito.matchbox.grammarfx.tags.TagBadges;
 import fr.cnrs.lacito.matchbox.grammarfx.metadata.MetadataPane;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -73,9 +74,11 @@ public class TextHeaderViewFactory implements ObjectViewFactory<TextHeader> {
         return true;
     }
 
-    /** "Media used in this text": files of its media segments and "media" metadata. */
+    /** Tags of the header and of the whole text, then "Media used in this text". */
     private static void fillMedia(VBox box, TextHeader header, ViewContext context) {
         box.getChildren().clear();
+        TagBadges.of(header, context).ifPresent(box.getChildren()::add);
+        context.corpus().textOf(header).flatMap(text -> TagBadges.ofText(text, context)).ifPresent(box.getChildren()::add);
         context.corpus().textOf(header).ifPresent(text -> {
             List<Path> files = MediaResolver.mediaFiles(text, context.corpus(), context.projectDirectory());
             if (files.isEmpty()) return;

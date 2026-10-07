@@ -50,6 +50,14 @@ public interface ObjectViewFactory<T extends CorpusObject> {
         return List.of();
     }
 
+    /**
+     * Columns of the table, for columns that need the application (e.g. the corpus, to show what
+     * an object is related to). The default returns {@link #getColumns()}.
+     */
+    default List<ObjectColumn<T>> getColumns(ViewContext context) {
+        return getColumns();
+    }
+
     /** Higher wins when two factories handle the same type. Built-in factories use 0. */
     default int getPriority() {
         return 0;

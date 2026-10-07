@@ -85,6 +85,10 @@ Implement `fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory<T>` and list it i
 
 Objects that refer to audio or video (a file and/or a time range) should implement `capability.MediaSegment` with the fields `media`, `range`, `start`, `end`, `caption` (`HasFields`) and an `ObjectEditor` supporting them: the application then shows them with its segment view and player, a ▶ button in the editor margin and the play shortcut, with no view code in the plugin. Use `grammarapi.TimeCodes` to read and write times.
 
+# Tags
+
+A grammar producing keywords attached to places of a text should implement `capability.Tag` (or reuse `simple.SimpleTag`, with the field `tag`): the application then shows them in the views of the objects they apply to (`Text.targetOf`) and highlights them. See `grammars/matchbox-grammar-tag`.
+
 # Optional: actions on a text
 
 Implement `fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider` (service file `META-INF/services/fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider`): from a parsed `Text`, return `TextAction`s (label, offset of the line, `TextEdit`s relative to `text.content()`, offset to select after the parse). The application shows them in the editor margin and applies them as one undoable change; return actions only for texts your grammar parsed (`text.grammarIds()`). See `MarkdownHeadingActions`.
