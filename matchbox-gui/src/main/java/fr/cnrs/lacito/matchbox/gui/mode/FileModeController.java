@@ -10,6 +10,8 @@ import fr.cnrs.lacito.matchbox.PluginManager;
 import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
 import fr.cnrs.lacito.matchbox.grammarfx.TextAction;
 import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
+import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayers;
+import fr.cnrs.lacito.matchbox.grammarfx.media.SharedMediaPlayers;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
 import fr.cnrs.lacito.matchbox.gui.UnsavedChangesDialog;
@@ -153,6 +155,8 @@ public class FileModeController {
     private GhostTextController ghostText;
     private SuggestionPanelController suggestionPanel;
     private ViewEditService viewEdits;
+    /** Players of media files shared by all views; closed when the project changes. */
+    private final SharedMediaPlayers mediaPlayers = new SharedMediaPlayers();
     /** Opens links in the system browser; set by the application. */
     private HostServices hostServices;
 
@@ -178,6 +182,8 @@ public class FileModeController {
     /** This method should be called after initialization 
      * to set the model. */
     public void setProject(Project project) {
+        // the players belong to the files of the previous project
+        mediaPlayers.closeAll();
         this.project = project;
         this.corpus = project.getCorpus();
         if (editorController != null) {
@@ -266,7 +272,10 @@ public class FileModeController {
         reviewSelection.setOnAction(e -> review("Selection"));
         MenuItem reviewBlock = new MenuItem("Review current block with AI");
         reviewBlock.setOnAction(e -> review("Current block"));
-        ContextMenu menu = new ContextMenu(suggest, explain, new SeparatorMenuItem(), reviewBlock, reviewSelection);
+        MenuItem play = new MenuItem("Play media segment at caret (⇧⌘Space)");
+        play.setOnAction(e -> editorController.playSegmentAtCaret());
+        ContextMenu menu = new ContextMenu(suggest, explain, new SeparatorMenuItem(), reviewBlock, reviewSelection,
+            new SeparatorMenuItem(), play);
         menu.setOnShowing(e -> {
             explain.setDisable(editorController.errorAt(fileContentCodeArea.getCaretPosition()).isEmpty());
             reviewSelection.setDisable(fileContentCodeArea.getSelection().getLength() == 0);
@@ -654,6 +663,11 @@ public class FileModeController {
         }
 
         @Override
+        public MediaPlayers mediaPlayers() {
+            return mediaPlayers;
+        }
+
+        @Override
         public void showDocument(String uri) {
             if (hostServices != null) {
                 hostServices.showDocument(uri);
@@ -753,8 +767,14 @@ public class FileModeController {
         return fileContentCodeArea.getScene() == null ? null : fileContentCodeArea.getScene().getWindow();
     }
 
-    /** Stops the background threads of the view editing service. */
+    /** Plays or pauses the media segment at the caret of the editor. */
+    public void playSegmentAtCaret() {
+        editorController.playSegmentAtCaret();
+    }
+
+    /** Stops the background threads of the view editing service and closes the media players. */
     public void shutdown() {
         viewEdits.close();
+        mediaPlayers.closeAll();
     }
 }

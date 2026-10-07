@@ -44,6 +44,12 @@
         <!-- real grammars for the tests of view editing -->
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-grammar-mediaref</artifactId>
+            <version>${revision}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-grammar-markdownheading</artifactId>
             <version>${revision}</version>
             <scope>test</scope>

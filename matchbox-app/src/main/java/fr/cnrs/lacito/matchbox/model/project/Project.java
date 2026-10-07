@@ -41,6 +41,8 @@ public class Project {
     public static final String DEFAULT_PLUGIN_ID = "notebook-grammar";
     /** Grammar of the sections and metadata of Markdown files, applied to .md files of new projects when installed. */
     public static final String MARKDOWN_HEADING_PLUGIN_ID = "markdown-heading-grammar";
+    /** Grammar of media markers (@media lines), applied to all files of new projects when installed. */
+    public static final String MEDIAREF_PLUGIN_ID = "mediaref-grammar";
     private String name;
     private String description;
 
@@ -186,6 +188,11 @@ public class Project {
                 new RuntimeException("Default plugin not found")
             );
         fileType.addGrammar(defaultPlugin);
+        // media markers may appear in any note
+        plugins.stream()
+            .filter(p -> p.getId().equals(MEDIAREF_PLUGIN_ID))
+            .findFirst()
+            .ifPresent(fileType::addGrammar);
         project.fileTypes.add(fileType);
         // sections and metadata of Markdown files, next to the notebook grammar ("All files" matches them too)
         plugins.stream()

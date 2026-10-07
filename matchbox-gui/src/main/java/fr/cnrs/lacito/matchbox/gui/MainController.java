@@ -314,6 +314,10 @@ public class MainController {
         bindSaveAll();
     }
 
+    public void handlePlaySegmentMenuItem() {
+        fileModeController.playSegmentAtCaret();
+    }
+
     public void handleUndoMenuItem() {
         editorController.undo();
     }

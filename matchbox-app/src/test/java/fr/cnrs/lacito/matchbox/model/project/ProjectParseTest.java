@@ -163,4 +163,15 @@ class ProjectParseTest {
         Project without = Project.createDefaultProject(List.of(new WholeTextGrammar()));
         assertEquals(1, without.getFileTypes().size());
     }
+
+    @Test
+    void defaultProjectAppliesTheMediaGrammarToAllFilesWhenInstalled() {
+        WholeTextGrammar media = new WholeTextGrammar() {
+            public String getId() { return Project.MEDIAREF_PLUGIN_ID; }
+        };
+        Project with = Project.createDefaultProject(List.of(new WholeTextGrammar(), media));
+        assertEquals(List.of(Project.DEFAULT_PLUGIN_ID, Project.MEDIAREF_PLUGIN_ID),
+            with.getGrammarsForFile(Path.of("notes.txt")).stream().map(g -> g.getId()).toList());
+    }
 }
+

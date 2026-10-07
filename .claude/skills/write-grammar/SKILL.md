@@ -13,7 +13,7 @@ description: write a grammar for a specific type of files for the matchbox APP
 
 If a grammar contains it own ANTLR parser, it is under the `fr.cnrs.lacito.matchbox.grammar.<grammar-name>` namespace, in the src/main/antlr4 directory
 
-`grammars/matchbox-grammar-notebook` (reuses the `Simple*` classes), `grammars/matchbox-grammar-conll` (ships its own view) and `grammars/matchbox-grammar-markdownheading` (implements the `Section` and `TextHeader` capabilities, ships a view built on the shared `MetadataPane`, a text action, and an `ObjectEditor` adding and removing fields) are the reference examples.
+`grammars/matchbox-grammar-notebook` (reuses the `Simple*` classes), `grammars/matchbox-grammar-conll` (ships its own view) and `grammars/matchbox-grammar-markdownheading` (implements the `Section` and `TextHeader` capabilities, ships a view built on the shared `MetadataPane`, a text action, and an `ObjectEditor` adding and removing fields) are the reference examples; `grammars/matchbox-grammar-mediaref` is a pure grammar (no view, no JavaFX) implementing a capability (`MediaSegment`) that the application displays and plays.
 
 # Dependencies
 
@@ -80,6 +80,10 @@ Implement `fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory<T>` and list it i
 - To edit from the view: `context.canEdit(object)`, then `context.setField(object, field, value)` or `context.applyEdits(object, edits)`; the returned `EditOutcome` says whether the change was applied, and why not. `context.corpus()` gives the text of the object, its sections and metadata.
 - `updateView(view, object, context)`: optionally shows the re-parsed object in the existing view (keeps focus and edits); return `false` to have the view rebuilt.
 - Metadata (key/value maps): reuse `fr.cnrs.lacito.matchbox.grammarfx.metadata.MetadataPane` (typed values from `context.metadataSchema()`, `*` to add, × to delete); it calls `context.addField`/`removeField`, so the grammar's `ObjectEditor` must implement `addField`/`removeField`. Needs `javafx-media` (`provided`).
+
+# Media segments
+
+Objects that refer to audio or video (a file and/or a time range) should implement `capability.MediaSegment` with the fields `media`, `range`, `start`, `end`, `caption` (`HasFields`) and an `ObjectEditor` supporting them: the application then shows them with its segment view and player, a ▶ button in the editor margin and the play shortcut, with no view code in the plugin. Use `grammarapi.TimeCodes` to read and write times.
 
 # Optional: actions on a text
 

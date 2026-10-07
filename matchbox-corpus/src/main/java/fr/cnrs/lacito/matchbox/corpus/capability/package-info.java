@@ -7,6 +7,7 @@
  *
  * <p>{@link fr.cnrs.lacito.matchbox.corpus.capability.TextHeader} gives the properties of a text,
  * {@link fr.cnrs.lacito.matchbox.corpus.capability.Section} its divisions (title, metadata,
- * content).
+ * content), {@link fr.cnrs.lacito.matchbox.corpus.capability.MediaSegment} the media files and
+ * segments it refers to.
  */
 package fr.cnrs.lacito.matchbox.corpus.capability;

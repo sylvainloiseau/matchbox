@@ -175,6 +175,11 @@
                     text="Redo"
                 />
                   <MenuItem
+                    mnemonicParsing="false"
+                    onAction="#handlePlaySegmentMenuItem"
+                    text="Play media segment at caret (⇧⌘Space)"
+                />
+                  <MenuItem
                     fx:id="searchMenuItem"
                     mnemonicParsing="false"
                     onAction="#handleSearchMenuItem"

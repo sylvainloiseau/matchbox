@@ -4,6 +4,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.Consumer;
+import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayerBox;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
@@ -63,7 +64,7 @@ final class MediaValueEditor implements MetadataValueEditor {
             unsupported.setStyle("-fx-text-fill: #888888;");
             box.getChildren().add(unsupported);
         } else {
-            box.getChildren().add(new MediaPlayerBox(r.path().get()));
+            box.getChildren().add(new MediaPlayerBox(r.path().get(), Optional.empty(), cell.context().mediaPlayers()));
         }
         return box;
     }

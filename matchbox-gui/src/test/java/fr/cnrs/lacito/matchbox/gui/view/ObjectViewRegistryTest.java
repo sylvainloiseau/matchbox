@@ -63,6 +63,14 @@ class ObjectViewRegistryTest {
     }
 
     @Test
+    void mediaSegmentsOfAnyGrammarGetTheSegmentView() {
+        var generic = new GenericObjectViewFactory();
+        var segments = new MediaSegmentViewFactory();
+        assertSame(segments, registry(generic, segments).factoryFor(fr.cnrs.lacito.matchbox.grammar.mediaref.MediaMarker.class));
+        assertSame(segments, registry(generic, segments).factoryFor(fr.cnrs.lacito.matchbox.gui.mode.fileMode.SegmentAtCaretTest.Segment.class));
+    }
+
+    @Test
     void sectionsGetTheSectionView() {
         var generic = new GenericObjectViewFactory();
         var section = new SectionViewFactory();

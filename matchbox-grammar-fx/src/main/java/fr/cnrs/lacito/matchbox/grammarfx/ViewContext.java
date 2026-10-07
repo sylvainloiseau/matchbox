@@ -4,6 +4,8 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.CorpusView;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayers;
+import fr.cnrs.lacito.matchbox.grammarfx.media.SharedMediaPlayers;
 import fr.cnrs.lacito.matchbox.grammarfx.metadata.MetadataSchema;
 import java.nio.file.Path;
 import java.util.List;
@@ -85,6 +87,14 @@ public interface ViewContext {
 
     /** Opens a URI (e.g. an http link) in the system browser or the default application. */
     default void showDocument(String uri) {
+    }
+
+    /**
+     * Players of media files shared by all views (each file opened once, one plays at a time).
+     * The default is an instance without managed lifetime, for views used outside the application.
+     */
+    default MediaPlayers mediaPlayers() {
+        return SharedMediaPlayers.fallback();
     }
 
     /** Types of metadata values by key and vocabularies of list values. */

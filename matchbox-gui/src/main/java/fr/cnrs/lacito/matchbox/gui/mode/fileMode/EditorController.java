@@ -13,6 +13,10 @@ import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
 import fr.cnrs.lacito.matchbox.grammarfx.TextAction;
 import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
+import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayers;
+import fr.cnrs.lacito.matchbox.grammarfx.media.MediaResolver;
+import fr.cnrs.lacito.matchbox.grammarfx.metadata.MediaPaths;
+import fr.cnrs.lacito.matchbox.corpus.capability.MediaSegment;
 import fr.cnrs.lacito.matchbox.gui.view.HighlightStyles;
 import fr.cnrs.lacito.matchbox.model.DocumentChange;
 import fr.cnrs.lacito.matchbox.model.DocumentListener;
@@ -94,6 +98,8 @@ public class EditorController {
     private Runnable ghostDismisser = () -> {};
     /** Style of the temporary highlight of a suggestion's range. */
     private static final String PREVIEW_STYLE = "-rtfx-background-color: #ffd8a8;";
+    /** Style of the line of a media segment while it plays. */
+    private static final String PLAYING_STYLE = "-rtfx-background-color: #c8f0c8;";
     private final CorpusListener corpusListener = (id, before, after) -> onCorpusTextChanged(id);
     private final DocumentListener mirror = this::mirror;
 
@@ -125,7 +131,10 @@ public class EditorController {
         Nodes.addInputMap(textArea, InputMap.sequence(
             InputMap.consume(EventPattern.keyPressed(KeyCode.Z, KeyCombination.SHORTCUT_DOWN), e -> undo()),
             InputMap.consume(EventPattern.keyPressed(KeyCode.Z, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN), e -> redo()),
-            InputMap.consume(EventPattern.keyPressed(KeyCode.Y, KeyCombination.SHORTCUT_DOWN), e -> redo())
+            InputMap.consume(EventPattern.keyPressed(KeyCode.Y, KeyCombination.SHORTCUT_DOWN), e -> redo()),
+            // play/pause the media segment at the caret
+            InputMap.consume(EventPattern.keyPressed(KeyCode.SPACE, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN),
+                e -> playSegmentAtCaret())
         ));
         // typing → document
         this.textArea.multiPlainChanges()
@@ -253,6 +262,24 @@ public class EditorController {
         refreshTextActions(text);
     }
 
+    /** ▶ (or ⏸ while it plays) for a media segment; greyed, with the reason as tooltip, if it cannot be played. */
+    private Button playButton(MediaSegment segment) {
+        boolean playing = isPlaying(segment);
+        Button button = new Button(playing ? "⏸" : "▶");
+        button.setStyle("-fx-font-size: 0.8em; -fx-padding: 0 4 0 4;");
+        button.setFocusTraversable(false);
+        String problem = playProblem(segment);
+        if (problem != null) {
+            button.setOpacity(0.4);
+            button.setTooltip(new Tooltip(problem));
+        } else {
+            button.setTooltip(new Tooltip((playing ? "Pause " : "Play ")
+                + (segment.getCaption().isEmpty() ? "the segment" : segment.getCaption()) + " (⇧⌘Space)"));
+        }
+        button.setOnAction(e -> toggle(segment));
+        return button;
+    }
+
     /** After the next parse of {@code text}, selects the object at {@code offset}. */
     public void selectAfterParse(TextId text, int offset) {
         this.pendingSelectText = text;
@@ -272,12 +299,84 @@ public class EditorController {
         this.actionProviders = List.copyOf(providers);
         this.actionContext = context;
         this.status = status;
+        // play buttons and the highlight follow what is playing
+        context.mediaPlayers().playingProperty().addListener((obs, o, n) -> {
+            refreshTextActions(displayedText());
+            highlightText();
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Media segments
+    // ------------------------------------------------------------------
+
+    /** Plays (or pauses, if it is playing) the media segment at the caret. */
+    public void playSegmentAtCaret() {
+        dismissGhost();
+        Optional<MediaSegment> segment = displayedText().flatMap(t -> SegmentAtCaret.find(t, textArea.getCaretPosition()));
+        if (segment.isEmpty()) {
+            status.accept("No media segment at the caret");
+            return;
+        }
+        toggle(segment.get());
+    }
+
+    /** Plays a segment, or pauses it if it is playing; problems go to the status line. */
+    private void toggle(MediaSegment segment) {
+        if (actionContext == null) return;
+        Optional<Path> file = playableFile(segment, true);
+        if (file.isEmpty()) return;
+        MediaPlayers players = actionContext.mediaPlayers();
+        if (players.isPlaying(file.get(), segment.getRange())) {
+            players.pause();
+        } else {
+            players.play(file.get(), segment.getRange());
+            players.error(file.get()).ifPresent(e -> status.accept("Cannot play " + file.get().getFileName() + ": " + e));
+        }
+    }
+
+    /** The resolved file of a segment if it can be played; otherwise the reason (reported if asked). */
+    private Optional<Path> playableFile(MediaSegment segment, boolean report) {
+        String problem = playProblem(segment);
+        if (problem != null) {
+            if (report) status.accept(problem);
+            return Optional.empty();
+        }
+        status.accept("");
+        return MediaResolver.resolve(segment, actionContext.corpus(), actionContext.projectDirectory()).file().path();
+    }
+
+    /** Why a segment cannot be played, or null. */
+    private String playProblem(MediaSegment segment) {
+        MediaResolver.Resolution r = MediaResolver.resolve(segment, actionContext.corpus(), actionContext.projectDirectory());
+        if (r.source() == MediaResolver.Source.NONE) {
+            return "No media file: write one after @media, or a \"media:\" entry in the section or the header";
+        }
+        if (r.isUrl()) return "Remote media are not played";
+        if (!r.file().exists()) return "File not found: " + r.file().path().map(Path::toString).orElse("");
+        if (MediaPaths.kindOf(r.file().path().get()) == MediaPaths.Kind.UNSUPPORTED) {
+            return "Format not supported by the player";
+        }
+        return null;
+    }
+
+    private boolean isPlaying(MediaSegment segment) {
+        if (actionContext == null || actionContext.mediaPlayers().playingProperty().get().isEmpty()) return false;
+        return MediaResolver.resolve(segment, actionContext.corpus(), actionContext.projectDirectory()).file().path()
+            .map(p -> actionContext.mediaPlayers().isPlaying(p, segment.getRange()))
+            .orElse(false);
     }
 
     /** Shows the actions of the parsed text as buttons in the margin of their line (never in the text). */
     private void refreshTextActions(Optional<Text> text) {
         Map<Integer, List<TextAction>> byParagraph = new TreeMap<>();
+        Map<Integer, List<MediaSegment>> segmentsByParagraph = new TreeMap<>();
         if (text.isPresent() && actionContext != null) {
+            for (MediaSegment segment : text.get().objectsOf(MediaSegment.class)) {
+                int offset = Math.max(0, Math.min(segment.getTextCoordinate().startIndex(), textArea.getLength()));
+                int paragraph = textArea.offsetToPosition(offset, TwoDimensional.Bias.Forward).getMajor();
+                segmentsByParagraph.computeIfAbsent(paragraph, k -> new ArrayList<>()).add(segment);
+            }
             for (TextActionProvider provider : actionProviders) {
                 List<TextAction> actions;
                 try {
@@ -295,14 +394,18 @@ public class EditorController {
                 }
             }
         }
-        if (byParagraph.isEmpty()) {
+        if (byParagraph.isEmpty() && segmentsByParagraph.isEmpty()) {
             textArea.setParagraphGraphicFactory(null);
             return;
         }
         textArea.setParagraphGraphicFactory(paragraph -> {
-            List<TextAction> actions = byParagraph.get(paragraph);
-            if (actions == null) return null;
+            List<TextAction> actions = byParagraph.getOrDefault(paragraph, List.of());
+            List<MediaSegment> segments = segmentsByParagraph.getOrDefault(paragraph, List.of());
+            if (actions.isEmpty() && segments.isEmpty()) return null;
             HBox box = new HBox(2);
+            for (MediaSegment segment : segments) {
+                box.getChildren().add(playButton(segment));
+            }
             for (TextAction action : actions) {
                 Button button = new Button(action.label());
                 button.setStyle("-fx-font-size: 0.8em; -fx-padding: 0 4 0 4;");
@@ -384,6 +487,16 @@ public class EditorController {
                 );
             }
         }));
+        // the media segments being played
+        displayedText().ifPresent(text -> text.objectsOf(MediaSegment.class).stream()
+            .filter(this::isPlaying)
+            .forEach(s -> {
+                TextCoordinate span = s.getTextCoordinate();
+                int end = Math.min(length, span.stopIndex() + 1);
+                if (span.startIndex() < end) {
+                    textArea.setStyle(span.startIndex(), end, PLAYING_STYLE);
+                }
+            }));
     }
 
     // ------------------------------------------------------------------

@@ -149,6 +149,26 @@ speakers: Elaisa, John
 - Media playback uses JavaFX Media (mp3, wav, aiff, m4a/aac, mp4/H.264). On Linux, AAC and H.264 need
   the system libavcodec (FFmpeg) libraries.
 
+### Media references
+
+The `mediaref-grammar` plugin reads one-line media markers, in any note:
+
+```
+@media recordings/s1.wav 12000-15500
+@media "field trip/s1.wav" 0:12.000-0:15.500 greeting
+@media 0:12.5-0:15
+@media recordings/jaflo.wav pronunciation of jaflo
+```
+
+- `@media`, then a file and/or a range, then an optional caption. Times are milliseconds or clock
+  times (`m:ss.mmm`, `h:mm:ss.mmm`). Without a range, the marker refers to the whole file; without a
+  file, to the `media` metadata of the enclosing section, or of the header.
+- Relative paths are resolved against the project directory, then the directory of the note. A path
+  with spaces, or that looks like a time range, is written between double quotes.
+- Each marker line has a ▶ button in the editor margin; `Shortcut+Shift+Space` (⇧⌘Space on macOS)
+  plays the segment at the caret, or the nearest one above it in the same section. The view of a
+  marker lets you edit its times (±100 ms, or from the player position), file and caption.
+
 ## Create parser for new conventions
 
 ## 
