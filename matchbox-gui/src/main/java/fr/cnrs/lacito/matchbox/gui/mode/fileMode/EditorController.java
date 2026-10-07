@@ -9,6 +9,10 @@ import fr.cnrs.lacito.matchbox.corpus.Text;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
+import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
+import fr.cnrs.lacito.matchbox.grammarfx.TextAction;
+import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
+import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.gui.view.HighlightStyles;
 import fr.cnrs.lacito.matchbox.model.DocumentChange;
 import fr.cnrs.lacito.matchbox.model.DocumentListener;
@@ -20,6 +24,13 @@ import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Consumer;
+import java.util.logging.Level;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -33,10 +44,14 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.control.Button;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.HBox;
 import javafx.scene.input.KeyCombination;
 import org.fxmisc.richtext.InlineCssTextArea;
 import org.fxmisc.richtext.MultiChangeBuilder;
+import org.fxmisc.richtext.model.TwoDimensional;
 import org.fxmisc.richtext.model.PlainTextChange;
 import org.fxmisc.richtext.util.UndoUtils;
 import org.fxmisc.wellbehaved.event.EventPattern;
@@ -90,6 +105,15 @@ public class EditorController {
     /** Text and offset of the last change made by a view, to re-select the edited object. */
     private TextId lastEditText;
     private int lastEditOffset = -1;
+    /** Object to select after the next parse of a text (set by a text action). */
+    private TextId pendingSelectText;
+    private int pendingSelectOffset = -1;
+
+    /** Actions plugins offer on the displayed text, shown in the margin of their line. */
+    private List<TextActionProvider> actionProviders = List.of();
+    private ViewContext actionContext;
+    private Consumer<String> status = message -> {};
+    private final Set<TextActionProvider> failedProviders = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public EditorController(
         InlineCssTextArea codeArea,
@@ -221,6 +245,77 @@ public class EditorController {
         if (previous != null && corpus.textOf(previous).isEmpty()) {
             selectedObject.set(findSuccessor(previous).orElse(null));
         }
+        if (document != null && document.getId().equals(pendingSelectText)) {
+            int offset = pendingSelectOffset;
+            pendingSelectText = null;
+            text.flatMap(t -> t.objectAt(offset)).ifPresent(selectedObject::set);
+        }
+        refreshTextActions(text);
+    }
+
+    /** After the next parse of {@code text}, selects the object at {@code offset}. */
+    public void selectAfterParse(TextId text, int offset) {
+        this.pendingSelectText = text;
+        this.pendingSelectOffset = offset;
+    }
+
+    // ------------------------------------------------------------------
+    // Text actions offered by plugins
+    // ------------------------------------------------------------------
+
+    /**
+     * @param providers actions offered by plugins on the displayed text
+     * @param context   runs the actions ({@link ViewContext#runTextAction})
+     * @param status    receives the message of an action that could not be applied
+     */
+    public void setTextActions(List<TextActionProvider> providers, ViewContext context, Consumer<String> status) {
+        this.actionProviders = List.copyOf(providers);
+        this.actionContext = context;
+        this.status = status;
+    }
+
+    /** Shows the actions of the parsed text as buttons in the margin of their line (never in the text). */
+    private void refreshTextActions(Optional<Text> text) {
+        Map<Integer, List<TextAction>> byParagraph = new TreeMap<>();
+        if (text.isPresent() && actionContext != null) {
+            for (TextActionProvider provider : actionProviders) {
+                List<TextAction> actions;
+                try {
+                    actions = provider.actionsFor(text.get(), actionContext);
+                } catch (RuntimeException | LinkageError e) {
+                    if (failedProviders.add(provider)) {
+                        logger.log(Level.WARNING, "Text action provider " + provider.getClass().getName() + " failed", e);
+                    }
+                    continue;
+                }
+                for (TextAction action : actions == null ? List.<TextAction>of() : actions) {
+                    int offset = Math.max(0, Math.min(action.offset(), textArea.getLength()));
+                    int paragraph = textArea.offsetToPosition(offset, TwoDimensional.Bias.Forward).getMajor();
+                    byParagraph.computeIfAbsent(paragraph, k -> new ArrayList<>()).add(action);
+                }
+            }
+        }
+        if (byParagraph.isEmpty()) {
+            textArea.setParagraphGraphicFactory(null);
+            return;
+        }
+        textArea.setParagraphGraphicFactory(paragraph -> {
+            List<TextAction> actions = byParagraph.get(paragraph);
+            if (actions == null) return null;
+            HBox box = new HBox(2);
+            for (TextAction action : actions) {
+                Button button = new Button(action.label());
+                button.setStyle("-fx-font-size: 0.8em; -fx-padding: 0 4 0 4;");
+                if (!action.description().isBlank()) button.setTooltip(new Tooltip(action.description()));
+                button.setFocusTraversable(false);
+                button.setOnAction(e -> {
+                    EditOutcome outcome = actionContext.runTextAction(action);
+                    status.accept(outcome.isApplied() ? "" : outcome.message());
+                });
+                box.getChildren().add(button);
+            }
+            return box;
+        });
     }
 
     /** Records where a view changed a text, so that the edited object is selected again. */
@@ -376,6 +471,7 @@ public class EditorController {
             document.removeChangeListener(mirror);
         }
         this.document = null;
+        textArea.setParagraphGraphicFactory(null);
         currentTextCouldBeWrittenDownProperty.unbind();
         currentTextCouldBeWrittenDownProperty.set(false);
         currentTextCouldBeReparsedProperty.unbind();

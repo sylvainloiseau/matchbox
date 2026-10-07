@@ -13,7 +13,7 @@ description: write a grammar for a specific type of files for the matchbox APP
 
 If a grammar contains it own ANTLR parser, it is under the `fr.cnrs.lacito.matchbox.grammar.<grammar-name>` namespace, in the src/main/antlr4 directory
 
-`grammars/matchbox-grammar-notebook` (reuses the `Simple*` classes) and `grammars/matchbox-grammar-conll` (ships its own view) are the reference examples.
+`grammars/matchbox-grammar-notebook` (reuses the `Simple*` classes), `grammars/matchbox-grammar-conll` (ships its own view) and `grammars/matchbox-grammar-markdownheading` (implements the `Section` and `TextHeader` capabilities, ships a view built on the shared `MetadataPane`, a text action, and an `ObjectEditor` adding and removing fields) are the reference examples.
 
 # Dependencies
 
@@ -79,6 +79,11 @@ Implement `fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory<T>` and list it i
 - `getColumns()`: `ObjectColumn`s for the table of objects of this kind; `ObjectColumn.editable(title, field, value)` makes the cells edit a field.
 - To edit from the view: `context.canEdit(object)`, then `context.setField(object, field, value)` or `context.applyEdits(object, edits)`; the returned `EditOutcome` says whether the change was applied, and why not. `context.corpus()` gives the text of the object, its sections and metadata.
 - `updateView(view, object, context)`: optionally shows the re-parsed object in the existing view (keeps focus and edits); return `false` to have the view rebuilt.
+- Metadata (key/value maps): reuse `fr.cnrs.lacito.matchbox.grammarfx.metadata.MetadataPane` (typed values from `context.metadataSchema()`, `*` to add, × to delete); it calls `context.addField`/`removeField`, so the grammar's `ObjectEditor` must implement `addField`/`removeField`. Needs `javafx-media` (`provided`).
+
+# Optional: actions on a text
+
+Implement `fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider` (service file `META-INF/services/fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider`): from a parsed `Text`, return `TextAction`s (label, offset of the line, `TextEdit`s relative to `text.content()`, offset to select after the parse). The application shows them in the editor margin and applies them as one undoable change; return actions only for texts your grammar parsed (`text.grammarIds()`). See `MarkdownHeadingActions`.
 - If the view loads FXML: `loader.setClassLoader(getClass().getClassLoader())`, otherwise the plugin's classes are not found. CSS: `getClass().getResource(...).toExternalForm()`.
 
 See `ConllSentenceViewFactory` in `grammars/matchbox-grammar-conll`.

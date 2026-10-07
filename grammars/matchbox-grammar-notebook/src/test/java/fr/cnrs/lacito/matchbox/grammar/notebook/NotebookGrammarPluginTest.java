@@ -140,4 +140,31 @@ class NotebookGrammarPluginTest {
         assertEquals(3, first.objects().size());
         assertEquals(1, second.objects().size());
     }
+
+    @Test
+    void linesOfOtherNotationsAreIgnored() {
+        String withOthers = """
+            ---
+            speaker: Elaisa
+            ---
+
+            # Session 1
+
+            Some free text: with punctuation, "quotes" and - dashes.
+            ---
+              indented text
+            <mami> {pig}
+            ## Nouns
+            :::
+            a mio-jaflo-m-wi-j
+            1sg down-canoe-top-m.sg-pred
+            'I went down in canoe'
+            :::
+            """;
+        ParseResult r = new NotebookGrammarPlugin().getResult(FILE, withOthers);
+        assertTrue(r.diagnostics().isEmpty(), () -> "errors: " + r.diagnostics());
+        assertEquals(1, objectsOf(r, SimpleLexicalDefinition.class).size());
+        assertEquals(1, objectsOf(r, SimpleIGT.class).size());
+        assertSpansNested(r.objects(), withOthers);
+    }
 }

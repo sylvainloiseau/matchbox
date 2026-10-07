@@ -28,6 +28,20 @@ public interface ObjectEditor {
     EditProposal setField(CorpusObject object, String fieldName, String value, String content);
 
     /**
+     * Edits adding a field (e.g. a metadata entry) to an object. Refused by default.
+     *
+     * @param fieldName name of the new field (e.g. {@code Section.metadataField("date")})
+     */
+    default EditProposal addField(CorpusObject object, String fieldName, String value, String content) {
+        return new EditProposal.Refused("Fields cannot be added to " + object.getKind());
+    }
+
+    /** Edits removing a field (e.g. a metadata entry) of an object. Refused by default. */
+    default EditProposal removeField(CorpusObject object, String fieldName, String content) {
+        return new EditProposal.Refused("Fields cannot be removed from " + object.getKind());
+    }
+
+    /**
      * Replaces the raw text of the field's span by the value (an empty field: inserts it at the
      * field's position). Refuses a line break in a field written on one line.
      */

@@ -66,6 +66,7 @@ public class MatchboxApplication extends Application {
         //         )
         //     );
         mainController.setPrimaryStage(primaryStage);
+        mainController.setHostServices(getHostServices());
 
         // Create scene and set up stage
         Scene scene = new Scene((Parent) root, 1200, 800);

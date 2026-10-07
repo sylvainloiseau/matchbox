@@ -6,7 +6,10 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusView;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.PluginManager;
 import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
+import fr.cnrs.lacito.matchbox.grammarfx.TextAction;
+import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
 import fr.cnrs.lacito.matchbox.gui.UnsavedChangesDialog;
@@ -15,6 +18,8 @@ import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
 import fr.cnrs.lacito.matchbox.gui.assist.GhostTextController;
 import fr.cnrs.lacito.matchbox.gui.assist.SuggestionPanelController;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
+import fr.cnrs.lacito.matchbox.gui.view.ErrorFilter;
+import fr.cnrs.lacito.matchbox.gui.view.GrammarNames;
 import fr.cnrs.lacito.matchbox.gui.view.Kinds;
 import fr.cnrs.lacito.matchbox.gui.view.ObjectViewRegistry;
 import fr.cnrs.lacito.matchbox.settings.UserSettings;
@@ -22,6 +27,9 @@ import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
 
 import java.io.File;
+import java.nio.file.Path;
+import java.util.Optional;
+import javafx.application.HostServices;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -35,6 +43,10 @@ import javafx.collections.ListChangeListener;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.Tooltip;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -121,6 +133,17 @@ public class FileModeController {
         String
     > messageColumn;
 
+    @FXML
+    private TableColumn<Diagnostic, String> pluginColumn;
+
+    /** Filters the error table by plugin. */
+    @FXML
+    private ChoiceBox<ErrorFilter.Choice> errorPluginChoice;
+
+    private FilteredList<Diagnostic> filteredErrors;
+    /** True while the choices are rebuilt (their selection must not filter yet). */
+    private boolean updatingErrorChoices;
+
     private Project project;
     private Corpus corpus;
     private UserSettings settings;
@@ -130,6 +153,8 @@ public class FileModeController {
     private GhostTextController ghostText;
     private SuggestionPanelController suggestionPanel;
     private ViewEditService viewEdits;
+    /** Opens links in the system browser; set by the application. */
+    private HostServices hostServices;
 
     private static final KeyCombination NEXT_SUGGESTION = new KeyCodeCombination(KeyCode.F8);
     private static final KeyCombination PREVIOUS_SUGGESTION = new KeyCodeCombination(KeyCode.F8, KeyCombination.SHIFT_DOWN);
@@ -190,6 +215,8 @@ public class FileModeController {
         );
         this.viewRegistry = ObjectViewRegistry.load();
         this.viewEdits = new ViewEditService(() -> project, editorController, settings);
+        editorController.setTextActions(PluginManager.loadServices(TextActionProvider.class), viewContext,
+            assistMessageLabel::setText);
         setupObjectsTab();
         setupErrorTab();
         setupAssistant();
@@ -357,6 +384,27 @@ public class FileModeController {
         messageColumn.setCellValueFactory(cellData ->
             new SimpleStringProperty(cellData.getValue().message())
         );
+        // the plugin that reported the error: display name and id
+        pluginColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
+            GrammarNames.label(cellData.getValue().grammarId(), PluginManager.getAvailableGrammars())));
+        pluginColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String label, boolean empty) {
+                super.updateItem(label, empty);
+                setText(empty ? null : label);
+                setTooltip(empty || label == null || label.isEmpty() ? null : new Tooltip(label));
+            }
+        });
+
+        filteredErrors = new FilteredList<>(editorController.getCurrentFileErrors());
+        SortedList<Diagnostic> sortedErrors = new SortedList<>(filteredErrors);
+        sortedErrors.comparatorProperty().bind(errorTableView.comparatorProperty());
+        editorController.getCurrentFileErrors().addListener(
+            (ListChangeListener<Diagnostic>) change -> refreshErrorChoices());
+        errorPluginChoice.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> {
+            if (!updatingErrorChoices) applyErrorFilter();
+        });
+        refreshErrorChoices();
 
         errorTableView
             .getSelectionModel()
@@ -366,7 +414,7 @@ public class FileModeController {
                     editorController.selectLinesInEditor(newError);
                 }
             });
-        errorTableView.setItems(editorController.getCurrentFileErrors());
+        errorTableView.setItems(sortedErrors);
 
         MenuItem explain = new MenuItem("Explain");
         explain.setOnAction(e -> {
@@ -391,6 +439,28 @@ public class FileModeController {
             show.setDisable(none);
         });
         errorTableView.setContextMenu(menu);
+    }
+
+    /** Rebuilds the plugin choices from the errors of the current file, keeping the chosen plugin if possible. */
+    private void refreshErrorChoices() {
+        ErrorFilter.Choice previous = errorPluginChoice.getSelectionModel().getSelectedItem();
+        var choices = ErrorFilter.choices(editorController.getCurrentFileErrors(), PluginManager.getAvailableGrammars());
+        updatingErrorChoices = true;
+        try {
+            errorPluginChoice.getItems().setAll(choices);
+            errorPluginChoice.getSelectionModel().select(
+                ErrorFilter.keep(choices, previous == null ? null : previous.grammarId()));
+        } finally {
+            updatingErrorChoices = false;
+        }
+        applyErrorFilter();
+    }
+
+    private void applyErrorFilter() {
+        ErrorFilter.Choice choice = errorPluginChoice.getSelectionModel().getSelectedItem();
+        filteredErrors.setPredicate(choice == null ? d -> true : choice::accepts);
+        parsingErrorPane.setText(ErrorFilter.tabTitle(filteredErrors.size(),
+            editorController.getCurrentFileErrors().size(), choice != null && choice.grammarId() != null));
     }
 
     // ------------------------------------------------------------------
@@ -561,6 +631,36 @@ public class FileModeController {
         }
 
         @Override
+        public EditOutcome addField(CorpusObject object, String fieldName, String value) {
+            return viewEdits.addField(object, fieldName, value);
+        }
+
+        @Override
+        public EditOutcome removeField(CorpusObject object, String fieldName) {
+            return viewEdits.removeField(object, fieldName);
+        }
+
+        @Override
+        public EditOutcome runTextAction(TextAction action) {
+            return editorController.getSelectedDocument()
+                .map(d -> viewEdits.runTextAction(d.getId(), action))
+                .orElseGet(() -> new EditOutcome.NotEditable("No file is displayed"));
+        }
+
+        @Override
+        public Optional<Path> projectDirectory() {
+            if (project == null || project.fileProperty().get() == null) return Optional.empty();
+            return Optional.ofNullable(project.fileProperty().get().toPath().toAbsolutePath().getParent());
+        }
+
+        @Override
+        public void showDocument(String uri) {
+            if (hostServices != null) {
+                hostServices.showDocument(uri);
+            }
+        }
+
+        @Override
         public boolean undo(CorpusObject object) {
             return viewEdits.undo(object);
         }
@@ -636,6 +736,10 @@ public class FileModeController {
 
     public void handleSaveCurrentFile() throws IOException {
         editorController.saveEditedFile();
+    }
+
+    public void setHostServices(HostServices hostServices) {
+        this.hostServices = hostServices;
     }
 
     /** Saves every document with unsaved changes (some may have been changed by views only). */

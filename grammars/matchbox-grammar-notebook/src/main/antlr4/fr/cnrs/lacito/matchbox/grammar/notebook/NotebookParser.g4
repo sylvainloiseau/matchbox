@@ -5,7 +5,10 @@ options { tokenVocab=NotebookLexer; }
  * Entry point
  */
 
-document : blankLines* paragraph (blankLines paragraph)* blankLines* EOF ;
+// constructs of the grammar among lines it ignores (free text, Markdown, other grammars' notations)
+document : (paragraph | otherLine | NEWLINE)* EOF ;
+
+otherLine : OTHER_LINE NEWLINE? ;
 
 /*
  * Paragraph can be one of three forms

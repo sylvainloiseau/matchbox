@@ -70,7 +70,7 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
         return """
 This grammar look for two patterns
 
-Both pattern are delimited by at least a blank lines before and after.
+Both patterns start at the beginning of a line. Every other line (free text, Markdown headings, `---` lines, metadata) is ignored.
 
 - The first one is is a IGT (interlinear glossed text) sentence. It is a group of three Line preceded and followed by a line containing only three columns (:::). The first line contains word, separated by blank and segemented into morphemes by hyphens. The second line contains the exact number of whitespace-separated tokens, each divided in the exact number of hyphen-separated morphemes than their corresponding token on the first line. This line contains a gloss for each morphemes on the first line.
   - Note that IGT rules allow a equal sign (=) instead of a hyphen (-) for clitic boundaries. In that case, the corresponding morphems gloss in the second line must also have a = sign at the corresponding position.

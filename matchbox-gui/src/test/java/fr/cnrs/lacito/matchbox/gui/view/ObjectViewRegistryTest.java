@@ -56,6 +56,13 @@ class ObjectViewRegistryTest {
     }
 
     @Test
+    void textHeadersGetThePluginView() {
+        var generic = new GenericObjectViewFactory();
+        var header = new fr.cnrs.lacito.matchbox.grammar.markdownheading.TextHeaderViewFactory();
+        assertSame(header, registry(generic, header).factoryFor(fr.cnrs.lacito.matchbox.corpus.simple.SimpleTextHeader.class));
+    }
+
+    @Test
     void sectionsGetTheSectionView() {
         var generic = new GenericObjectViewFactory();
         var section = new SectionViewFactory();

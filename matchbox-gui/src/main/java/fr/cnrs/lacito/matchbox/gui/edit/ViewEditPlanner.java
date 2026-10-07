@@ -57,6 +57,22 @@ public final class ViewEditPlanner {
         if (text.isEmpty()) {
             return new Failed(new EditOutcome.Stale("The text changed: the object no longer exists"));
         }
+        return prepare(text.get(), edits);
+    }
+
+    /**
+     * Edits of a whole text (e.g. a text action), computed against the content of its last parse.
+     */
+    public Prepared prepare(TextId id, List<TextEdit> edits) {
+        Optional<Text> text = corpus.text(id);
+        if (text.isEmpty()) {
+            return new Failed(new EditOutcome.Stale("The text is not parsed yet"));
+        }
+        return prepare(text.get(), edits);
+    }
+
+    private Prepared prepare(Text parsed, List<TextEdit> edits) {
+        Optional<Text> text = Optional.of(parsed);
         Optional<TextDocument> document = documents.apply(text.get().id());
         if (document.isEmpty()) {
             return new Failed(new EditOutcome.NotEditable("The file is no longer in the project"));

@@ -113,4 +113,21 @@ class ViewEditPlannerTest {
             planner(true).prepare(igt, setTranslation("x")));
         assertInstanceOf(EditOutcome.Stale.class, failed.outcome());
     }
+
+    @Test
+    void textActionsArePreparedForTheWholeText() {
+        var markdown = new fr.cnrs.lacito.matchbox.grammar.markdownheading.MarkdownHeadingGrammarPlugin();
+        ParseResult r = markdown.getResult(document.getId(), TEXT);
+        corpus.put(Text.builder(document.getId(), TEXT).add(markdown.getId(), r.objects(), r.diagnostics()).build());
+        var actions = new fr.cnrs.lacito.matchbox.grammar.markdownheading.MarkdownHeadingActions()
+            .actionsFor(corpus.text(document.getId()).orElseThrow(), null);
+        assertEquals(1, actions.size(), "no header: 'Add header' offered");
+        var ready = assertInstanceOf(ViewEditPlanner.Ready.class,
+            new ViewEditPlanner(corpus, id -> Optional.of(document), d -> List.of(markdown), validator)
+                .prepare(document.getId(), actions.get(0).edits()));
+        assertEquals("---\n---\n", ready.edits().get(0).replacement());
+        var unknown = new ViewEditPlanner(new Corpus(), id -> Optional.of(document), d -> List.of(), null)
+            .prepare(document.getId(), actions.get(0).edits());
+        assertInstanceOf(ViewEditPlanner.Failed.class, unknown);
+    }
 }

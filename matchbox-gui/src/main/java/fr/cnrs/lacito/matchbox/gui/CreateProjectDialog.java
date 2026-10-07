@@ -46,11 +46,7 @@ public class CreateProjectDialog {
             project.fileProperty().set(projectFile);
             // Step 2: Show project properties dialog
             ProjectPropertiesDialog propertiesDialog =
-                new ProjectPropertiesDialog(
-                    parentStage,
-                    project,
-                    fileModeController
-                );
+                new ProjectPropertiesDialog(parentStage, project);
             propertiesDialog.showAndWait();
 
             // Step 3: If Save was clicked, save the project

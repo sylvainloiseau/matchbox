@@ -10,6 +10,11 @@ import java.util.Map;
  */
 public interface TextHeader extends CorpusObject {
 
+    /** Name of the field holding the value of a property (see {@link fr.cnrs.lacito.matchbox.corpus.HasFields}). */
+    static String propertyField(String key) {
+        return "property:" + key;
+    }
+
     /** Properties in declaration order; unmodifiable, never {@code null}. */
     Map<String, String> getProperties();
 }

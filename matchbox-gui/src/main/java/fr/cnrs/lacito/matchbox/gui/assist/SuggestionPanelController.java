@@ -14,7 +14,9 @@ import fr.cnrs.lacito.matchbox.assist.suggestion.Suggestion.Status;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.assist.suggestion.TokenNames;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
+import fr.cnrs.lacito.matchbox.PluginManager;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
+import fr.cnrs.lacito.matchbox.gui.view.GrammarNames;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
 import java.nio.file.Path;
@@ -41,6 +43,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ToggleButton;
@@ -575,6 +578,16 @@ public final class SuggestionPanelController {
             close.setStyle("-fx-font-size: 9; -fx-padding: 0 4 0 4;");
             close.setOnAction(e -> dismiss(s));
             HBox header = new HBox(6, badge, position, spacer, close);
+            // errors and grammar fixes: the plugin that reported the error
+            s.error().ifPresent(error -> {
+                String name = GrammarNames.label(error.grammarId(), PluginManager.getAvailableGrammars());
+                if (!name.isEmpty()) {
+                    Label plugin = new Label(name);
+                    plugin.setStyle("-fx-text-fill: #777777; -fx-font-size: 10;");
+                    plugin.setTooltip(new Tooltip(name));
+                    header.getChildren().add(2, plugin);
+                }
+            });
             header.setAlignment(Pos.CENTER_LEFT);
             if (s.status() == Status.OUTDATED) {
                 Label outdated = new Label("outdated");

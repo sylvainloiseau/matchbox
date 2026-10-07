@@ -115,6 +115,40 @@ Parsers exist for the following conventions:
 
 ### Conll
 
+### Markdown sections and metadata
+
+The `markdown-heading-grammar` plugin reads the structure of Markdown notes (`.md` files of new
+projects): headings make nested sections, and YAML blocks hold metadata.
+
+```markdown
+---
+language: Tuwari
+speaker: Elaisa
+---
+
+Session 1
+=========
+
+---
+date: 2024-05-12T14:30
+media: recordings/session1.wav
+speakers: Elaisa, John
+---
+
+## Nouns
+```
+
+- Headings: `#` … `######` + title, or a single line underlined by `===` / `---`.
+- Metadata: `key: value` lines between two `---` lines, on the first line of the file (header of the
+  text) or right after a heading (metadata of the section); the objects of a section (IGTs, entries…)
+  inherit them.
+- In the section and header views, values can be edited, deleted (×) and added (`*`): `date` opens
+  a date picker, `media` a file chooser with an audio/video player (or the browser for an http link),
+  `speakers` shows badges with `+`. A file without header shows an "Add header" button in the
+  editor margin (or type two `---` lines on the first line and parse).
+- Media playback uses JavaFX Media (mp3, wav, aiff, m4a/aac, mp4/H.264). On Linux, AAC and H.264 need
+  the system libavcodec (FFmpeg) libraries.
+
 ## Create parser for new conventions
 
 ## 

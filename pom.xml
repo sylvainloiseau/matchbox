@@ -20,6 +20,7 @@
         <module>grammars/matchbox-grammar-notebook</module>
         <module>grammars/matchbox-grammar-lex</module>
         <module>grammars/matchbox-grammar-conll</module>
+        <module>grammars/matchbox-grammar-markdownheading</module>
         <module>matchbox-corpus</module>
         <module>matchbox-gui</module>
         <module>matchbox-grammar-api</module>
@@ -121,6 +122,11 @@
             <dependency>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-graphics</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-media</artifactId>
                 <version>${javafx.version}</version>
             </dependency>
         </dependencies>

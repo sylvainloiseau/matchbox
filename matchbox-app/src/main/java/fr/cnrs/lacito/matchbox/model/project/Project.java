@@ -39,6 +39,8 @@ import javafx.collections.ObservableMap;
 public class Project {
 
     public static final String DEFAULT_PLUGIN_ID = "notebook-grammar";
+    /** Grammar of the sections and metadata of Markdown files, applied to .md files of new projects when installed. */
+    public static final String MARKDOWN_HEADING_PLUGIN_ID = "markdown-heading-grammar";
     private String name;
     private String description;
 
@@ -185,6 +187,15 @@ public class Project {
             );
         fileType.addGrammar(defaultPlugin);
         project.fileTypes.add(fileType);
+        // sections and metadata of Markdown files, next to the notebook grammar ("All files" matches them too)
+        plugins.stream()
+            .filter(p -> p.getId().equals(MARKDOWN_HEADING_PLUGIN_ID))
+            .findFirst()
+            .ifPresent(markdown -> {
+                FileType markdownFiles = new FileType("Markdown files", ".*\\.md");
+                markdownFiles.addGrammar(markdown);
+                project.fileTypes.add(markdownFiles);
+            });
         project.isProjectDefinitionOutdatedProperty().set(true);
         return project;
     }
@@ -479,6 +490,16 @@ public class Project {
         this.isProjectDefinitionOutdatedProperty().set(true);
     }
 
+    /** Files and directories of the project definition, as given (including missing ones), in order. */
+    public List<Path> getDefinitionPaths() {
+        return List.copyOf(filesAndDirectories);
+    }
+
+    /** True if the path was added as a directory of the project definition. */
+    public boolean isDefinitionDirectory(Path path) {
+        return filesByDir.containsKey(path) || Files.isDirectory(path);
+    }
+
     public List<String> getFiles() {
         return filesAndDirectories
             .stream()
@@ -574,6 +595,14 @@ public class Project {
 
     public void addFileType(FileType type) {
         fileTypes.add(type);
+        isDesynchronized = true;
+        this.isProjectDefinitionOutdatedProperty().set(true);
+    }
+
+    /** Replaces the file types (order = precedence of their grammars). */
+    public void setFileTypes(List<FileType> types) {
+        fileTypes.clear();
+        fileTypes.addAll(types);
         isDesynchronized = true;
         this.isProjectDefinitionOutdatedProperty().set(true);
     }

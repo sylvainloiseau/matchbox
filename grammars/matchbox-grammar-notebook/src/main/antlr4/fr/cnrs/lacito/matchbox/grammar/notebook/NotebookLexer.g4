@@ -17,7 +17,23 @@ lexer grammar NotebookLexer;
     private boolean isMorphemeSeparator() {
         return morphemeSeparators.contains(_input.LA(1));
     }
+
+    /** True if the input starts one of the constructs of this grammar: "<", ":::" or "#LEX". */
+    private boolean constructAhead() {
+        int c = _input.LA(1);
+        if (c == '<') return true;
+        if (c == ':' && _input.LA(2) == ':' && _input.LA(3) == ':') return true;
+        return c == '#' && _input.LA(2) == 'L' && _input.LA(3) == 'E' && _input.LA(4) == 'X';
+    }
 }
+
+/*
+ * ---- Lines that are not constructs of this grammar ----
+ * Free text, Markdown headings, "---" lines, metadata of other grammars… are one token each and
+ * ignored by the parser, so that the grammar can run next to other ones on the same files.
+ */
+
+OTHER_LINE : {getCharPositionInLine() == 0 && !constructAhead()}? ~[\r\n]+ ;
 
 /*
  * ---- Tokens for single-line entries ----

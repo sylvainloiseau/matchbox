@@ -4,7 +4,10 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.CorpusView;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.grammarfx.metadata.MetadataSchema;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Services the application offers to object views.
@@ -51,6 +54,42 @@ public interface ViewContext {
      */
     default EditOutcome applyEdits(CorpusObject object, List<TextEdit> edits) {
         return new EditOutcome.NotEditable("Editing is not available");
+    }
+
+    /**
+     * Adds a field to the object (e.g. a metadata entry), written in the notation of the object's
+     * grammar ({@code ObjectEditor.addField}).
+     */
+    default EditOutcome addField(CorpusObject object, String fieldName, String value) {
+        return new EditOutcome.NotEditable("Editing is not available");
+    }
+
+    /** Removes a field of the object (e.g. a metadata entry). */
+    default EditOutcome removeField(CorpusObject object, String fieldName) {
+        return new EditOutcome.NotEditable("Editing is not available");
+    }
+
+    /**
+     * Applies the edits of a text action (see {@link TextActionProvider}) to the displayed
+     * document, as one undoable change, and selects the object at {@link TextAction#selectOffset()}
+     * once the text is parsed again.
+     */
+    default EditOutcome runTextAction(TextAction action) {
+        return new EditOutcome.NotEditable("Editing is not available");
+    }
+
+    /** Directory of the saved project file, if any (used to resolve relative paths). */
+    default Optional<Path> projectDirectory() {
+        return Optional.empty();
+    }
+
+    /** Opens a URI (e.g. an http link) in the system browser or the default application. */
+    default void showDocument(String uri) {
+    }
+
+    /** Types of metadata values by key and vocabularies of list values. */
+    default MetadataSchema metadataSchema() {
+        return MetadataSchema.DEFAULT;
     }
 
     /** Undoes the last change of the object's document. */

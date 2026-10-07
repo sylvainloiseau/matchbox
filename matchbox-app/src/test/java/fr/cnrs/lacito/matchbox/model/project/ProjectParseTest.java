@@ -149,4 +149,18 @@ class ProjectParseTest {
         project.history(TextId.of(a)).orElseThrow().undo();
         assertFalse(project.anyDocumentDirtyProperty().get(), "undo back to the saved text");
     }
+
+    @Test
+    void defaultProjectAppliesTheMarkdownGrammarToMdFilesWhenInstalled() {
+        WholeTextGrammar markdown = new WholeTextGrammar() {
+            public String getId() { return Project.MARKDOWN_HEADING_PLUGIN_ID; }
+        };
+        Project with = Project.createDefaultProject(List.of(new WholeTextGrammar(), markdown));
+        assertEquals(List.of(Project.DEFAULT_PLUGIN_ID, Project.MARKDOWN_HEADING_PLUGIN_ID),
+            with.getGrammarsForFile(Path.of("notes.md")).stream().map(g -> g.getId()).toList());
+        assertEquals(List.of(Project.DEFAULT_PLUGIN_ID),
+            with.getGrammarsForFile(Path.of("notes.txt")).stream().map(g -> g.getId()).toList());
+        Project without = Project.createDefaultProject(List.of(new WholeTextGrammar()));
+        assertEquals(1, without.getFileTypes().size());
+    }
 }

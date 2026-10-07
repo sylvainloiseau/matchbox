@@ -29,13 +29,13 @@ The project is a **Maven multi-module** repository with the following structure:
 
 | Directory/Module               | Purpose                                                                                     |
 |--------------------------------|---------------------------------------------------------------------------------------------|
-| `grammars/`                    | Contains submodules for ANTLR grammars (e.g., `matchbox-grammar-notebook`, `matchbox-grammar-lex`). |
+| `grammars/`                    | Contains submodules for ANTLR grammars (`matchbox-grammar-notebook`, `matchbox-grammar-conll`, `matchbox-grammar-markdownheading`, `matchbox-grammar-lex`). |
 | `matchbox-app`                 | Main application logic (excluding grammars).                                                |
 | `matchbox-distribution`        | Packaging and distribution logic (e.g., assembly scripts).                                  |
 | `matchbox-corpus`              | The corpus: `Corpus` (texts of a project), `Text` (one parse of a text), `TextId`, `TextCoordinate`, `Diagnostic`, `TextEdit`, `CorpusObject`, capability interfaces, `Simple*` implementations (no JavaFX, no ANTLR). |
 | `matchbox-grammar-api`         | Defines the contract for grammars (`GrammarPlugin`, `ParseResult`, `ObjectEditor`, `CollectingErrorListener`, `Spans`), no JavaFX. |
 | `matchbox-assist`              | AI assistant without JavaFX: providers (Anthropic, OpenAI-compatible/Ollama), prompts, grammar validation of suggested edits, suggestion model (see `AI_SUGGESTIONS_PLAN.md`). |
-| `matchbox-grammar-fx`          | Optional JavaFX contract for plugins that provide views of their objects (`ObjectViewFactory`, `ObjectColumn`, `ViewContext`). |
+| `matchbox-grammar-fx`          | JavaFX code shared by plugins and the GUI: contracts for views and text actions (`ObjectViewFactory`, `ObjectColumn`, `ViewContext`, `TextActionProvider`) and reusable controls (`grammarfx.metadata`: `MetadataPane`, typed value editors). |
 | `matchbox-gui`                 | JavaFX GUI code (MVC pattern).                                                              |
 | `.github/`                     | GitHub workflows and templates.                                                             |
 | `.vscode/`                     | VS Code configuration.                                                                      |
@@ -97,16 +97,19 @@ The project is a **Maven multi-module** repository with the following structure:
   | `LexicalEntryViewFactory` | `LexicalEntry` | `LexicalEntryView.fxml` (headword, senses, examples) | Headword (editable), Senses |
   | `SectionViewFactory` | `Section` | Title, position, breadcrumb of enclosing sections, own and inherited metadata, summary, outline of the content (objects of other grammars included) | Title (editable), Metadata, Content |
 
-  `InterlinearSentenceViewFactory` edits the three lines in its detail view and table (when the object `HasFields`).
-- **Editable views**: a view never changes a corpus object; it asks `ViewContext` for text edits (`canEdit`, `setField`, `applyEdits`, `undo`, `redo`), which return an `EditOutcome` (`Applied`, `Stale`, `Refused`, `Invalid`, `NotEditable`). `gui.edit.ViewEditService` applies them to the object's `TextDocument` (displayed or not) as one undoable change, after `ViewEditPlanner` has relocated them in the current text and, unless the `allowInvalidViewEdits` setting is on, refused those adding parse errors (`EditValidator`); the project then parses the document and the views are refreshed. `ViewContext.corpus()` gives the texts (object's text, sections, metadata).
+  `InterlinearSentenceViewFactory` edits the three lines in its detail view and table (when the object `HasFields`). `SectionViewFactory` shows the metadata with the shared `MetadataPane` and refreshes in place (`updateView`). Plugin factory: `TextHeaderViewFactory` (markdown-heading plugin, type `TextHeader`: header properties in a `MetadataPane`).
+- **Metadata editor** (`grammarfx.metadata`, public API for plugins: keep changes backward compatible): `MetadataPane(owner, own, inherited, key → field name, context)` shows key/value rows (own editable with a × delete button, inherited greyed), a `*` button to add an entry, and `update(...)` keeps unchanged rows (and media players) after a re-parse. Values are shown by the editor of their `ValueType`, given by `ViewContext.metadataSchema()` (`MetadataSchema.DEFAULT`: `date` → date picker, ISO 8601 via `IsoDates`; `media` → link + file chooser + audio/video player, or browser for http(s), resolution via `MediaPaths`: project directory then text directory; `speakers` → `ValueList` of badges with `+`, `ValueLists`, `Vocabulary` (empty for now); other keys plain). The application owns the schema; loading vocabularies (e.g. speakers) is an application change only.
+- **Text actions** (`TextActionProvider`, registered by plugins like view factories): actions on a parsed text (`TextAction`: label, offset, `TextEdit`s, offset to select after the parse) shown as buttons in the editor margin (never in the text) and applied by `ViewContext.runTextAction`; e.g. "Add header" of the markdown-heading plugin. The GUI never depends on a particular plugin.
+- **Editable views**: a view never changes a corpus object; it asks `ViewContext` for text edits (`canEdit`, `setField`, `addField`, `removeField`, `applyEdits`, `undo`, `redo`), which return an `EditOutcome` (`Applied`, `Stale`, `Refused`, `Invalid`, `NotEditable`). `gui.edit.ViewEditService` applies them to the object's `TextDocument` (displayed or not) as one undoable change, after `ViewEditPlanner` has relocated them in the current text and, unless the `allowInvalidViewEdits` setting is on, refused those adding parse errors (`EditValidator`); the project then parses the document and the views are refreshed. `ViewContext.corpus()` gives the texts (object's text, sections, metadata).
 
 - A plugin without a factory: objects implementing `InterlinearSentence`, `LexicalEntry` or `Section` get the corresponding view; any other object only shows what `CorpusObject` exposes (kind, label, position, children), so give it an informative `getLabel()` and a meaningful `getChildren()` tree. `DependencySentence`, `Sense` and `Example` have no built-in view (tokens/heads of a `DependencySentence` are not shown by the fallback).
 
 #### `grammars/`
 
 - Each submodule (e.g., `matchbox-grammar-notebook`) contains:
-  - ANTLR grammar files (`.g4`) in `src/main/antlr4/fr/lacito/matchbox/`.
+  - ANTLR grammar files (`.g4`) in `src/main/antlr4/fr/cnrs/lacito/matchbox/grammar/<name>/`.
   - Java listeners/visitors (e.g., `NotebookListener.java`).
+- `matchbox-grammar-markdownheading` (id `markdown-heading-grammar`): sections from ATX and Setext headings (`MarkdownSection`, with level and style) and YAML `key: value` metadata (file header on line 1 → `SimpleTextHeader`; block after a heading → section metadata); every other line ignored, so it runs next to the notebook grammar on `.md` files (the default project applies it to `.*\.md` when installed). Whole-line lexer tokens; context decisions (Setext underline vs metadata block vs separator, fences) in lexer actions. Ships `TextHeaderViewFactory` and the "Add header" text action; `ObjectEditor` with `addField`/`removeField`.
 
 ---
 
@@ -297,6 +300,8 @@ Managed by `fr.cnrs.lacito.matchbox.settings` (matchbox-app):
 | `TextDocument`, `TextHistory` | `matchbox-app`             | Owner of a file's text (all changes, dirty state) and its undo history.                     |
 | `ViewEditService`             | `matchbox-gui`             | Applies the edits requested by object views to the documents.                               |
 | `ObjectViewFactory`           | `matchbox-grammar-fx`      | Optional plugin-provided view of a type of corpus object.                                   |
+| `TextActionProvider`          | `matchbox-grammar-fx`      | Optional plugin-provided actions on a text, shown in the editor margin.                     |
+| `MetadataPane`                | `matchbox-grammar-fx`      | Shared editor of metadata (typed values, add/delete entries).                               |
 | `ObjectViewRegistry`          | `matchbox-gui`             | Chooses the view factory of an object.                                                      |
 
 ---

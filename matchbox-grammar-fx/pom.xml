@@ -29,6 +29,11 @@
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
         </dependency>
+        <!-- audio/video player of the metadata editor -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-media</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

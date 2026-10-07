@@ -503,11 +503,7 @@ public class MainController {
     }
 
     public void handleEditProject() {
-        ProjectPropertiesDialog dialog = new ProjectPropertiesDialog(
-            primaryStage,
-            this.project,
-            fileModeController
-        );
+        ProjectPropertiesDialog dialog = new ProjectPropertiesDialog(primaryStage, this.project);
         dialog.showAndWait();
         if (dialog.isSaved()) {
             onProjectChangeHook();
@@ -626,6 +622,11 @@ public class MainController {
         }
     }
 
+
+    /** Lets the views open links in the system browser. */
+    public void setHostServices(javafx.application.HostServices hostServices) {
+        fileModeController.setHostServices(hostServices);
+    }
 
     public void setPrimaryStage(Stage stage) {
         this.primaryStage = stage;

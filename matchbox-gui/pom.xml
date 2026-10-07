@@ -41,7 +41,13 @@
             <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-assist</artifactId>
         </dependency>
-        <!-- a real grammar for the tests of view editing -->
+        <!-- real grammars for the tests of view editing -->
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-grammar-markdownheading</artifactId>
+            <version>${revision}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-grammar-notebook</artifactId>
@@ -69,6 +75,10 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-media</artifactId>
         </dependency>
     </dependencies>
 

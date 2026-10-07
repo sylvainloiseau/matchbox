@@ -1,33 +1,26 @@
-# "YAML header" plugin
+# Tag grammar module
 
-I would you like to generate a plan for a new plugin (in the grammars
-directory). You will look at the corresponding skill for writting plugins.
+You will create a plan for a matchbox plugin module called matchbox-grammar-tag.
 
-The plugins will contain a ANTLR grammar for extracting a YAML header at the
-begining of a file : ie. lines of comma-searated field/value pairs, wrapped
-between two lines of triple dashes. All other lines in the text are ignored.
+This plugin will contain an ANTLR grammar matching tag, i.e. a '#' followed by a keyword, for instance #infinitive.
 
-You will create a class TextHeader that extends CorpusObject, and contains a list
-of pairs key/values from the YAML header.
+The sequence do not allow a whitespace. It can therefore not be confused with a markdown section title.
 
-You will create a class TextHeaderViewFactory that implements
-ObjectViewFactory<TextHeader>
+The sequence can appear anywhere in a line, not necessarily on line on its own. Several tags can appear on the same line.
 
-TextHeaderViewFactory will be registerd as a service in
-resources/META-INF/services/fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory
+In the matchbox-corpus module, a new interface "Tag" in the capability package and a new simpleTag class in the the simple package could be designed.
 
-The text header view factory will contains a two columns table: a column for
-the field name, and a column for the field value, and as many rows as there are
-fields in the header.
+A plugin view is not ncessary: the first table displayed in the objectKindTabPane pane say it all. The fallback GenericObjectViewFactory will be used.
 
-The table will be editable, so the user can modify the field values: if the user
-modifying a value in a cell and hit enter, the underlying corpus object will be
-updated, and the content of the file at the given coordinates is updated. If he
-or she hit escape, the cell value is reverted to its original value.
+# CoNLL editable with drag and drop
+
+Create a detailled component
 
 # "Media reference" plugin
 
-You will create a plan for a plugin for reference to audio pages.
+You will create a plan for a grammar module that will match reference to sequence in milisecond in media file.
+
+This module will be called m
 
 You will look at the corresponding skill for writting plugins.
 

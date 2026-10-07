@@ -7,6 +7,7 @@ import fr.cnrs.lacito.matchbox.corpus.capability.Section;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectColumn;
 import fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
+import fr.cnrs.lacito.matchbox.grammarfx.metadata.MetadataPane;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -23,12 +24,14 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
-/** Built-in view of sections: title, metadata (own and inherited), outline of the content. */
+/**
+ * Built-in view of sections: title, breadcrumb, metadata (own entries editable, inherited ones
+ * read-only, shared {@link MetadataPane}), outline of the content.
+ */
 public class SectionViewFactory implements ObjectViewFactory<Section> {
 
     @Override
@@ -47,28 +50,60 @@ public class SectionViewFactory implements ObjectViewFactory<Section> {
         );
     }
 
+    /** Parts of a section view refreshed by {@link #updateView}. */
+    private static final class State {
+        final Label title = new Label();
+        final Label position = new Label();
+        final VBox breadcrumb = new VBox();
+        final Label summary = new Label();
+        final VBox outline = new VBox();
+        MetadataPane metadata;
+    }
+
+    private static final String STATE = SectionViewFactory.class.getName();
+
     @Override
     public Node createView(Section section, ViewContext context) {
+        State state = new State();
+        state.title.setStyle("-fx-font-weight: bold; -fx-font-size: 1.2em;");
+        state.position.setStyle("-fx-text-fill: #777777;");
+        VBox.setVgrow(state.outline, Priority.ALWAYS);
+        // own entries editable (dates, media, lists), inherited ones read-only, "*" adds an entry
+        state.metadata = new MetadataPane(section, section.getMetadata(), inherited(section, context),
+            Section::metadataField, context);
+        VBox box = new VBox(6, new HBox(10, state.title, state.position), state.breadcrumb, state.metadata,
+            state.summary, state.outline);
+        box.setStyle("-fx-padding: 8;");
+        box.getProperties().put(STATE, state);
+        fill(state, section, context);
+        return box;
+    }
+
+    /** Shows the re-parsed section in place: the metadata rows being edited and media players are kept. */
+    @Override
+    public boolean updateView(Node view, Section section, ViewContext context) {
+        if (!(view.getProperties().get(STATE) instanceof State state)) {
+            return false;
+        }
+        state.metadata.update(section, section.getMetadata(), inherited(section, context));
+        fill(state, section, context);
+        return true;
+    }
+
+    private static void fill(State state, Section section, ViewContext context) {
         // empty for an object of an outdated parse
         Optional<Text> text = context.corpus().textOf(section);
-
-        Label title = new Label(section.getLabel());
-        title.setStyle("-fx-font-weight: bold; -fx-font-size: 1.2em;");
-        Label position = new Label(GenericObjectViewFactory.position(section.getTextCoordinate()));
-        position.setStyle("-fx-text-fill: #777777;");
-        position.setOnMouseClicked(e -> context.selectInEditor(section.getTextCoordinate()));
-
-        VBox box = new VBox(6, new HBox(10, title, position));
-        box.setStyle("-fx-padding: 8;");
-        text.flatMap(t -> breadcrumb(t, section, context)).ifPresent(box.getChildren()::add);
-        metadataGrid(section, text).ifPresent(box.getChildren()::add);
+        state.title.setText(section.getLabel());
+        state.position.setText(GenericObjectViewFactory.position(section.getTextCoordinate()));
+        state.position.setOnMouseClicked(e -> context.selectInEditor(section.getTextCoordinate()));
+        state.breadcrumb.getChildren().setAll(
+            text.flatMap(t -> breadcrumb(t, section, context)).map(List::of).orElse(List.of()));
         List<CorpusObject> content = text.map(t -> contentInText(t, section))
             .orElse(List.copyOf(section.getContent()));
-        box.getChildren().add(new Label(summary(content)));
+        state.summary.setText(summary(content));
         TreeView<CorpusObject> outline = outline(content, context);
         VBox.setVgrow(outline, Priority.ALWAYS);
-        box.getChildren().add(outline);
-        return box;
+        state.outline.getChildren().setAll(outline);
     }
 
     /** Enclosing sections as links, outermost first; empty for a top-level section. */
@@ -84,27 +119,12 @@ public class SectionViewFactory implements ObjectViewFactory<Section> {
         return Optional.of(crumbs);
     }
 
-    /** Own metadata, then the inherited values it does not override (greyed). */
-    private static Optional<Node> metadataGrid(Section section, Optional<Text> text) {
-        Map<String, String> own = section.getMetadata();
-        Map<String, String> inherited = new LinkedHashMap<>(text.map(t -> t.metadataOf(section)).orElse(Map.of()));
-        inherited.keySet().removeAll(own.keySet());
-        if (own.isEmpty() && inherited.isEmpty()) return Optional.empty();
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(2);
-        int row = 0;
-        for (var e : own.entrySet()) addRow(grid, row++, e.getKey(), e.getValue(), false);
-        for (var e : inherited.entrySet()) addRow(grid, row++, e.getKey(), e.getValue(), true);
-        return Optional.of(grid);
-    }
-
-    private static void addRow(GridPane grid, int row, String key, String value, boolean inherited) {
-        Label k = new Label(key + ":");
-        k.setStyle("-fx-font-weight: bold;" + (inherited ? " -fx-text-fill: #888888;" : ""));
-        Label v = new Label(value);
-        if (inherited) v.setStyle("-fx-text-fill: #888888;");
-        grid.addRow(row, k, v);
+    /** Metadata the section inherits (text header, enclosing sections) and does not override. */
+    private static Map<String, String> inherited(Section section, ViewContext context) {
+        Map<String, String> inherited = new LinkedHashMap<>(
+            context.corpus().textOf(section).map(t -> t.metadataOf(section)).orElse(Map.of()));
+        inherited.keySet().removeAll(section.getMetadata().keySet());
+        return inherited;
     }
 
     /**

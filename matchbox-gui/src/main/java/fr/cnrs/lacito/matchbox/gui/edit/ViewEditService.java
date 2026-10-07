@@ -5,6 +5,9 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.HasFields;
 import fr.cnrs.lacito.matchbox.corpus.Text;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
+import fr.cnrs.lacito.matchbox.grammarapi.ObjectEditor;
+import fr.cnrs.lacito.matchbox.grammarfx.TextAction;
 import fr.cnrs.lacito.matchbox.grammarapi.EditProposal;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
@@ -17,6 +20,7 @@ import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -46,10 +50,13 @@ public final class ViewEditService {
             d -> p.getGrammarsForFile(d.getFilePath()), validate ? validator : null);
     }
 
-    /** True if the object's text is in the project, its file writable and the object has fields. */
+    /**
+     * True if the object's text is in the project, its file writable and the object has fields
+     * (possibly none yet: entries can be added to an empty metadata block).
+     */
     public boolean canEdit(CorpusObject object) {
         Project p = project.get();
-        if (p == null || !(object instanceof HasFields withFields) || withFields.getFields().isEmpty()) {
+        if (p == null || !(object instanceof HasFields)) {
             return false;
         }
         return p.getCorpus().textOf(object)
@@ -59,6 +66,23 @@ public final class ViewEditService {
     }
 
     public EditOutcome setField(CorpusObject object, String fieldName, String value) {
+        return edit(object, e -> e.setField(object, fieldName, value, contentOf(object)));
+    }
+
+    public EditOutcome addField(CorpusObject object, String fieldName, String value) {
+        return edit(object, e -> e.addField(object, fieldName, value, contentOf(object)));
+    }
+
+    public EditOutcome removeField(CorpusObject object, String fieldName) {
+        return edit(object, e -> e.removeField(object, fieldName, contentOf(object)));
+    }
+
+    private String contentOf(CorpusObject object) {
+        return project.get().getCorpus().textOf(object).map(Text::content).orElse("");
+    }
+
+    /** Asks the object's grammar for the edits, then applies them. */
+    private EditOutcome edit(CorpusObject object, Function<ObjectEditor, EditProposal> request) {
         Project p = project.get();
         Optional<Text> text = p.getCorpus().textOf(object);
         if (text.isEmpty()) {
@@ -72,7 +96,7 @@ public final class ViewEditService {
         }
         EditProposal proposal;
         try {
-            proposal = grammar.get().getObjectEditor().setField(object, fieldName, value, text.get().content());
+            proposal = request.apply(grammar.get().getObjectEditor());
         } catch (RuntimeException | LinkageError e) {
             return new EditOutcome.NotEditable("The grammar failed to write the value: " + e);
         }
@@ -108,6 +132,26 @@ public final class ViewEditService {
         }
         // the project parses the document again (non-typing change)
         return new EditOutcome.Applied();
+    }
+
+    /**
+     * Applies the edits of a text action to a document and selects the object at
+     * {@link TextAction#selectOffset()} once the text is parsed again.
+     */
+    public EditOutcome runTextAction(TextId text, TextAction action) {
+        if (project.get() == null) {
+            return new EditOutcome.NotEditable("No project");
+        }
+        return switch (planner().prepare(text, action.edits())) {
+            case ViewEditPlanner.Failed f -> f.outcome();
+            case ViewEditPlanner.Ready r -> {
+                EditOutcome outcome = apply(r);
+                if (outcome.isApplied() && action.selectOffset() >= 0) {
+                    editor.selectAfterParse(text, action.selectOffset());
+                }
+                yield outcome;
+            }
+        };
     }
 
     public boolean undo(CorpusObject object) {
