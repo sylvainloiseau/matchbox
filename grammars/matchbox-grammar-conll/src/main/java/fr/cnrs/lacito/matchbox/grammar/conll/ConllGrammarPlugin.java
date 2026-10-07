@@ -155,12 +155,12 @@ The fields must additionally meet the following constraints:
                 """
 # sent_id = 1
 # text = They buy and sell books.
-1   They     they    PRON    PRP    Case=Nom|Number=Plur               2   nsubj   2:nsubj|4:nsubj   _
-2   buy      buy     VERB    VBP    Number=Plur|Person=3|Tense=Pres    0   root    0:root            _
-3   and      and     CCONJ   CC     _                                  4   cc      4:cc              _
-4   sell     sell    VERB    VBP    Number=Plur|Person=3|Tense=Pres    2   conj    0:root|2:conj     _
-5   books    book    NOUN    NNS    Number=Plur                        2   obj     2:obj|4:obj       SpaceAfter=No
-6   .        .       PUNCT   .      _                                  2   punct   2:punct           _"""),
+1\tThey\tthey\tPRON\tPRP\tCase=Nom|Number=Plur\t2\tnsubj\t2:nsubj|4:nsubj\t_
+2\tbuy\tbuy\tVERB\tVBP\tNumber=Plur|Person=3|Tense=Pres\t0\troot\t0:root\t_
+3\tand\tand\tCCONJ\tCC\t_\t4\tcc\t4:cc\t_
+4\tsell\tsell\tVERB\tVBP\tNumber=Plur|Person=3|Tense=Pres\t2\tconj\t0:root|2:conj\t_
+5\tbooks\tbook\tNOUN\tNNS\tNumber=Plur\t2\tobj\t2:obj|4:obj\tSpaceAfter=No
+6\t.\t.\tPUNCT\t.\t_\t2\tpunct\t2:punct\t_"""),
             new GrammarExample(
                 "Typical sentence in conll format",
                 """
@@ -169,12 +169,12 @@ The fields must additionally meet the following constraints:
 # sent_id = mf920901-001-p1s1A
 # text = Slovenská ústava: pro i proti
 # text_en = Slovak constitution: pros and cons
-1   Slovenská   slovenský   ADJ     AAFS1----1A---- Case=Nom|Degree=Pos|Gender=Fem|Number=Sing|Polarity=Pos 2 amod _ _
-2   ústava      ústava      NOUN    NNFS1-----A---- Case=Nom|Gender=Fem|Number=Sing|Polarity=Pos 0 root _ SpaceAfter=No
-3   :           :           PUNCT   Z:------------- _          2       punct   _       _
-4   pro         pro         ADP     RR--4---------- Case=Acc   2       appos   _       LId=pro-1
-5   i           i           CCONJ   J^------------- _          6       cc      _       LId=i-1
-6   proti       proti       ADP     RR--3---------- Case=Dat   4       conj    _       LId=proti-1""")
+1\tSlovenská\tslovenský\tADJ\tAAFS1----1A----\tCase=Nom|Degree=Pos|Gender=Fem|Number=Sing|Polarity=Pos\t2\tamod\t_\t_
+2\tústava\tústava\tNOUN\tNNFS1-----A----\tCase=Nom|Gender=Fem|Number=Sing|Polarity=Pos\t0\troot\t_\tSpaceAfter=No
+3\t:\t:\tPUNCT\tZ:-------------\t_\t2\tpunct\t_\t_
+4\tpro\tpro\tADP\tRR--4----------\tCase=Acc\t2\tappos\t_\tLId=pro-1
+5\ti\ti\tCCONJ\tJ^-------------\t_\t6\tcc\t_\tLId=i-1
+6\tproti\tproti\tADP\tRR--3----------\tCase=Dat\t4\tconj\t_\tLId=proti-1""")
         );
     }
 
