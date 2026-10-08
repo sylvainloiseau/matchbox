@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 
 class ErrorReporterTest {
 
+    private static final Path LOG_FILE = Path.of("/logs/matchbox-0.log");
+
     private final List<LogRecord> records = new ArrayList<>();
     private final List<String> shown = new ArrayList<>();
     private final Logger logger = Logger.getLogger(ErrorReporter.class.getName());
@@ -30,7 +32,7 @@ class ErrorReporterTest {
     void capture() {
         logger.addHandler(handler);
         ErrorReporter.setDisplay((owner, title, message) -> shown.add(title + " | " + message));
-        ErrorReporter.setLogFile(Path.of("/logs/matchbox-0.log"));
+        ErrorReporter.setLogFile(LOG_FILE);
     }
 
     @AfterEach
@@ -55,7 +57,7 @@ class ErrorReporterTest {
         assertSame(npe, records.get(0).getThrown(), "unwrapped");
         String message = shown.get(0);
         assertTrue(message.contains("unexpected error occurred (NullPointerException"), message);
-        assertTrue(message.contains("/logs/matchbox-0.log"), message);
+        assertTrue(message.contains(LOG_FILE.toString()), message);
     }
 
     @Test
