@@ -113,7 +113,10 @@ mode is hidden.
 - Put the logic in pure classes without JavaFX (as `ObjectSuccessor`, `SegmentAtCaret`,
   `ErrorFilter`, `ViewEditPlanner`) and unit-test them. `AbstractModeTest` shows how to test a mode
   with a `ProjectSession` and no window.
-- Finish with `mvn clean install` (incremental builds can keep stale classes), then a smoke launch
-  with `mvn -pl matchbox-gui javafx:run` and a manual checklist.
+- Test the mode in the real window with TestFX (headless, nothing shown on screen): extend
+  `MainWindowFixture` as `MainWindowTest` does (switch to the mode with its button, select, edit,
+  undo, check the status line and the focus).
+- Finish with `mvn clean install` (incremental builds can keep stale classes), then a look at the
+  window with `mvn -pl matchbox-gui javafx:run`.
 - Write a plan in `.claude/plans/` first, as for the other features. Then update CLAUDE.md §3
   (matchbox-gui, Modes) and the README section "Modes, undo and navigation".

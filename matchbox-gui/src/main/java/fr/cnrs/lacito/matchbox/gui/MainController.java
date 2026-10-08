@@ -483,6 +483,11 @@ public class MainController {
         workbench.setHostServices(hostServices);
     }
 
+    /** The window's services (for the GUI tests). */
+    Workbench workbench() {
+        return workbench;
+    }
+
     public void setPrimaryStage(Stage stage) {
         this.primaryStage = stage;
     }

@@ -66,15 +66,20 @@ public final class ViewEditService {
     }
 
     public EditOutcome setField(CorpusObject object, String fieldName, String value) {
-        return edit(object, "Edit " + fieldName, e -> e.setField(object, fieldName, value, contentOf(object)));
+        return edit(object, "Edit " + describe(fieldName), e -> e.setField(object, fieldName, value, contentOf(object)));
     }
 
     public EditOutcome addField(CorpusObject object, String fieldName, String value) {
-        return edit(object, "Add " + fieldName, e -> e.addField(object, fieldName, value, contentOf(object)));
+        return edit(object, "Add " + describe(fieldName), e -> e.addField(object, fieldName, value, contentOf(object)));
     }
 
     public EditOutcome removeField(CorpusObject object, String fieldName) {
-        return edit(object, "Remove " + fieldName, e -> e.removeField(object, fieldName, contentOf(object)));
+        return edit(object, "Remove " + describe(fieldName), e -> e.removeField(object, fieldName, contentOf(object)));
+    }
+
+    /** A field name for the user: "freeTranslation" → "free translation". */
+    static String describe(String fieldName) {
+        return fieldName.replaceAll("([a-z0-9])([A-Z])", "$1 $2").toLowerCase(java.util.Locale.ROOT);
     }
 
     private String contentOf(CorpusObject object) {

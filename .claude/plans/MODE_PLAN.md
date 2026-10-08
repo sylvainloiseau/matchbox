@@ -588,7 +588,8 @@ Pure classes, without the JavaFX toolkit:
   at the same index; a mode without a menu leaves the slot empty; no accelerator of a mode menu
   equals one of the window menus (checked for every built-in mode).
 
-Manual checklist (`mvn -pl matchbox-gui javafx:run`):
+Checklist, automated in `MainWindowTest` (TestFX, headless; see CLAUDE.md §8), still worth a look
+by hand with `mvn -pl matchbox-gui javafx:run` for what tests do not see (layout, actual playback):
 - edit an IGT in a detail view, type in another file, then undo twice from the menu: the labels
   name the right files;
 - undo a change of a file that is not displayed: check the status message and the Show link;
