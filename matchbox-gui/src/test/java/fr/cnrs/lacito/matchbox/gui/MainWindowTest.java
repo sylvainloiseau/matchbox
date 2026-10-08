@@ -209,6 +209,25 @@ class MainWindowTest extends MainWindowFixture {
     }
 
     @Test
+    void saveProjectWritesTheProjectFileWithoutAsking(FxRobot robot) throws Exception {
+        // a project saved earlier, opened again
+        Project saved = Project.createDefaultProject(PluginManager.loadPlugins());
+        Path mbx = dir.resolve("p.mbx");
+        saved.setFile(mbx.toFile());
+        fr.cnrs.lacito.matchbox.model.project.ProjectXMLSerializer.save(saved);
+        Project opened = Project.loadProject(PluginManager.loadPlugins(), mbx.toFile());
+        robot.interact(() -> workbench().session().setProject(opened));
+        Path a = addFile(robot, "a.txt", "notes\n");
+
+        MenuItem save = item(menu(robot, "File"), "Save project");
+        assertFalse(save.isDisable());
+        int windows = Window.getWindows().size();
+        robot.interact(save::fire);
+        assertEquals(windows, Window.getWindows().size(), "no file chooser, no dialog");
+        assertTrue(java.nio.file.Files.readString(mbx).contains(a.getFileName().toString()), "the file added is saved");
+    }
+
+    @Test
     void theFileModeMenuActsOnTheDisplayedFile(FxRobot robot) throws Exception {
         Menu fileMode = menu(robot, "File Mode");
         assertTrue(item(fileMode, "Search").isDisable(), "no file displayed");

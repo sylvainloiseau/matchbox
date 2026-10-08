@@ -55,8 +55,8 @@ class FileTypeTest {
         Path note = Files.writeString(dir.resolve("n.txt"), "x");
         assertTrue(p.getGrammarsForFile(note).isEmpty());
 
-        // saved back unchanged
-        p.setFile(file.toFile());
+        // saved back unchanged, to the file it was loaded from
+        assertEquals(file.toFile(), p.fileProperty().get());
         ProjectXMLSerializer.save(p);
         assertTrue(Files.readString(file).contains("<regex>*.txt</regex>"));
     }

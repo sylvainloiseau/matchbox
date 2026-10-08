@@ -221,7 +221,6 @@ public class MainController {
     }
 
     private void onProjectChangeHook() {
-        saveProjectMenuItem.disableProperty().bind(project().fileProperty().isNotNull());
         project().isProjectDefinitionOutdatedProperty().set(true);
     }
 
@@ -383,6 +382,7 @@ public class MainController {
         // TODO implement
     }
 
+    /** Saves the project to its file; a project never saved is saved as (a file chooser). */
     public void handleSaveCurrentProject() {
         if (project().fileProperty().isNull().get()) {
             handleSaveAsProject();
@@ -419,9 +419,9 @@ public class MainController {
             return;
         }
         if (project().isProjectDefinitionOutdatedProperty().get()) {
-            ButtonType ok = new ButtonType("foo", ButtonBar.ButtonData.OK_DONE);
-            ButtonType no = new ButtonType("bar", ButtonBar.ButtonData.NO);
-            ButtonType cancel = new ButtonType("bar", ButtonBar.ButtonData.CANCEL_CLOSE);
+            ButtonType ok = new ButtonType("Yes", ButtonBar.ButtonData.OK_DONE);
+            ButtonType no = new ButtonType("No", ButtonBar.ButtonData.NO);
+            ButtonType cancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
 
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
                 "would you like to discard change in current project?",

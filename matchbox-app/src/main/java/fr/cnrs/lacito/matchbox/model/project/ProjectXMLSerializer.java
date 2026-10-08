@@ -117,6 +117,8 @@ public class ProjectXMLSerializer {
     public static Project load(File file, List<GrammarPlugin> plugins, DocumentOptions documentOptions)
         throws Exception {
         Project project = new Project(plugins, documentOptions);
+        // "Save project" writes back to the file the project was loaded from
+        project.setFile(file);
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
