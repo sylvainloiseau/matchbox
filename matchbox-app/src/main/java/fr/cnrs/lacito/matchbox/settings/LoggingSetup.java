@@ -66,6 +66,18 @@ public final class LoggingSetup {
         return logFile;
     }
 
+    /**
+     * Removes the file handler from the root logger and closes the log file (at exit, and in
+     * tests: Windows cannot delete a file that is still open).
+     */
+    public static synchronized void close() {
+        if (installed != null) {
+            Logger.getLogger("").removeHandler(installed);
+            installed.close();
+            installed = null;
+        }
+    }
+
     /** {@code %} has a meaning in {@link FileHandler} patterns. */
     private static String escape(String path) {
         return path.replace("%", "%%");

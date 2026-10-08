@@ -106,6 +106,8 @@ public class MatchboxApplication extends Application {
         if (settings != null) {
             settings.close();
         }
+        // flushes and releases the log file
+        LoggingSetup.close();
     }
 
     public static void main(String[] args) {

@@ -28,6 +28,9 @@ class LoggingSetupTest {
             assertTrue(content.contains("first session"), content);
             assertTrue(content.contains("second session"), content);
             assertTrue(content.lines().anyMatch(l -> l.matches("\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d INFO matchbox.test - first session")), content);
+        } finally {
+            // the log file must be closed before the temporary directory is deleted (Windows)
+            LoggingSetup.close();
         }
     }
 }

@@ -76,6 +76,14 @@ jobs:
         shell: bash
         run: mvn -pl matchbox-distribution clean package
 
+      # the detailed test results, to debug a build that fails on one OS only
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ matrix.runner }}
+          path: '**/target/surefire-reports/'
+
       - name: Publish artifacts on the GitHub release
         uses: softprops/action-gh-release@v3
         with:
