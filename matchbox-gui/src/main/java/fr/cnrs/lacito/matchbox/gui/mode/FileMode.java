@@ -2,20 +2,13 @@ package fr.cnrs.lacito.matchbox.gui.mode;
 
 import fr.cnrs.lacito.matchbox.corpus.Corpus;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
-import fr.cnrs.lacito.matchbox.corpus.CorpusView;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
-import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
-import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.PluginManager;
-import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
-import fr.cnrs.lacito.matchbox.grammarfx.TextAction;
 import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
-import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayers;
-import fr.cnrs.lacito.matchbox.grammarfx.media.SharedMediaPlayers;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
+import fr.cnrs.lacito.matchbox.gui.SearchDialog;
 import fr.cnrs.lacito.matchbox.gui.UnsavedChangesDialog;
-import fr.cnrs.lacito.matchbox.gui.edit.ViewEditService;
 import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
 import fr.cnrs.lacito.matchbox.gui.assist.GhostTextController;
 import fr.cnrs.lacito.matchbox.gui.assist.SuggestionPanelController;
@@ -24,59 +17,65 @@ import fr.cnrs.lacito.matchbox.gui.view.ErrorFilter;
 import fr.cnrs.lacito.matchbox.gui.view.GrammarNames;
 import fr.cnrs.lacito.matchbox.gui.view.Kinds;
 import fr.cnrs.lacito.matchbox.gui.view.ObjectViewRegistry;
-import fr.cnrs.lacito.matchbox.settings.UserSettings;
-import fr.cnrs.lacito.matchbox.model.project.Project;
+import fr.cnrs.lacito.matchbox.gui.workbench.Focus;
+import fr.cnrs.lacito.matchbox.gui.workbench.Workbench;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
-
-import java.io.File;
-import java.nio.file.Path;
-import java.util.Optional;
-import javafx.application.HostServices;
+import fr.cnrs.lacito.matchbox.model.project.Project;
+import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
-import javafx.scene.Node;
-import javafx.collections.ListChangeListener;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.value.ObservableValue;
+import javafx.collections.ListChangeListener;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
-import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.Tooltip;
 import javafx.fxml.FXML;
-import javafx.scene.control.Alert;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckMenuItem;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TabPane;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextField;
-import javafx.stage.DirectoryChooser;
-import javafx.stage.Stage;
-import javafx.util.Callback;
+import javafx.stage.Window;
 import org.fxmisc.richtext.InlineCssTextArea;
 
-public class FileModeController {
+/**
+ * File Mode: the files of the project, the text editor, the objects of the displayed file (tables
+ * by kind, detail pane) and its parse errors, the assistant's suggestions. The mode that "show in
+ * editor" switches to. Its own functions (search, assistant at the caret, insert) are in its menu.
+ */
+public class FileMode implements Mode {
 
     @FXML
     private ListView<TextDocument> fileListView;
@@ -112,28 +111,16 @@ public class FileModeController {
     private ToggleButton suggestionsToggle;
 
     @FXML
-    private Hyperlink assistStatusLink;
-
-    @FXML
-    private Label assistMessageLabel;
-
-    @FXML
     private TableView<Diagnostic> errorTableView;
 
     @FXML
     private TableColumn<Diagnostic, Number> lineColumn;
 
     @FXML
-    private TableColumn<
-        Diagnostic,
-        Number
-    > charPositionColumn;
+    private TableColumn<Diagnostic, Number> charPositionColumn;
 
     @FXML
-    private TableColumn<
-        Diagnostic,
-        String
-    > messageColumn;
+    private TableColumn<Diagnostic, String> messageColumn;
 
     @FXML
     private TableColumn<Diagnostic, String> pluginColumn;
@@ -146,19 +133,30 @@ public class FileModeController {
     /** True while the choices are rebuilt (their selection must not filter yet). */
     private boolean updatingErrorChoices;
 
-    private Project project;
-    private Corpus corpus;
-    private UserSettings settings;
-    private EditorController editorController;
-    private ObjectViewRegistry viewRegistry;
+    private final Workbench workbench;
+    private final UserSettings settings;
     private final AssistController assist;
+    private final ViewContext viewContext;
+    private final ObjectViewRegistry viewRegistry;
+    private final Node root;
+    private Project project;
+    private EditorController editorController;
     private GhostTextController ghostText;
     private SuggestionPanelController suggestionPanel;
-    private ViewEditService viewEdits;
-    /** Players of media files shared by all views; closed when the project changes. */
-    private final SharedMediaPlayers mediaPlayers = new SharedMediaPlayers();
-    /** Opens links in the system browser; set by the application. */
-    private HostServices hostServices;
+    private FilteredList<TextDocument> filteredFiles;
+    private Menu menu;
+    /** What the window's commands target: the displayed file, the caret and the selected object. */
+    private final ObjectProperty<Optional<Focus>> focus = new SimpleObjectProperty<>(Optional.empty());
+    /** Shows the first file when files are added while none is displayed. */
+    private final ListChangeListener<TextDocument> filesAdded = change -> {
+        if (editorController.getSelectedDocument().isEmpty() && !fileListView.getItems().isEmpty()) {
+            Platform.runLater(() -> {
+                if (fileListView.getSelectionModel().isEmpty() && !fileListView.getItems().isEmpty()) {
+                    fileListView.getSelectionModel().select(0);
+                }
+            });
+        }
+    };
 
     private static final KeyCombination NEXT_SUGGESTION = new KeyCodeCombination(KeyCode.F8);
     private static final KeyCombination PREVIOUS_SUGGESTION = new KeyCodeCombination(KeyCode.F8, KeyCombination.SHIFT_DOWN);
@@ -174,58 +172,170 @@ public class FileModeController {
     /** True while the selection is propagated, to avoid feedback between table and editor. */
     private boolean propagatingSelection;
 
-    public FileModeController(UserSettings settings, AssistController assist) {
-        this.settings = settings;
-        this.assist = assist;
-    }
-
-    /** This method should be called after initialization 
-     * to set the model. */
-    public void setProject(Project project) {
-        // the players belong to the files of the previous project
-        mediaPlayers.closeAll();
-        this.project = project;
-        this.corpus = project.getCorpus();
-        if (editorController != null) {
-            editorController.setProject(project);
+    public FileMode(Workbench workbench) {
+        this.workbench = workbench;
+        this.settings = workbench.settings();
+        this.assist = workbench.assist();
+        this.viewContext = workbench.viewContext();
+        this.viewRegistry = workbench.viewRegistry();
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fr/cnrs/lacito/matchbox/gui/mode/FileMode.fxml"));
+        loader.setController(this);
+        try {
+            root = loader.load();
+        } catch (IOException e) {
+            // the window cannot work without it
+            throw new UncheckedIOException("Cannot load the file mode view", e);
         }
-        setupFileListView();
-        project.setApplyExecutor(Platform::runLater);
-        saveButton
-            .disableProperty()
-            .bind(
-                editorController
-                    .getCurrentTextCouldBeWrittenDownProperty()
-                    .not()
-            );
-        closeButton
-            .disableProperty()
-            .bind(editorController.getClosableProperty().not());
-        parseButton
-            .disableProperty()
-            .bind(
-                editorController
-                    .getCurrentTextCouldBeParsedAgainProperty()
-                    .not()
-            );
-
-        this.editorController.setProject(project);
-        assist.setProject(project);
+        workbench.session().projectProperty().addListener((obs, o, n) -> setProject(n));
+        if (workbench.session().project() != null) {
+            setProject(workbench.session().project());
+        }
     }
 
     @FXML
-    public void initialize() throws Exception {
-        this.editorController = new EditorController(
-            fileContentCodeArea,
-            settings
-        );
-        this.viewRegistry = ObjectViewRegistry.load();
-        this.viewEdits = new ViewEditService(() -> project, editorController, settings);
-        editorController.setTextActions(PluginManager.loadServices(TextActionProvider.class), viewContext,
-            assistMessageLabel::setText);
+    public void initialize() {
+        this.editorController = new EditorController(fileContentCodeArea, workbench);
+        editorController.setTextActions(PluginManager.loadServices(TextActionProvider.class));
+        setupFileListView();
         setupObjectsTab();
         setupErrorTab();
         setupAssistant();
+        setupFocus();
+        this.menu = buildMenu();
+        saveButton.disableProperty().bind(editorController.getCurrentTextCouldBeWrittenDownProperty().not());
+        closeButton.disableProperty().bind(editorController.getClosableProperty().not());
+        parseButton.disableProperty().bind(editorController.getCurrentTextCouldBeParsedAgainProperty().not());
+    }
+
+    /** Shows the files of a new project; nothing is displayed until a file is chosen. */
+    private void setProject(Project project) {
+        if (this.project != null) {
+            this.project.getDerivedFileList().removeListener(filesAdded);
+        }
+        this.project = project;
+        editorController.setProject(project);
+        filteredFiles = new FilteredList<>(project.getDerivedFileList());
+        applyFileFilter(filterFileTextField.getText());
+        fileListView.setItems(filteredFiles);
+        project.getDerivedFileList().addListener(filesAdded);
+    }
+
+    // ------------------------------------------------------------------
+    // Mode
+    // ------------------------------------------------------------------
+
+    @Override
+    public Node root() {
+        return root;
+    }
+
+    @Override
+    public ObservableValue<Optional<Focus>> focusProperty() {
+        return focus;
+    }
+
+    @Override
+    public Optional<Menu> menu() {
+        return Optional.of(menu);
+    }
+
+    /** Opens the file of the focus, then selects its object or range. */
+    @Override
+    public boolean reveal(Focus target) {
+        if (project == null) return false;
+        if (!isDisplayed(target)) {
+            project.document(target.text()).ifPresent(d -> {
+                // the file may be hidden by the filter of the list
+                if (!fileListView.getItems().contains(d)) filterFileTextField.clear();
+                fileListView.getSelectionModel().select(d);
+            });
+        }
+        if (!isDisplayed(target)) return false;
+        if (target.object().isPresent()) {
+            editorController.selectInEditor(target.object().get().getTextCoordinate());
+            editorController.selectedObjectProperty().set(target.object().get());
+        } else {
+            editorController.selectRange(target.start(), target.end());
+        }
+        return true;
+    }
+
+    private boolean isDisplayed(Focus target) {
+        return editorController.getSelectedDocument().map(d -> d.getId().equals(target.text())).orElse(false);
+    }
+
+    /** The focus follows the displayed file, the caret, the selection of the editor and the selected object. */
+    private void setupFocus() {
+        fileContentCodeArea.caretPositionProperty().addListener((obs, o, n) -> updateFocus());
+        fileContentCodeArea.selectionProperty().addListener((obs, o, n) -> updateFocus());
+        editorController.selectedObjectProperty().addListener((obs, o, n) -> updateFocus());
+        editorController.getClosableProperty().addListener((obs, o, n) -> updateFocus());
+    }
+
+    private void updateFocus() {
+        Optional<TextDocument> document = editorController.getSelectedDocument();
+        if (document.isEmpty()) {
+            focus.set(Optional.empty());
+            return;
+        }
+        var selection = fileContentCodeArea.getSelection();
+        int start = selection.getLength() > 0 ? selection.getStart() : fileContentCodeArea.getCaretPosition();
+        int end = selection.getLength() > 0 ? selection.getEnd() : start;
+        CorpusObject object = editorController.selectedObjectProperty().get();
+        Optional<CorpusObject> selected = object != null && object.getTextCoordinate().text().equals(document.get().getId())
+            ? Optional.of(object) : Optional.empty();
+        focus.set(Optional.of(new Focus(document.get().getId(), start, end, selected)));
+    }
+
+    // ------------------------------------------------------------------
+    // The File Mode menu
+    // ------------------------------------------------------------------
+
+    private Menu buildMenu() {
+        MenuItem search = item("Search…", this::openSearch);
+        MenuItem parse = item("Parse file", this::handleParseText);
+        MenuItem suggest = item("Suggest completion (Ctrl+Space)", this::requestCompletion);
+        CheckMenuItem inline = new CheckMenuItem("Inline suggestions");
+        inline.setSelected(assist.data().inlineEnabled());
+        settings.assistProperty().addListener((obs, o, n) -> inline.setSelected(n.inlineEnabled()));
+        inline.setOnAction(e -> settings.assistProperty().set(
+            settings.assistProperty().get().withInlineEnabled(inline.isSelected())));
+        MenuItem explain = item("Explain error at cursor", this::explainErrorAtCaret);
+        MenuItem reviewBlock = item("Review current block", () -> review("Current block"));
+        MenuItem reviewSelection = item("Review selection", () -> review("Selection"));
+        MenuItem reviewFile = item("Review whole file", () -> review("Whole file"));
+        CheckMenuItem panel = new CheckMenuItem("Suggestions panel");
+        panel.selectedProperty().bindBidirectional(suggestionsToggle.selectedProperty());
+        Menu insert = new Menu("Insert", null,
+            new MenuItem("Insert intermorphemic gloss"),
+            new MenuItem("Insert lexical information"));
+
+        Menu result = new Menu("File Mode", null,
+            search, parse,
+            new SeparatorMenuItem(),
+            suggest, inline, explain, reviewBlock, reviewSelection, reviewFile, panel,
+            new SeparatorMenuItem(),
+            insert);
+        // everything acts on the displayed file
+        var noFile = editorController.getClosableProperty().not();
+        for (MenuItem i : List.of(search, suggest, explain, reviewBlock, reviewFile, insert)) {
+            i.disableProperty().bind(noFile);
+        }
+        parse.disableProperty().bind(editorController.getCurrentTextCouldBeParsedAgainProperty().not());
+        result.setOnShowing(e -> reviewSelection.setDisable(editorController.getSelectedDocument().isEmpty()
+            || fileContentCodeArea.getSelection().getLength() == 0));
+        return result;
+    }
+
+    private static MenuItem item(String text, Runnable action) {
+        MenuItem item = new MenuItem(text);
+        item.setOnAction(e -> action.run());
+        return item;
+    }
+
+    /** Find and replace in the displayed file; the replacements are one undoable change. */
+    public void openSearch() {
+        new SearchDialog(fileContentCodeArea, editorController::applySearchEdits, window()).show();
     }
 
     // ------------------------------------------------------------------
@@ -233,14 +343,8 @@ public class FileModeController {
     // ------------------------------------------------------------------
 
     private void setupAssistant() {
-        ghostText = new GhostTextController(editorController, assist, assistMessageLabel::setText);
+        ghostText = new GhostTextController(editorController, assist, workbench.status()::info);
         suggestionPanel = new SuggestionPanelController(editorController, assist);
-
-        assistStatusLink.textProperty().bind(assist.statusProperty());
-        assistStatusLink.setOnAction(e -> {
-            assistStatusLink.setVisited(false);
-            assist.openSettings();
-        });
 
         // the panel's visibility is a setting
         suggestionsToggle.setSelected(assist.data().suggestionPanelVisible());
@@ -274,13 +378,13 @@ public class FileModeController {
         reviewBlock.setOnAction(e -> review("Current block"));
         MenuItem play = new MenuItem("Play media segment at caret (⇧⌘Space)");
         play.setOnAction(e -> editorController.playSegmentAtCaret());
-        ContextMenu menu = new ContextMenu(suggest, explain, new SeparatorMenuItem(), reviewBlock, reviewSelection,
+        ContextMenu contextMenu = new ContextMenu(suggest, explain, new SeparatorMenuItem(), reviewBlock, reviewSelection,
             new SeparatorMenuItem(), play);
-        menu.setOnShowing(e -> {
+        contextMenu.setOnShowing(e -> {
             explain.setDisable(editorController.errorAt(fileContentCodeArea.getCaretPosition()).isEmpty());
             reviewSelection.setDisable(fileContentCodeArea.getSelection().getLength() == 0);
         });
-        fileContentCodeArea.setContextMenu(menu);
+        fileContentCodeArea.setContextMenu(contextMenu);
     }
 
     private void showSuggestionPanel(boolean visible) {
@@ -314,85 +418,59 @@ public class FileModeController {
         suggestionPanel.review(what);
     }
 
-    public AssistController getAssist() {
-        return assist;
-    }
+    // ------------------------------------------------------------------
+    // Files
+    // ------------------------------------------------------------------
 
     private void setupFileListView() {
-        FilteredList<TextDocument> filteredList = new FilteredList<>(
-            project.getDerivedFileList()
-        );
-        filterFileTextField
-            .textProperty()
-            .addListener((obs, oldValue, newValue) -> {
-                if (newValue == null || newValue.isEmpty()) {
-                    filteredList.setPredicate(item -> true);
+        filterFileTextField.textProperty().addListener((obs, oldValue, newValue) -> applyFileFilter(newValue));
+        fileListView.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(TextDocument item, boolean empty) {
+                super.updateItem(item, empty);
+                textProperty().unbind();
+                styleProperty().unbind();
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
                 } else {
-                    String filterText = newValue.toLowerCase();
-                    filteredList.setPredicate(item ->
-                        item
-                            .getFilePath()
-                            .toString()
-                            .toLowerCase()
-                            .contains(filterText)
-                    );
-                }
-            });
-
-        fileListView.setItems(filteredList);
-        fileListView.setCellFactory(
-            new Callback<ListView<TextDocument>, ListCell<TextDocument>>() {
-                @Override
-                public ListCell<TextDocument> call(ListView<TextDocument> param) {
-                    return new ListCell<TextDocument>() {
-                        @Override
-                        protected void updateItem(
-                            TextDocument item,
-                            boolean empty
-                        ) {
-                            super.updateItem(item, empty);
-                            textProperty().unbind();
-                            styleProperty().unbind();
-                            if (empty || item == null) {
-                                setText(null);
-                                setStyle("");
-                            } else {
-                                // unsaved documents (possibly changed by a view) are marked
-                                String path = item.getFilePath().toString();
-                                var dirty = item.getCouldBeWrittenBooleanProperty();
-                                textProperty().bind(Bindings.when(dirty).then("* " + path).otherwise(path));
-                                styleProperty().bind(Bindings.when(dirty)
-                                    .then("-fx-font-weight: bold; -fx-font-style: italic;").otherwise(""));
-                            }
-                        }
-                    };
+                    // unsaved documents (possibly changed by a view) are marked
+                    String path = item.getFilePath().toString();
+                    var dirty = item.getCouldBeWrittenBooleanProperty();
+                    textProperty().bind(Bindings.when(dirty).then("* " + path).otherwise(path));
+                    styleProperty().bind(Bindings.when(dirty)
+                        .then("-fx-font-weight: bold; -fx-font-style: italic;").otherwise(""));
                 }
             }
-        );
-        fileListView
-            .getSelectionModel()
-            .selectedItemProperty()
-            .addListener((obs, oldVal, newVal) -> {
-                if (newVal != null) {
-                    editorController.selectEditedFile(newVal.getFilePath());
-                } else {
-                    editorController.clearEditor();
-                }
-            });
+        });
+        fileListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                editorController.selectEditedFile(newVal.getFilePath());
+            } else {
+                editorController.clearEditor();
+            }
+            updateFocus();
+        });
     }
 
+    private void applyFileFilter(String filter) {
+        if (filteredFiles == null) return;
+        if (filter == null || filter.isEmpty()) {
+            filteredFiles.setPredicate(item -> true);
+        } else {
+            String lower = filter.toLowerCase();
+            filteredFiles.setPredicate(item -> item.getFilePath().toString().toLowerCase().contains(lower));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Errors tab
+    // ------------------------------------------------------------------
+
     private void setupErrorTab() {
-        lineColumn.setCellValueFactory(cellData ->
-            new SimpleIntegerProperty(cellData.getValue().line())
-        );
-        charPositionColumn.setCellValueFactory(cellData ->
-            new SimpleIntegerProperty(
-                cellData.getValue().column()
-            )
-        );
-        messageColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().message())
-        );
+        lineColumn.setCellValueFactory(cellData -> new SimpleIntegerProperty(cellData.getValue().line()));
+        charPositionColumn.setCellValueFactory(cellData -> new SimpleIntegerProperty(cellData.getValue().column()));
+        messageColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().message()));
         // the plugin that reported the error: display name and id
         pluginColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
             GrammarNames.label(cellData.getValue().grammarId(), PluginManager.getAvailableGrammars())));
@@ -415,14 +493,11 @@ public class FileModeController {
         });
         refreshErrorChoices();
 
-        errorTableView
-            .getSelectionModel()
-            .selectedItemProperty()
-            .addListener((obs, oldError, newError) -> {
-                if (newError != null) {
-                    editorController.selectLinesInEditor(newError);
-                }
-            });
+        errorTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldError, newError) -> {
+            if (newError != null) {
+                editorController.selectLinesInEditor(newError);
+            }
+        });
         errorTableView.setItems(sortedErrors);
 
         MenuItem explain = new MenuItem("Explain");
@@ -441,13 +516,13 @@ public class FileModeController {
                 suggestionPanel.showError(error, false);
             }
         });
-        ContextMenu menu = new ContextMenu(explain, show);
-        menu.setOnShowing(e -> {
+        ContextMenu contextMenu = new ContextMenu(explain, show);
+        contextMenu.setOnShowing(e -> {
             boolean none = errorTableView.getSelectionModel().getSelectedItem() == null;
             explain.setDisable(none);
             show.setDisable(none);
         });
-        errorTableView.setContextMenu(menu);
+        errorTableView.setContextMenu(contextMenu);
     }
 
     /** Rebuilds the plugin choices from the errors of the current file, keeping the chosen plugin if possible. */
@@ -504,7 +579,7 @@ public class FileModeController {
             TableView<CorpusObject> table = (TableView<CorpusObject>) tab.getContent();
             Class<?> type = objects.get(0).getClass();
             if (!type.equals(table.getUserData())) {
-                table.getColumns().setAll(viewRegistry.columnsFor(type, viewContext, assistMessageLabel::setText));
+                table.getColumns().setAll(viewRegistry.columnsFor(type, viewContext, workbench.status()::warn));
                 table.setUserData(type);
             }
             table.getItems().setAll(objects);
@@ -591,118 +666,22 @@ public class FileModeController {
             && Objects.equals(a.getLabel(), b.getLabel());
     }
 
-    /** Services offered to object views. */
-    private final ViewContext viewContext = new ViewContext() {
-        @Override
-        public void selectInEditor(TextCoordinate span) {
-            if (span == null || project == null) return;
-            if (!isDisplayed(span)) {
-                project.document(span.text()).ifPresent(d -> fileListView.getSelectionModel().select(d));
-            }
-            if (isDisplayed(span)) {
-                editorController.selectInEditor(span);
-            }
-        }
-
-        private boolean isDisplayed(TextCoordinate span) {
-            return editorController.getSelectedDocument().map(d -> d.getId().equals(span.text())).orElse(false);
-        }
-
-        @Override
-        public void select(CorpusObject object) {
-            selectInEditor(object.getTextCoordinate());
-            editorController.selectedObjectProperty().set(object);
-        }
-
-        @Override
-        public String highlightColor(CorpusObject object) {
-            return editorController.getHighlightStyles().colorFor(object);
-        }
-
-        @Override
-        public CorpusView corpus() {
-            return corpus;
-        }
-
-        @Override
-        public boolean canEdit(CorpusObject object) {
-            return viewEdits.canEdit(object);
-        }
-
-        @Override
-        public EditOutcome setField(CorpusObject object, String fieldName, String value) {
-            return viewEdits.setField(object, fieldName, value);
-        }
-
-        @Override
-        public EditOutcome applyEdits(CorpusObject object, List<TextEdit> edits) {
-            return viewEdits.applyEdits(object, edits);
-        }
-
-        @Override
-        public EditOutcome addField(CorpusObject object, String fieldName, String value) {
-            return viewEdits.addField(object, fieldName, value);
-        }
-
-        @Override
-        public EditOutcome removeField(CorpusObject object, String fieldName) {
-            return viewEdits.removeField(object, fieldName);
-        }
-
-        @Override
-        public EditOutcome runTextAction(TextAction action) {
-            return editorController.getSelectedDocument()
-                .map(d -> viewEdits.runTextAction(d.getId(), action))
-                .orElseGet(() -> new EditOutcome.NotEditable("No file is displayed"));
-        }
-
-        @Override
-        public Optional<Path> projectDirectory() {
-            if (project == null || project.fileProperty().get() == null) return Optional.empty();
-            return Optional.ofNullable(project.fileProperty().get().toPath().toAbsolutePath().getParent());
-        }
-
-        @Override
-        public MediaPlayers mediaPlayers() {
-            return mediaPlayers;
-        }
-
-        @Override
-        public void showDocument(String uri) {
-            if (hostServices != null) {
-                hostServices.showDocument(uri);
-            }
-        }
-
-        @Override
-        public boolean undo(CorpusObject object) {
-            return viewEdits.undo(object);
-        }
-
-        @Override
-        public boolean redo(CorpusObject object) {
-            return viewEdits.redo(object);
-        }
-    };
+    // ------------------------------------------------------------------
+    // Toolbar of the editor
+    // ------------------------------------------------------------------
 
     /** Parses the edited file in the background; the views refresh when the results arrive. */
+    @FXML
     public void handleParseText() {
         editorController.parseEditedFile().exceptionally(e -> {
-            Platform.runLater(() -> ErrorReporter.report(
-                fileContentCodeArea.getScene() == null ? null : fileContentCodeArea.getScene().getWindow(),
-                "Parsing failed", e));
+            Platform.runLater(() -> ErrorReporter.report(window(), "Parsing failed", e));
             return null;
         });
     }
 
-    public InlineCssTextArea getFileContentArea() {
-        return editorController.getFileContentArea();
-    }
-
+    @FXML
     public void handleCloseFile() {
-        TextDocument selected = fileListView
-            .getSelectionModel()
-            .getSelectedItem();
+        TextDocument selected = fileListView.getSelectionModel().getSelectedItem();
         if (selected != null && UnsavedChangesDialog.confirm(window(), List.of(selected), "closing the file")) {
             project.removeFile(selected.getFilePath());
             if (!project.getDerivedFileList().isEmpty()) {
@@ -711,28 +690,12 @@ public class FileModeController {
         }
     }
 
-    public void openFileOrDirectory(File f) throws Exception {
-        if (f != null) {
-            if (f.isDirectory()) {
-                project.addDirectory(f.toPath(), true);
-            } else {
-                project.addFile(f.toPath());
-            }
-            if (!project.getDerivedFileList().isEmpty()) {
-                fileListView.getSelectionModel().select(0);
-            }
-            settings.recentFiles().add(f.toPath());
-        }
-    }
-
-    public void handleOpenDirectory(Stage primaryStage) throws Exception {
-        DirectoryChooser chooser = new DirectoryChooser();
-        File selected = chooser.showDialog(primaryStage);
-        if (selected != null) {
-            project.addDirectory(selected.toPath(), true);
-            if (!project.getDerivedFileList().isEmpty()) {
-                fileListView.getSelectionModel().select(0);
-            }
+    @FXML
+    public void handleSaveCurrentFile() {
+        try {
+            editorController.saveEditedFile();
+        } catch (IOException e) {
+            ErrorReporter.report(window(), "Error saving file", e);
         }
     }
 
@@ -740,41 +703,7 @@ public class FileModeController {
         return editorController;
     }
 
-    public java.util.List<String> getOpenedFiles() {
-        java.util.List<String> files = new java.util.ArrayList<>();
-        for (TextDocument parser : project.getDerivedFileList()) {
-            files.add(parser.getFilePath().toString());
-        }
-        return files;
-    }
-
-    public void handleSaveCurrentFile() throws IOException {
-        editorController.saveEditedFile();
-    }
-
-    public void setHostServices(HostServices hostServices) {
-        this.hostServices = hostServices;
-    }
-
-    /** Saves every document with unsaved changes (some may have been changed by views only). */
-    public void handleSaveAll() throws IOException {
-        if (project != null) {
-            project.saveAll();
-        }
-    }
-
-    private javafx.stage.Window window() {
-        return fileContentCodeArea.getScene() == null ? null : fileContentCodeArea.getScene().getWindow();
-    }
-
-    /** Plays or pauses the media segment at the caret of the editor. */
-    public void playSegmentAtCaret() {
-        editorController.playSegmentAtCaret();
-    }
-
-    /** Stops the background threads of the view editing service and closes the media players. */
-    public void shutdown() {
-        viewEdits.close();
-        mediaPlayers.closeAll();
+    private Window window() {
+        return root.getScene() == null ? workbench.window() : root.getScene().getWindow();
     }
 }

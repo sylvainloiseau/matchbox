@@ -1,28 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Hyperlink?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.CheckMenuItem?>
+<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.SeparatorMenuItem?>
-<?import javafx.scene.control.ToggleButton?>
-<?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.control.ToolBar?>
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.paint.Color?>
-<?import javafx.scene.text.Font?>
 <VBox
     fx:id="mainBorderPane"
     style="-fx-background-color: #cccccc;"
     xmlns="http://javafx.com/javafx/19"
     xmlns:fx="http://javafx.com/fxml/1"
 >
-        <MenuBar VBox.vgrow="NEVER">
+        <MenuBar fx:id="menuBar" VBox.vgrow="NEVER">
             <Menu fx:id="fileMenu" text="File">
             <items>
             <MenuItem
@@ -175,69 +172,33 @@
                     text="Redo"
                 />
                   <MenuItem
+                    fx:id="playSegmentMenuItem"
                     mnemonicParsing="false"
                     onAction="#handlePlaySegmentMenuItem"
-                    text="Play media segment at caret (⇧⌘Space)"
-                />
-                  <MenuItem
-                    fx:id="searchMenuItem"
-                    mnemonicParsing="false"
-                    onAction="#handleSearchMenuItem"
-                    text="Search"
+                    text="Play media segment (⇧⌘Space)"
                 />
                 </items>
               </Menu>
-      <Menu mnemonicParsing="false" text="Insert">
-        <items>
-          <MenuItem
+              <!-- the modes are listed first (ModeHost); the active mode's menu follows this menu -->
+              <Menu fx:id="viewMenu" text="View">
+                <items>
+                  <SeparatorMenuItem mnemonicParsing="false" />
+                  <MenuItem
+                    fx:id="backMenuItem"
                     mnemonicParsing="false"
-                    text="Insert intermorphemic gloss"
+                    onAction="#handleBack"
+                    text="Back"
                 />
-            <MenuItem
+                  <MenuItem
+                    fx:id="forwardMenuItem"
                     mnemonicParsing="false"
-                    text="Insert lexical information"
+                    onAction="#handleForward"
+                    text="Forward"
                 />
-        </items>
-      </Menu>
+                </items>
+              </Menu>
             <Menu fx:id="assistantMenu" text="Assistant">
               <items>
-                <MenuItem
-                    mnemonicParsing="false"
-                    onAction="#handleSuggestCompletion"
-                    text="Suggest completion (Ctrl+Space)"
-                />
-                <CheckMenuItem
-                    fx:id="inlineSuggestionsMenuItem"
-                    mnemonicParsing="false"
-                    text="Inline suggestions"
-                />
-                <SeparatorMenuItem mnemonicParsing="false" />
-                <MenuItem
-                    mnemonicParsing="false"
-                    onAction="#handleExplainError"
-                    text="Explain error at cursor"
-                />
-                <MenuItem
-                    mnemonicParsing="false"
-                    onAction="#handleReviewBlock"
-                    text="Review current block"
-                />
-                <MenuItem
-                    mnemonicParsing="false"
-                    onAction="#handleReviewSelection"
-                    text="Review selection"
-                />
-                <MenuItem
-                    mnemonicParsing="false"
-                    onAction="#handleReviewFile"
-                    text="Review whole file"
-                />
-                <SeparatorMenuItem mnemonicParsing="false" />
-                <CheckMenuItem
-                    fx:id="suggestionPanelMenuItem"
-                    mnemonicParsing="false"
-                    text="Suggestions panel"
-                />
                 <MenuItem
                     mnemonicParsing="false"
                     onAction="#handleRefreshExamples"
@@ -262,7 +223,9 @@
               </items>
             </Menu>
         </MenuBar>
+        <!-- Back/Forward, then one button per mode (ModeHost) -->
         <ToolBar
+        fx:id="toolBar"
         maxHeight="40.0"
         minHeight="40.0"
         prefHeight="40.0"
@@ -270,84 +233,32 @@
         VBox.vgrow="NEVER"
     >
           <items>
-          <fx:define>
-               <ToggleGroup fx:id="viewToggleGroup">
-               </ToggleGroup>
-            </fx:define>
-         <ToggleButton
-                fx:id="fileModeToggleButton"
-                mnemonicParsing="false"
-                selected="true"
-                text="File Mode"
-            >
-            <toggleGroup>
-               <ToggleGroup fx:id="viewToggleGroup" />
-            </toggleGroup></ToggleButton>
-         <ToggleButton
-                fx:id="corpusViewToggleButton"
-                mnemonicParsing="false"
-                prefHeight="25.0"
-                prefWidth="90.0"
-                text="Corpus View"
-                toggleGroup="$viewToggleGroup"
-            >
-            </ToggleButton>
-         <ToggleButton
-                fx:id="tagViewToggleButton"
-                mnemonicParsing="false"
-                prefHeight="25.0"
-                prefWidth="82.0"
-                text="Tag View"
-                toggleGroup="$viewToggleGroup"
-            />
+            <Button fx:id="backButton" mnemonicParsing="false" onAction="#handleBack" text="◀" />
+            <Button fx:id="forwardButton" mnemonicParsing="false" onAction="#handleForward" text="▶" />
+            <Separator orientation="VERTICAL" />
           </items>
         </ToolBar>
    <AnchorPane
         fx:id="viewPane"
         VBox.vgrow="ALWAYS"
     />
+   <!-- status bar: messages of the status line (left), focus and assistant status (right) -->
    <HBox
         id="HBox"
         alignment="CENTER_LEFT"
-        maxHeight="14.0"
-        minHeight="14.0"
-        prefHeight="14.0"
+        maxHeight="18.0"
+        minHeight="18.0"
+        prefHeight="18.0"
         spacing="5.0"
+        style="-fx-padding: 0 4 0 4;"
         VBox.vgrow="NEVER"
     >
       <children>
-         <Label
-                maxHeight="14.0"
-                minHeight="14.0"
-                prefHeight="14.0"
-                maxWidth="-1.0"
-                text="Left status"
-                HBox.hgrow="ALWAYS"
-            >
-            <font>
-               <Font size="11.0" fx:id="x3" />
-            </font>
-            <textFill>
-               <Color red="0.625" green="0.625" blue="0.625" fx:id="x4" />
-            </textFill>
-         </Label>
+         <Label fx:id="statusMessageLabel" style="-fx-font-size: 11;" />
+         <Hyperlink fx:id="statusLink" style="-fx-font-size: 11; -fx-padding: 0;" />
          <Pane prefHeight="-1.0" prefWidth="-1.0" HBox.hgrow="ALWAYS" />
-         <Label
-                fx:id="statusBarRightLabel"
-                font="$x3"
-                maxHeight="14.0"
-                minHeight="14.0"
-                prefHeight="14.0"
-                maxWidth="-1.0"
-                prefWidth="295.0"
-                textFill="#0d0000"
-                HBox.hgrow="NEVER"
-            />
+         <Label fx:id="focusLabel" style="-fx-font-size: 11; -fx-text-fill: #555555;" />
+         <Hyperlink fx:id="assistStatusLink" style="-fx-font-size: 11; -fx-padding: 0;" />
       </children>
-      <!--
-      <padding>
-         <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />
-      </padding>
-      -->
    </HBox>
 </VBox>

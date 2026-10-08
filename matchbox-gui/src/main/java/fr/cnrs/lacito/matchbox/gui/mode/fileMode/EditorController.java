@@ -1,8 +1,7 @@
 package fr.cnrs.lacito.matchbox.gui.mode.fileMode;
 
 import fr.cnrs.lacito.matchbox.assist.prompt.PromptBuilder;
-import fr.cnrs.lacito.matchbox.corpus.Corpus;
-import fr.cnrs.lacito.matchbox.corpus.CorpusListener;
+import fr.cnrs.lacito.matchbox.corpus.CorpusView;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.corpus.Text;
@@ -12,19 +11,15 @@ import fr.cnrs.lacito.matchbox.corpus.TextId;
 import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
 import fr.cnrs.lacito.matchbox.grammarfx.TextAction;
 import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
-import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
-import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayers;
-import fr.cnrs.lacito.matchbox.grammarfx.media.MediaResolver;
-import fr.cnrs.lacito.matchbox.grammarfx.metadata.MediaPaths;
 import fr.cnrs.lacito.matchbox.corpus.capability.MediaSegment;
 import fr.cnrs.lacito.matchbox.gui.view.HighlightStyles;
+import fr.cnrs.lacito.matchbox.gui.workbench.SelectionTracker;
+import fr.cnrs.lacito.matchbox.gui.workbench.Workbench;
 import fr.cnrs.lacito.matchbox.model.DocumentChange;
 import fr.cnrs.lacito.matchbox.model.DocumentListener;
 import fr.cnrs.lacito.matchbox.model.EditOrigin;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
-import fr.cnrs.lacito.matchbox.model.TextHistory;
 import fr.cnrs.lacito.matchbox.model.project.Project;
-import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -33,7 +28,6 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.Comparator;
 import java.util.List;
@@ -45,7 +39,6 @@ import javafx.application.Platform;
 import javafx.beans.binding.BooleanExpression;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.Button;
@@ -68,8 +61,9 @@ import org.reactfx.EventStream;
  *
  * <p>The document owns the text: the user's typing is forwarded to it at once (one change per
  * keystroke, paste…), and the changes made by others (views, assistant, search, undo) are mirrored
- * in the code area. The undo history is the document's ({@link TextHistory}), so it survives a
- * change of file and contains the changes made while the document was not displayed.
+ * in the code area. Undo and redo use the project's journal
+ * ({@link fr.cnrs.lacito.matchbox.model.EditJournal}), which records the changes of every document.
+ * The selected object is kept across re-parses by a {@link SelectionTracker}.
  */
 public class EditorController {
 
@@ -77,15 +71,14 @@ public class EditorController {
 
     private final InlineCssTextArea textArea;
     private TextDocument document;
-    private Corpus corpus;
+    private CorpusView corpus;
     private Project project;
+    private final Workbench workbench;
 
     private final HighlightStyles highlightStyles;
     private final SimpleBooleanProperty currentTextCouldBeWrittenDownProperty = new SimpleBooleanProperty(false);
     private final SimpleBooleanProperty currentTextCouldBeReparsedProperty = new SimpleBooleanProperty(false);
     private final SimpleBooleanProperty closableProperty = new SimpleBooleanProperty(false);
-    private final SimpleBooleanProperty undoAvailable = new SimpleBooleanProperty(false);
-    private final SimpleBooleanProperty redoAvailable = new SimpleBooleanProperty(false);
 
     /**
      * True while provisional text (an inline suggestion shown in grey) is inserted or removed:
@@ -100,33 +93,23 @@ public class EditorController {
     private static final String PREVIEW_STYLE = "-rtfx-background-color: #ffd8a8;";
     /** Style of the line of a media segment while it plays. */
     private static final String PLAYING_STYLE = "-rtfx-background-color: #c8f0c8;";
-    private final CorpusListener corpusListener = (id, before, after) -> onCorpusTextChanged(id);
     private final DocumentListener mirror = this::mirror;
 
     /** Top-level corpus objects of the current file, grammars in rank order. */
     private final ObservableList<CorpusObject> currentFileObjects = FXCollections.observableArrayList();
     private final ObservableList<Diagnostic> currentFileErrors = FXCollections.observableArrayList();
     /** Object selected in the editor, a table or a view (may be a nested object, of any file). */
-    private final ObjectProperty<CorpusObject> selectedObject = new SimpleObjectProperty<>();
-    /** Text and offset of the last change made by a view, to re-select the edited object. */
-    private TextId lastEditText;
-    private int lastEditOffset = -1;
-    /** Object to select after the next parse of a text (set by a text action). */
-    private TextId pendingSelectText;
-    private int pendingSelectOffset = -1;
+    private final SelectionTracker selection;
 
     /** Actions plugins offer on the displayed text, shown in the margin of their line. */
     private List<TextActionProvider> actionProviders = List.of();
-    private ViewContext actionContext;
-    private Consumer<String> status = message -> {};
     private final Set<TextActionProvider> failedProviders = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    public EditorController(
-        InlineCssTextArea codeArea,
-        UserSettings settings
-    ) {
+    public EditorController(InlineCssTextArea codeArea, Workbench workbench) {
         this.textArea = codeArea;
-        // the undo history is the document's
+        this.workbench = workbench;
+        this.selection = new SelectionTracker(workbench.editHints());
+        // the undo history is the project's journal
         this.textArea.setUndoManager(UndoUtils.noOpUndoManager());
         Nodes.addInputMap(textArea, InputMap.sequence(
             InputMap.consume(EventPattern.keyPressed(KeyCode.Z, KeyCombination.SHORTCUT_DOWN), e -> undo()),
@@ -141,24 +124,27 @@ public class EditorController {
             .filter(changes -> !ghostOperation && !mirroring && document != null)
             .subscribe(this::forward);
 
-        this.highlightStyles = new HighlightStyles(settings);
+        this.highlightStyles = workbench.highlightStyles();
+        var settings = workbench.settings();
         // show colour changes made in the settings immediately
         settings.igtColorProperty().addListener((obs, o, n) -> highlightText());
         settings.lexicalColorProperty().addListener((obs, o, n) -> highlightText());
         settings.tagColorProperty().addListener((obs, o, n) -> highlightText());
         clearEditor();
+        workbench.session().addCorpusListener((id, before, after) -> onCorpusTextChanged(id));
+        // play buttons and the highlight follow what is playing
+        workbench.mediaPlayers().playingProperty().addListener((obs, o, n) -> {
+            refreshTextActions(displayedText());
+            highlightText();
+        });
 
         this.textArea.setOnMouseClicked(e -> handleCodeAreaClick());
     }
 
     public void setProject(Project project) {
-        if (this.corpus != null) {
-            this.corpus.removeListener(corpusListener);
-        }
         clearEditor();
         this.project = project;
         this.corpus = project.getCorpus();
-        this.corpus.addListener(corpusListener);
     }
 
     public HighlightStyles getHighlightStyles() {
@@ -233,10 +219,8 @@ public class EditorController {
             refreshFromCorpus();
         } else {
             // the selected object may belong to a text that is not displayed (edited by a view)
-            CorpusObject previous = selectedObject.get();
-            if (previous != null && previous.getTextCoordinate().text().equals(id)
-                && corpus.textOf(previous).isEmpty()) {
-                selectedObject.set(findSuccessor(previous).orElse(null));
+            if (corpus != null) {
+                selection.textChanged(id, corpus, false);
             }
         }
     }
@@ -247,29 +231,23 @@ public class EditorController {
 
     /** Reloads objects and errors of the current file and keeps the selection if possible. */
     private void refreshFromCorpus() {
-        CorpusObject previous = selectedObject.get();
         Optional<Text> text = displayedText();
         currentFileObjects.setAll(text.map(Text::objects).orElse(List.of()));
         currentFileErrors.setAll(text.map(Text::diagnostics).orElse(List.of()));
         highlightText();
-        if (previous != null && corpus.textOf(previous).isEmpty()) {
-            selectedObject.set(findSuccessor(previous).orElse(null));
-        }
-        if (document != null && document.getId().equals(pendingSelectText)) {
-            int offset = pendingSelectOffset;
-            pendingSelectText = null;
-            text.flatMap(t -> t.objectAt(offset)).ifPresent(selectedObject::set);
+        if (document != null) {
+            selection.textChanged(document.getId(), corpus, true);
         }
         refreshTextActions(text);
     }
 
     /** ▶ (or ⏸ while it plays) for a media segment; greyed, with the reason as tooltip, if it cannot be played. */
     private Button playButton(MediaSegment segment) {
-        boolean playing = isPlaying(segment);
+        boolean playing = workbench.playback().isPlaying(segment);
         Button button = new Button(playing ? "⏸" : "▶");
         button.setStyle("-fx-font-size: 0.8em; -fx-padding: 0 4 0 4;");
         button.setFocusTraversable(false);
-        String problem = playProblem(segment);
+        String problem = workbench.playback().problem(segment);
         if (problem != null) {
             button.setOpacity(0.4);
             button.setTooltip(new Tooltip(problem));
@@ -277,14 +255,8 @@ public class EditorController {
             button.setTooltip(new Tooltip((playing ? "Pause " : "Play ")
                 + (segment.getCaption().isEmpty() ? "the segment" : segment.getCaption()) + " (⇧⌘Space)"));
         }
-        button.setOnAction(e -> toggle(segment));
+        button.setOnAction(e -> workbench.playback().toggle(segment));
         return button;
-    }
-
-    /** After the next parse of {@code text}, selects the object at {@code offset}. */
-    public void selectAfterParse(TextId text, int offset) {
-        this.pendingSelectText = text;
-        this.pendingSelectOffset = offset;
     }
 
     // ------------------------------------------------------------------
@@ -292,19 +264,12 @@ public class EditorController {
     // ------------------------------------------------------------------
 
     /**
-     * @param providers actions offered by plugins on the displayed text
-     * @param context   runs the actions ({@link ViewContext#runTextAction})
-     * @param status    receives the message of an action that could not be applied
+     * @param providers actions offered by plugins on the displayed text, run through the window's
+     *                  {@code ViewContext}; messages go to the status line
      */
-    public void setTextActions(List<TextActionProvider> providers, ViewContext context, Consumer<String> status) {
+    public void setTextActions(List<TextActionProvider> providers) {
         this.actionProviders = List.copyOf(providers);
-        this.actionContext = context;
-        this.status = status;
-        // play buttons and the highlight follow what is playing
-        context.mediaPlayers().playingProperty().addListener((obs, o, n) -> {
-            refreshTextActions(displayedText());
-            highlightText();
-        });
+        refreshTextActions(displayedText());
     }
 
     // ------------------------------------------------------------------
@@ -316,63 +281,18 @@ public class EditorController {
         dismissGhost();
         Optional<MediaSegment> segment = displayedText().flatMap(t -> SegmentAtCaret.find(t, textArea.getCaretPosition()));
         if (segment.isEmpty()) {
-            status.accept("No media segment at the caret");
+            workbench.status().info("No media segment at the caret");
             return;
         }
-        toggle(segment.get());
-    }
-
-    /** Plays a segment, or pauses it if it is playing; problems go to the status line. */
-    private void toggle(MediaSegment segment) {
-        if (actionContext == null) return;
-        Optional<Path> file = playableFile(segment, true);
-        if (file.isEmpty()) return;
-        MediaPlayers players = actionContext.mediaPlayers();
-        if (players.isPlaying(file.get(), segment.getRange())) {
-            players.pause();
-        } else {
-            players.play(file.get(), segment.getRange());
-            players.error(file.get()).ifPresent(e -> status.accept("Cannot play " + file.get().getFileName() + ": " + e));
-        }
-    }
-
-    /** The resolved file of a segment if it can be played; otherwise the reason (reported if asked). */
-    private Optional<Path> playableFile(MediaSegment segment, boolean report) {
-        String problem = playProblem(segment);
-        if (problem != null) {
-            if (report) status.accept(problem);
-            return Optional.empty();
-        }
-        status.accept("");
-        return MediaResolver.resolve(segment, actionContext.corpus(), actionContext.projectDirectory()).file().path();
-    }
-
-    /** Why a segment cannot be played, or null. */
-    private String playProblem(MediaSegment segment) {
-        MediaResolver.Resolution r = MediaResolver.resolve(segment, actionContext.corpus(), actionContext.projectDirectory());
-        if (r.source() == MediaResolver.Source.NONE) {
-            return "No media file: write one after @media, or a \"media:\" entry in the section or the header";
-        }
-        if (r.isUrl()) return "Remote media are not played";
-        if (!r.file().exists()) return "File not found: " + r.file().path().map(Path::toString).orElse("");
-        if (MediaPaths.kindOf(r.file().path().get()) == MediaPaths.Kind.UNSUPPORTED) {
-            return "Format not supported by the player";
-        }
-        return null;
-    }
-
-    private boolean isPlaying(MediaSegment segment) {
-        if (actionContext == null || actionContext.mediaPlayers().playingProperty().get().isEmpty()) return false;
-        return MediaResolver.resolve(segment, actionContext.corpus(), actionContext.projectDirectory()).file().path()
-            .map(p -> actionContext.mediaPlayers().isPlaying(p, segment.getRange()))
-            .orElse(false);
+        workbench.playback().toggle(segment.get());
     }
 
     /** Shows the actions of the parsed text as buttons in the margin of their line (never in the text). */
     private void refreshTextActions(Optional<Text> text) {
         Map<Integer, List<TextAction>> byParagraph = new TreeMap<>();
         Map<Integer, List<MediaSegment>> segmentsByParagraph = new TreeMap<>();
-        if (text.isPresent() && actionContext != null) {
+        var actionContext = workbench.viewContext();
+        if (text.isPresent()) {
             for (MediaSegment segment : text.get().objectsOf(MediaSegment.class)) {
                 int offset = Math.max(0, Math.min(segment.getTextCoordinate().startIndex(), textArea.getLength()));
                 int paragraph = textArea.offsetToPosition(offset, TwoDimensional.Bias.Forward).getMajor();
@@ -413,8 +333,12 @@ public class EditorController {
                 if (!action.description().isBlank()) button.setTooltip(new Tooltip(action.description()));
                 button.setFocusTraversable(false);
                 button.setOnAction(e -> {
-                    EditOutcome outcome = actionContext.runTextAction(action);
-                    status.accept(outcome.isApplied() ? "" : outcome.message());
+                    EditOutcome outcome = actionContext.runTextAction(text.get().id(), action);
+                    if (outcome.isApplied()) {
+                        workbench.status().clear();
+                    } else {
+                        workbench.status().warn(outcome.message());
+                    }
                 });
                 box.getChildren().add(button);
             }
@@ -422,47 +346,10 @@ public class EditorController {
         });
     }
 
-    /** Records where a view changed a text, so that the edited object is selected again. */
-    public void rememberEdit(TextId text, int offset) {
-        this.lastEditText = text;
-        this.lastEditOffset = offset;
-    }
-
-    /**
-     * After a re-parse all objects are new instances: find the object that replaces
-     * {@code previous}. After a view edit, the object of the same kind containing the edit;
-     * otherwise preferably an object of the same kind and label (the closest one to the previous
-     * position, which may have moved if text was inserted before it), otherwise the object of the
-     * same kind containing the previous start offset.
-     */
-    private Optional<CorpusObject> findSuccessor(CorpusObject previous) {
-        TextId id = previous.getTextCoordinate().text();
-        Optional<Text> text = corpus.text(id);
-        if (text.isEmpty()) {
-            return Optional.empty();
-        }
-        int start = previous.getTextCoordinate().startIndex();
-        List<CorpusObject> sameKind = text.get().flatten()
-            .filter(o -> o.getKind().equals(previous.getKind()))
-            .toList();
-        Optional<CorpusObject> edited = Optional.empty();
-        if (id.equals(lastEditText) && lastEditOffset >= 0) {
-            edited = sameKind.stream()
-                .filter(o -> o.getTextCoordinate().contains(lastEditOffset)
-                    || o.getTextCoordinate().stopIndex() + 1 == lastEditOffset)
-                .reduce((a, b) -> b);
-        }
-        return edited
-            .or(() -> sameKind.stream()
-                .filter(o -> Objects.equals(o.getLabel(), previous.getLabel()))
-                .min(Comparator.comparingInt(o -> Math.abs(o.getTextCoordinate().startIndex() - start))))
-            .or(() -> sameKind.stream().filter(o -> o.getTextCoordinate().contains(start)).findFirst());
-    }
-
     private void handleCodeAreaClick() {
         dismissGhost();
         int caretPosition = textArea.getCaretPosition();
-        displayedText().flatMap(t -> t.objectAt(caretPosition)).ifPresent(selectedObject::set);
+        displayedText().flatMap(t -> t.objectAt(caretPosition)).ifPresent(selection::set);
     }
 
     /** Highlights every corpus object of the file: grammars in rank order, parents before children. */
@@ -494,7 +381,7 @@ public class EditorController {
         }));
         // the media segments being played
         displayedText().ifPresent(text -> text.objectsOf(MediaSegment.class).stream()
-            .filter(this::isPlaying)
+            .filter(workbench.playback()::isPlaying)
             .forEach(s -> {
                 TextCoordinate span = s.getTextCoordinate();
                 int end = Math.min(length, span.stopIndex() + 1);
@@ -567,10 +454,6 @@ public class EditorController {
 
         currentTextCouldBeWrittenDownProperty.bind(selected.getCouldBeWrittenBooleanProperty());
         currentTextCouldBeReparsedProperty.bind(selected.getCouldBeReparsedBooleanProperty());
-        project.history(selected.getId()).ifPresent(h -> {
-            undoAvailable.bind(h.undoAvailableProperty());
-            redoAvailable.bind(h.redoAvailableProperty());
-        });
         closableProperty.set(true);
     }
 
@@ -594,10 +477,6 @@ public class EditorController {
         currentTextCouldBeWrittenDownProperty.set(false);
         currentTextCouldBeReparsedProperty.unbind();
         currentTextCouldBeReparsedProperty.set(false);
-        undoAvailable.unbind();
-        undoAvailable.set(false);
-        redoAvailable.unbind();
-        redoAvailable.set(false);
         closableProperty.set(false);
         mirroring = true;
         try {
@@ -606,7 +485,7 @@ public class EditorController {
             mirroring = false;
         }
         textArea.setEditable(false);
-        this.selectedObject.set(null);
+        this.selection.set(null);
         this.currentFileObjects.clear();
         this.currentFileErrors.clear();
     }
@@ -623,28 +502,16 @@ public class EditorController {
         return currentTextCouldBeReparsedProperty;
     }
 
-    public BooleanExpression undoAvailableProperty() {
-        return undoAvailable;
-    }
-
-    public BooleanExpression redoAvailableProperty() {
-        return redoAvailable;
-    }
-
-    /** Undoes the last change of the displayed document. */
+    /** Undoes the last change of the project (the journal is project-wide). */
     public void undo() {
         dismissGhost();
-        if (document != null) {
-            project.history(document.getId()).ifPresent(TextHistory::undo);
-        }
+        workbench.undo();
     }
 
-    /** Applies again the last undone change of the displayed document. */
+    /** Applies again the last undone change of the project. */
     public void redo() {
         dismissGhost();
-        if (document != null) {
-            project.history(document.getId()).ifPresent(TextHistory::redo);
-        }
+        workbench.redo();
     }
 
     public void saveEditedFile() throws IOException {
@@ -678,7 +545,7 @@ public class EditorController {
     }
 
     public ObjectProperty<CorpusObject> selectedObjectProperty() {
-        return selectedObject;
+        return selection.selectedProperty();
     }
 
     public InlineCssTextArea getFileContentArea() {
@@ -739,7 +606,7 @@ public class EditorController {
     public boolean applyEdits(List<TextEdit> edits) {
         if (document == null || edits.isEmpty()) return false;
         dismissGhost();
-        if (!document.applyEdits(edits, EditOrigin.of(EditOrigin.Kind.ASSIST, "assistant"))) {
+        if (!document.applyEdits(edits, EditOrigin.of(EditOrigin.Kind.ASSIST, "assistant", "Apply suggestion"))) {
             return false;
         }
         TextEdit first = edits.stream().min(Comparator.comparingInt(TextEdit::start)).orElseThrow();
@@ -753,7 +620,7 @@ public class EditorController {
     public boolean applySearchEdits(List<TextEdit> edits) {
         if (document == null || edits.isEmpty()) return false;
         dismissGhost();
-        return document.applyEdits(edits, EditOrigin.of(EditOrigin.Kind.SEARCH, "search"));
+        return document.applyEdits(edits, EditOrigin.of(EditOrigin.Kind.SEARCH, "search", "Replace"));
     }
 
     /** Highlights a range temporarily (e.g. while the pointer is over a suggestion). */

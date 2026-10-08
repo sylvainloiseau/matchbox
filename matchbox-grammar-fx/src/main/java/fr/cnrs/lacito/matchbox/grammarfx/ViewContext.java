@@ -4,6 +4,7 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.CorpusView;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.TextId;
 import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayers;
 import fr.cnrs.lacito.matchbox.grammarfx.media.SharedMediaPlayers;
 import fr.cnrs.lacito.matchbox.grammarfx.metadata.MetadataSchema;
@@ -18,13 +19,21 @@ import java.util.Optional;
  * asks for text edits ({@link #setField}, {@link #applyEdits}). The application applies them to
  * the object's document, as one undoable change, whether or not the document is shown in the
  * editor, and parses it again; the view is then refreshed with the new object.
+ *
+ * <p>One instance serves all the views of a window, whatever mode of the application shows them.
  */
 public interface ViewContext {
 
-    /** Opens the file of the span if needed, and selects the span in the editor. */
+    /**
+     * Shows the span in the text editor: the application switches to the mode that owns the
+     * editor (File Mode) if needed, opens the file of the span and selects it.
+     */
     void selectInEditor(TextCoordinate span);
 
-    /** Selects the object in the application (table, detail pane and editor). */
+    /**
+     * Selects the object in the application: in the mode currently shown if it can show the
+     * object, otherwise in the editor (File Mode).
+     */
     void select(CorpusObject object);
 
     /** Highlight colour used in the editor for this object, as a CSS colour (e.g. {@code "#ffeeaa"}). */
@@ -72,12 +81,21 @@ public interface ViewContext {
     }
 
     /**
-     * Applies the edits of a text action (see {@link TextActionProvider}) to the displayed
-     * document, as one undoable change, and selects the object at {@link TextAction#selectOffset()}
-     * once the text is parsed again.
+     * Applies the edits of a text action (see {@link TextActionProvider}) to the text the user is
+     * working on (the displayed document in File Mode), as one undoable change, and selects the
+     * object at {@link TextAction#selectOffset()} once the text is parsed again.
      */
     default EditOutcome runTextAction(TextAction action) {
         return new EditOutcome.NotEditable("Editing is not available");
+    }
+
+    /**
+     * Applies the edits of a text action to the given text (the one the action was computed for),
+     * as one undoable change, and selects the object at {@link TextAction#selectOffset()} once the
+     * text is parsed again.
+     */
+    default EditOutcome runTextAction(TextId text, TextAction action) {
+        return runTextAction(action);
     }
 
     /** Directory of the saved project file, if any (used to resolve relative paths). */
@@ -102,12 +120,15 @@ public interface ViewContext {
         return MetadataSchema.DEFAULT;
     }
 
-    /** Undoes the last change of the object's document. */
+    /**
+     * Undoes the last change of the project (the undo journal is project-wide: the change may be
+     * in another document than the object's).
+     */
     default boolean undo(CorpusObject object) {
         return false;
     }
 
-    /** Applies again the last undone change of the object's document. */
+    /** Applies again the last undone change of the project. */
     default boolean redo(CorpusObject object) {
         return false;
     }

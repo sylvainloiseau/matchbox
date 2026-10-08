@@ -25,13 +25,14 @@ class TextDocumentTest {
     private TextDocument document;
     private final List<DocumentChange> changes = new ArrayList<>();
     private long now;
-    private TextHistory history;
+    private EditJournal history;
 
     @BeforeEach
     void setUp() throws IOException {
         document = new TextDocument(Files.writeString(dir.resolve("a.txt"), "hello world"));
         document.addChangeListener(changes::add);
-        history = new TextHistory(document, () -> now);
+        history = new EditJournal(() -> now);
+        history.track(document);
     }
 
     @Test
@@ -58,7 +59,7 @@ class TextDocumentTest {
         assertTrue(document.applySequential(List.of(delete, insert), TYPING));
         assertEquals("world hello", document.getCurrentText());
         assertEquals(1, changes.size());
-        assertTrue(history.undo());
+        assertTrue(history.undo().isPresent());
         assertEquals("hello world", document.getCurrentText());
     }
 
@@ -68,7 +69,7 @@ class TextDocumentTest {
         document.replaceAll("hello there", TYPING);
         assertTrue(document.getCouldBeWritten());
         assertTrue(document.getCouldBeReparsed());
-        history.undo();
+        history.undo().isPresent();
         assertFalse(document.getCouldBeWritten(), "back to the saved text");
         document.replaceAll("saved", TYPING);
         document.writeFile();
@@ -97,15 +98,15 @@ class TextDocumentTest {
         document.applyEdits(List.of(TextEdit.replace(text, 0, 5, "HELLO")), VIEW);
         assertEquals("HELLO world!!", document.getCurrentText());
 
-        assertTrue(history.undo());
+        assertTrue(history.undo().isPresent());
         assertEquals("hello world!!", document.getCurrentText());
-        assertTrue(history.undo());
+        assertTrue(history.undo().isPresent());
         assertEquals("hello world", document.getCurrentText(), "both characters in one step");
-        assertFalse(history.undo());
+        assertFalse(history.undo().isPresent());
 
-        assertTrue(history.redo());
+        assertTrue(history.redo().isPresent());
         assertEquals("hello world!!", document.getCurrentText());
-        assertTrue(history.redo());
+        assertTrue(history.redo().isPresent());
         assertEquals("HELLO world!!", document.getCurrentText());
         assertFalse(history.redoAvailableProperty().get());
     }
@@ -113,16 +114,16 @@ class TextDocumentTest {
     @Test
     void typingAfterADelayIsANewStep() {
         type(11, "!");
-        now += TextHistory.MERGE_DELAY_MS + 1;
+        now += EditJournal.MERGE_DELAY_MS + 1;
         type(12, "?");
-        history.undo();
+        history.undo().isPresent();
         assertEquals("hello world!", document.getCurrentText());
     }
 
     @Test
     void aNewChangeClearsRedo() {
         type(11, "!");
-        history.undo();
+        history.undo().isPresent();
         assertTrue(history.redoAvailableProperty().get());
         type(0, ">");
         assertFalse(history.redoAvailableProperty().get());
@@ -133,7 +134,7 @@ class TextDocumentTest {
         String text = document.getCurrentText();
         document.applyEdits(List.of(TextEdit.replace(text, 0, 1, "JJJ"), TextEdit.replace(text, 6, 11, "")), VIEW);
         assertEquals("JJJello ", document.getCurrentText());
-        history.undo();
+        history.undo().isPresent();
         assertEquals("hello world", document.getCurrentText());
     }
 

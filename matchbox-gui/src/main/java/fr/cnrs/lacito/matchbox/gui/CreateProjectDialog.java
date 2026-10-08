@@ -1,6 +1,5 @@
 package fr.cnrs.lacito.matchbox.gui;
 
-import fr.cnrs.lacito.matchbox.gui.mode.FileModeController;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.model.project.ProjectXMLSerializer;
 import java.io.File;
@@ -14,17 +13,14 @@ import javafx.stage.Stage;
 public class CreateProjectDialog {
 
     private Stage parentStage;
-    private FileModeController fileModeController;
     private File projectFile;
     private Project project;
 
     public CreateProjectDialog(
         Stage parentStage,
-        FileModeController fileModeController,
         Project project
     ) {
         this.parentStage = parentStage;
-        this.fileModeController = fileModeController;
         this.project = project;
     }
 

@@ -2,14 +2,15 @@ package fr.cnrs.lacito.matchbox.gui;
 
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
-import fr.cnrs.lacito.matchbox.gui.mode.FileModeController;
-import fr.cnrs.lacito.matchbox.settings.AssistSettingsData;
-import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
-import fr.cnrs.lacito.matchbox.settings.UserSettings;
+import fr.cnrs.lacito.matchbox.gui.mode.ModeHost;
+import fr.cnrs.lacito.matchbox.gui.mode.Modes;
+import fr.cnrs.lacito.matchbox.gui.workbench.Focus;
+import fr.cnrs.lacito.matchbox.gui.workbench.Workbench;
+import fr.cnrs.lacito.matchbox.gui.workbench.WorkbenchCommands;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.model.project.ProjectXMLSerializer;
+import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -17,41 +18,54 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
 import javafx.beans.Observable;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import org.fxmisc.richtext.InlineCssTextArea;
 
 /**
- * Main controller for the Notebook application
+ * The main window: its menus, toolbar and status bar, and the window's services
+ * ({@link Workbench}) shared by the modes shown in the main area ({@link ModeHost}). The window's
+ * menus are mode-independent ({@link WorkbenchCommands}); each mode adds its own menu.
  */
 public class MainController {
 
     private static final Logger logger = Logger.getLogger(MainController.class.getName());
 
+    private static final KeyCombination BACK = new KeyCodeCombination(KeyCode.LEFT,
+        KeyCombination.SHORTCUT_DOWN, KeyCombination.ALT_DOWN);
+    private static final KeyCombination FORWARD = new KeyCodeCombination(KeyCode.RIGHT,
+        KeyCombination.SHORTCUT_DOWN, KeyCombination.ALT_DOWN);
+    private static final KeyCombination UNDO = new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN);
+    private static final KeyCombination REDO = new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
+    private static final KeyCombination REDO_ALT = new KeyCodeCombination(KeyCode.Y, KeyCombination.SHORTCUT_DOWN);
+
     @FXML
     private VBox mainBorderPane;
 
     @FXML
-    private Menu fileMenu;
+    private MenuBar menuBar;
 
     @FXML
-    private SplitPane topSplitPane;
+    private Menu viewMenu;
 
     @FXML
-    private MenuItem saveAsProjectMenuItem;
+    private ToolBar toolBar;
+
+    @FXML
+    private Button backButton;
+
+    @FXML
+    private Button forwardButton;
 
     @FXML
     private Menu openRecentMenu;
-
-    @FXML
-    private Menu editMenu;
 
     @FXML
     private MenuItem undoMenuItem;
@@ -60,10 +74,16 @@ public class MainController {
     private MenuItem redoMenuItem;
 
     @FXML
-    private MenuItem searchMenuItem;
+    private MenuItem backMenuItem;
+
+    @FXML
+    private MenuItem forwardMenuItem;
 
     @FXML
     private MenuItem closeFileMenuItem;
+
+    @FXML
+    private MenuItem closeAllFilesItem;
 
     @FXML
     private MenuItem saveCurrentFileMenuItem;
@@ -72,177 +92,137 @@ public class MainController {
     private MenuItem saveAllFilesMenuItem;
 
     @FXML
-    private MenuItem openProjectMenuItem;
-
-    @FXML
     private Menu openRecentProjectsMenuItem;
-
-    @FXML
-    private MenuItem closeCurrentProjectMenuItem;
-
-    @FXML
-    private MenuItem newProjectMenuItem;
 
     @FXML
     private MenuItem saveProjectMenuItem;
 
     @FXML
-    private Label statusBarRightLabel;
+    private Label statusMessageLabel;
 
     @FXML
-    private CheckMenuItem inlineSuggestionsMenuItem;
+    private Hyperlink statusLink;
 
     @FXML
-    private CheckMenuItem suggestionPanelMenuItem;
+    private Label focusLabel;
+
+    @FXML
+    private Hyperlink assistStatusLink;
 
     @FXML
     private Pane viewPane;
 
-    @FXML
-    ToggleButton tagViewToggleButton;
-
-    @FXML
-    ToggleButton fileModeToggleButton;
-
-    @FXML
-    ToggleButton corpusViewToggleButton;
-
-    @FXML
-    ToggleGroup viewToggleGroup;
-
-    SplitPane fileModePane = null;
-
-    private UserSettings settings;
+    private final UserSettings settings;
     private Stage primaryStage;
-
-    private FileModeController fileModeController;
-    // TODO should not be visible here... should be accessed via fileModeController
-    private EditorController editorController;
-    // TODO should not be visible here... Should be passing of property instead.
-    private InlineCssTextArea fileContentCodeArea;
-
-    ChangeListener<Toggle> toggleGroupListener;
-
-    private List<GrammarPlugin> plugins;
-
-    private Project project;
-
+    private final List<GrammarPlugin> plugins;
     private final AssistController assist;
+    private final Workbench workbench;
+    private final WorkbenchCommands commands;
+    private ModeHost modes;
 
-    public MainController(
-        UserSettings settings,
-        List<GrammarPlugin> plugins
-    ) {
+    public MainController(UserSettings settings, List<GrammarPlugin> plugins) {
         this.settings = settings;
         this.plugins = plugins;
         this.assist = new AssistController(settings, () -> primaryStage);
+        this.workbench = new Workbench(settings, assist, () -> primaryStage, Platform::runLater);
+        this.commands = new WorkbenchCommands(workbench);
+        Project project = null;
         List<Path> recentProjects = settings.recentProjects().existing();
         if (settings.openLastProjectProperty().get() && !recentProjects.isEmpty()) {
             File lastProjectFile = recentProjects.get(0).toFile();
             try {
-                this.project = Project.loadProject(plugins, lastProjectFile, settings.documentOptions());
+                project = Project.loadProject(plugins, lastProjectFile, settings.documentOptions());
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Cannot reopen the last project " + lastProjectFile, e);
             }
         }
-        if (this.project == null) {
-            this.project = Project.createDefaultProject(plugins, settings.documentOptions());
+        if (project == null) {
+            project = Project.createDefaultProject(plugins, settings.documentOptions());
         }
-
-        // Load file mode controller, editor controller and fileContentCodeArea
-        fileModeController = loadFileMode();
-        fileModeController.setProject(this.project);
-        fileContentCodeArea = fileModeController.getFileContentArea();
-        editorController = fileModeController.getEditorController();
-
-        toggleGroupListener = new ChangeListener<Toggle>() {
-            @Override
-            public void changed(
-                ObservableValue<? extends Toggle> ov,
-                Toggle toggle,
-                Toggle new_toggle
-            ) {
-                // clicking the selected button deselects it: keep a view selected
-                if (new_toggle == null) {
-                    if (toggle != null) {
-                        viewToggleGroup.selectToggle(toggle);
-                    }
-                    return;
-                }
-                if (new_toggle == fileModeToggleButton) {
-                    switchToFileMode();
-                }
-            }
-        };
+        workbench.session().setProject(project);
     }
 
-    /** "Save all files" is enabled while a document of the project has unsaved changes. */
-    private void bindSaveAll() {
-        if (saveAllFilesMenuItem != null && project != null) {
-            saveAllFilesMenuItem.disableProperty().unbind();
-            saveAllFilesMenuItem.disableProperty().bind(project.anyDocumentDirtyProperty().not());
-        }
-    }
-
-    private void onProjectChangeHook() {
-        bindSaveAll();
-        saveProjectMenuItem
-            .disableProperty()
-            .bind(project.fileProperty().isNotNull());
-        project.isProjectDefinitionOutdatedProperty().set(true);
-    }
-
-    private FileModeController loadFileMode() {
-        FileModeController fileModeController = new FileModeController(
-            settings,
-            assist
-        );
-        FXMLLoader loader = new FXMLLoader();
-        loader.setLocation(
-            getClass().getResource(
-                "/fr/cnrs/lacito/matchbox/gui/mode/FileMode.fxml"
-            )
-        );
-        loader.setController(fileModeController);
-        try {
-            fileModePane = loader.load();
-        } catch (IOException e) {
-            // the main view cannot work without it
-            throw new java.io.UncheckedIOException("Cannot load the file mode view", e);
-        }
-        return fileModeController;
+    private Project project() {
+        return workbench.session().project();
     }
 
     @FXML
     public void initialize() {
-        viewToggleGroup
-            .selectedToggleProperty()
-            .addListener(toggleGroupListener);
-        viewToggleGroup.selectToggle(fileModeToggleButton);
+        modes = new ModeHost(workbench, Modes.builtIn(), viewPane, toolBar, menuBar, viewMenu);
+        workbench.navigator().attach(modes);
+        commands.attach(modes);
+        modes.activate(Modes.FILE);
+
+        commands.bindMenus(saveCurrentFileMenuItem, saveAllFilesMenuItem, closeFileMenuItem, closeAllFilesItem,
+            undoMenuItem, redoMenuItem, backMenuItem, forwardMenuItem);
+        backMenuItem.setAccelerator(BACK);
+        forwardMenuItem.setAccelerator(FORWARD);
+        backButton.disableProperty().bind(backMenuItem.disableProperty());
+        forwardButton.disableProperty().bind(forwardMenuItem.disableProperty());
+        backButton.setTooltip(new Tooltip("Back (" + BACK.getDisplayText() + ")"));
+        forwardButton.setTooltip(new Tooltip("Forward (" + FORWARD.getDisplayText() + ")"));
+        // Ctrl+Z not handled by the focused control (editor, table, text field) undoes in the journal
+        mainBorderPane.addEventHandler(KeyEvent.KEY_PRESSED, e -> {
+            if (UNDO.match(e)) {
+                commands.undo();
+                e.consume();
+            } else if (REDO.match(e) || REDO_ALT.match(e)) {
+                commands.redo();
+                e.consume();
+            }
+        });
+        setupStatusBar();
+
         loadRecentFilesMenu();
         loadRecentProjectsMenu();
         settings.recentFiles().items().addListener((Observable o) -> loadRecentFilesMenu());
         settings.recentProjects().items().addListener((Observable o) -> loadRecentProjectsMenu());
-        // loadRecentFileSetsMenu();
-        wireMenuItem();
-        wireAssistantMenu();
-        switchToFileMode();
+        onProjectChangeHook();
         // problems of the project reopened at startup
         Platform.runLater(this::reportLoadProblems);
     }
 
-    private void wireAssistantMenu() {
-        AssistSettingsData d = settings.assistProperty().get();
-        inlineSuggestionsMenuItem.setSelected(d.inlineEnabled());
-        suggestionPanelMenuItem.setSelected(d.suggestionPanelVisible());
-        settings.assistProperty().addListener((obs, o, n) -> {
-            inlineSuggestionsMenuItem.setSelected(n.inlineEnabled());
-            suggestionPanelMenuItem.setSelected(n.suggestionPanelVisible());
+    /** Messages of the status line on the left; the focused text and the assistant on the right. */
+    private void setupStatusBar() {
+        var status = workbench.status();
+        statusMessageLabel.textProperty().bind(status.messageProperty());
+        statusMessageLabel.styleProperty().bind(javafx.beans.binding.Bindings.when(status.warningProperty())
+            .then("-fx-font-size: 11; -fx-text-fill: #b00000;").otherwise("-fx-font-size: 11;"));
+        statusLink.textProperty().bind(status.linkTextProperty());
+        statusLink.visibleProperty().bind(status.linkTextProperty().isNotEmpty());
+        statusLink.managedProperty().bind(statusLink.visibleProperty());
+        statusLink.setOnAction(e -> {
+            statusLink.setVisited(false);
+            status.followLink();
         });
-        inlineSuggestionsMenuItem.setOnAction(e -> settings.assistProperty().set(
-            settings.assistProperty().get().withInlineEnabled(inlineSuggestionsMenuItem.isSelected())));
-        suggestionPanelMenuItem.setOnAction(e ->
-            fileModeController.setSuggestionPanelVisible(suggestionPanelMenuItem.isSelected()));
+        modes.focusProperty().addListener((obs, o, n) -> focusLabel.setText(describe(n)));
+        focusLabel.setText(describe(modes.focus()));
+        assistStatusLink.textProperty().bind(assist.statusProperty());
+        assistStatusLink.setOnAction(e -> {
+            assistStatusLink.setVisited(false);
+            assist.openSettings();
+        });
+    }
+
+    /** "notes.txt:12" for the focus of the active mode. */
+    private String describe(Optional<Focus> focus) {
+        Project project = project();
+        if (focus.isEmpty() || project == null) return "";
+        return project.document(focus.get().text()).map(d -> {
+            String content = d.getCurrentText();
+            int end = Math.min(focus.get().start(), content.length());
+            int line = 1;
+            for (int i = 0; i < end; i++) {
+                if (content.charAt(i) == '\n') line++;
+            }
+            Path name = d.getFilePath().getFileName();
+            return (name == null ? d.getFilePath().toString() : name.toString()) + ":" + line;
+        }).orElse("");
+    }
+
+    private void onProjectChangeHook() {
+        saveProjectMenuItem.disableProperty().bind(project().fileProperty().isNotNull());
+        project().isProjectDefinitionOutdatedProperty().set(true);
     }
 
     // ---------------------------------------------
@@ -253,115 +233,58 @@ public class MainController {
         assist.openSettings();
     }
 
-    public void handleSuggestCompletion() {
-        fileModeController.requestCompletion();
-    }
-
-    public void handleExplainError() {
-        fileModeController.explainErrorAtCaret();
-    }
-
-    public void handleReviewBlock() {
-        fileModeController.review("Current block");
-    }
-
-    public void handleReviewSelection() {
-        fileModeController.review("Selection");
-    }
-
-    public void handleReviewFile() {
-        fileModeController.review("Whole file");
-    }
-
     public void handleRefreshExamples() {
         assist.refreshExamples();
     }
 
-    /** Stops the assistant's background threads. */
+    /** Stops the background threads and closes the media players. */
     public void shutdown() {
-        assist.close();
-        fileModeController.shutdown();
+        workbench.close();
     }
 
-    private void switchToFileMode() {
-        viewPane.getChildren().clear();
-        viewPane.getChildren().add(fileModePane);
-        // undo/redo use the history of the displayed document
-        if (undoMenuItem != null) {
-            undoMenuItem.disableProperty().unbind();
-            undoMenuItem.disableProperty().bind(editorController.undoAvailableProperty().not());
-        }
-        if (redoMenuItem != null) {
-            redoMenuItem.disableProperty().unbind();
-            redoMenuItem.disableProperty().bind(editorController.redoAvailableProperty().not());
-        }
-        // enable search only when the code area has focus
-        if (searchMenuItem != null && fileContentCodeArea != null) {
-            searchMenuItem.disableProperty().bind(
-                fileContentCodeArea.focusedProperty() //.not()
-            );
-        }
-    }
-
-    private void wireMenuItem() {
-        saveCurrentFileMenuItem
-            .disableProperty()
-            .bind(
-                editorController
-                    .getCurrentTextCouldBeWrittenDownProperty()
-                    .not()
-            );
-        closeFileMenuItem
-            .disableProperty()
-            .bind(editorController.getClosableProperty().not());
-        bindSaveAll();
-    }
+    // ---------------------------------------------
+    // Edit and View
+    // ---------------------------------------------
 
     public void handlePlaySegmentMenuItem() {
-        fileModeController.playSegmentAtCaret();
+        commands.playSegment();
     }
 
     public void handleUndoMenuItem() {
-        editorController.undo();
+        commands.undo();
     }
 
     public void handleRedoMenuItem() {
-        editorController.redo();
+        commands.redo();
     }
 
-    public void handleSearchMenuItem() {
-        // Show search dialog bound to current code area
-        SearchDialog dialog = new SearchDialog(
-            fileContentCodeArea,
-            editorController::applySearchEdits,
-            primaryStage
-        );
-        dialog.show();
+    public void handleBack() {
+        commands.back();
+    }
+
+    public void handleForward() {
+        commands.forward();
     }
 
     public void handleExportDictionary() {
         //TODO
     }
 
-    // start open file submenus
-    //
+    // ---------------------------------------------
+    // Files
+    // ---------------------------------------------
+
     public void handleOpenFileWithFileChooser() {
         FileChooser chooser = new FileChooser();
-        chooser
-            .getExtensionFilters()
-            .addAll(
-                new FileChooser.ExtensionFilter("Text Files", "*.txt", "*.md"),
-                new FileChooser.ExtensionFilter("All Files", "*.*")
-            );
-        File selected = chooser.showOpenDialog(primaryStage);
-        openFileOrDirectory(selected);
+        chooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("Text Files", "*.txt", "*.md"),
+            new FileChooser.ExtensionFilter("All Files", "*.*")
+        );
+        commands.addFileOrDirectory(chooser.showOpenDialog(primaryStage));
     }
+
     public void handleOpenDirectory() {
-        try {
-            fileModeController.handleOpenDirectory(primaryStage);
-        } catch (Exception e) {
-            ErrorReporter.report(primaryStage, "Error opening directory", e);
-        }
+        commands.addDirectory();
     }
 
     private void loadRecentFilesMenu() {
@@ -374,59 +297,37 @@ public class MainController {
         } else {
             for (Path path : recent) {
                 MenuItem item = new MenuItem(path.toString());
-                item.setOnAction(e -> openFileOrDirectory(path.toFile()));
+                item.setOnAction(e -> commands.addFileOrDirectory(path.toFile()));
                 openRecentMenu.getItems().add(item);
             }
-            // Add separator
             openRecentMenu.getItems().add(new SeparatorMenuItem());
-            // Add clear recent files item
             MenuItem clearItem = new MenuItem("Clear Recent Files");
-            clearItem.setOnAction(e -> {
-                settings.recentFiles().clear();
-            });
+            clearItem.setOnAction(e -> settings.recentFiles().clear());
             openRecentMenu.getItems().add(clearItem);
         }
     }
 
-    /**
-    */
-
-    // End open file submenus
-
-    private void openFileOrDirectory(File f) {
-        try {
-            fileModeController.openFileOrDirectory(f);
-        } catch (Exception e) {
-            ErrorReporter.report(primaryStage, "Error opening file", e);
-        }
-    }
-
-    // for the button, no need of that, directly called in fileModeController
     public void handleCloseFile() {
-        fileModeController.handleCloseFile();
+        commands.closeFile();
     }
 
     public void handleSaveCurrentFile() {
-        try {
-            fileModeController.handleSaveCurrentFile();
-        } catch (IOException e) {
-            ErrorReporter.report(primaryStage, "Error saving file", e);
-        }
+        commands.saveCurrentFile();
     }
 
     /** Saves every file with unsaved changes, displayed or not. */
     public void handleSaveAllFiles() {
-        try {
-            fileModeController.handleSaveAll();
-        } catch (IOException e) {
-            ErrorReporter.report(primaryStage, "Error saving files", e);
-        }
+        commands.saveAll();
+    }
+
+    public void handleCloseAllFiles() {
+        commands.closeAllFiles();
     }
 
     /** Asks what to do with unsaved files before they are dropped; false to cancel. */
     private boolean confirmDropDocuments(String action) {
-        return project == null
-            || UnsavedChangesDialog.confirm(primaryStage, List.copyOf(project.getDerivedFileList()), action);
+        return project() == null
+            || UnsavedChangesDialog.confirm(primaryStage, List.copyOf(project().getDerivedFileList()), action);
     }
 
     /** Called when the main window is about to close: false keeps it open. */
@@ -443,8 +344,8 @@ public class MainController {
             return;
         }
         try {
-            this.project = Project.loadProject(this.plugins, f, settings.documentOptions());
-            fileModeController.setProject(project);
+            Project project = Project.loadProject(this.plugins, f, settings.documentOptions());
+            workbench.session().setProject(project);
             settings.recentProjects().add(f.toPath());
             project.parseProject();
             onProjectChangeHook();
@@ -456,11 +357,11 @@ public class MainController {
 
     /** Shows the problems found when the project was loaded (unreadable files, invalid patterns). */
     private void reportLoadProblems() {
-        if (!project.getLoadProblems().isEmpty()) {
+        if (!project().getLoadProblems().isEmpty()) {
             ErrorReporter.report(
                 primaryStage,
                 "Some parts of the project could not be loaded",
-                String.join("\n\n", project.getLoadProblems()) +
+                String.join("\n\n", project().getLoadProblems()) +
                     "\n\nCorrect them in File › Edit project…"
             );
         }
@@ -468,15 +369,10 @@ public class MainController {
 
     public void handleOpenProject() {
         FileChooser chooser = new FileChooser();
-        chooser
-            .getExtensionFilters()
-            .addAll(
-                new FileChooser.ExtensionFilter(
-                    "Matchbox project files",
-                    "*.mbx"
-                ),
-                new FileChooser.ExtensionFilter("All Files", "*.*")
-            );
+        chooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("Matchbox project files", "*.mbx"),
+            new FileChooser.ExtensionFilter("All Files", "*.*")
+        );
         File selected = chooser.showOpenDialog(primaryStage);
         if (selected != null) {
             openProject(selected);
@@ -488,29 +384,28 @@ public class MainController {
     }
 
     public void handleSaveCurrentProject() {
-        if (project.fileProperty().isNull().get()) {
+        if (project().fileProperty().isNull().get()) {
             handleSaveAsProject();
             return;
         }
         try {
-            ProjectXMLSerializer.save(project);
+            ProjectXMLSerializer.save(project());
         } catch (Exception e) {
             // the project stays marked as modified
             ErrorReporter.report(primaryStage, "Error saving project", e);
             return;
         }
-        project.isProjectDefinitionOutdatedProperty().set(false);
+        project().isProjectDefinitionOutdatedProperty().set(false);
     }
 
     public void handleNewProject() {
         handleCloseCurrentProject();
-        Project newProject = Project.createDefaultProject(plugins, settings.documentOptions());
-        project = newProject;
+        workbench.session().setProject(Project.createDefaultProject(plugins, settings.documentOptions()));
         onProjectChangeHook();
     }
 
     public void handleEditProject() {
-        ProjectPropertiesDialog dialog = new ProjectPropertiesDialog(primaryStage, this.project);
+        ProjectPropertiesDialog dialog = new ProjectPropertiesDialog(primaryStage, project());
         dialog.showAndWait();
         if (dialog.isSaved()) {
             onProjectChangeHook();
@@ -523,7 +418,7 @@ public class MainController {
         if (!confirmDropDocuments("closing the project")) {
             return;
         }
-        if (project.isProjectDefinitionOutdatedProperty().get()) {
+        if (project().isProjectDefinitionOutdatedProperty().get()) {
             ButtonType ok = new ButtonType("foo", ButtonBar.ButtonData.OK_DONE);
             ButtonType no = new ButtonType("bar", ButtonBar.ButtonData.NO);
             ButtonType cancel = new ButtonType("bar", ButtonBar.ButtonData.CANCEL_CLOSE);
@@ -543,44 +438,9 @@ public class MainController {
                 return;
             }
         }
-        //project.close();
-        this.project = Project.createDefaultProject(plugins, settings.documentOptions());
-        fileModeController.setProject(project);
+        workbench.session().setProject(Project.createDefaultProject(plugins, settings.documentOptions()));
         onProjectChangeHook();
     }
-
-    public void handleCloseAllFiles() {
-        // TODO implement
-    }
-
-    private void openFileset(File f) {
-        // TODO implement
-    }
-
-    // private void loadRecentFileSetsMenu() {
-    //     this.openRecentFilesetMenuItem.getItems().clear();
-    //     List<String> recentFileSets = applicationSettings.getRecentFileSets();
-    //     if (recentFileSets.isEmpty()) {
-    //         MenuItem noRecentItem = new MenuItem("No recent file sets");
-    //         noRecentItem.setDisable(true);
-    //         openRecentFilesetMenuItem.getItems().add(noRecentItem);
-    //     } else {
-    //         for (String filepath : recentFileSets) {
-    //             MenuItem item = new MenuItem(filepath);
-    //             item.setOnAction(e -> openFileset(new File(filepath)));
-    //             openRecentFilesetMenuItem.getItems().add(item);
-    //         }
-    //         // Add separator
-    //         openRecentFilesetMenuItem.getItems().add(new SeparatorMenuItem());
-    //         // Add clear recent files item
-    //         MenuItem clearItem = new MenuItem("Clear Recent Files");
-    //         clearItem.setOnAction(e -> {
-    //             applicationSettings.clearRecentFilesets();
-    //             loadRecentFileSetsMenu();
-    //         });
-    //         openRecentFilesetMenuItem.getItems().add(clearItem);
-    //     }
-    // }
 
     private void loadRecentProjectsMenu() {
         this.openRecentProjectsMenuItem.getItems().clear();
@@ -595,31 +455,20 @@ public class MainController {
                 item.setOnAction(e -> openProject(path.toFile()));
                 openRecentProjectsMenuItem.getItems().add(item);
             }
-            // Add separator
             openRecentProjectsMenuItem.getItems().add(new SeparatorMenuItem());
-            // Add clear recent projects item
             MenuItem clearItem = new MenuItem("Clear Recent Projects");
-            clearItem.setOnAction(e -> {
-                settings.recentProjects().clear();
-            });
+            clearItem.setOnAction(e -> settings.recentProjects().clear());
             openRecentProjectsMenuItem.getItems().add(clearItem);
         }
     }
 
     public void handleSaveAsProject() {
-        CreateProjectDialog dialog = new CreateProjectDialog(
-            primaryStage,
-            fileModeController,
-            this.project
-        );
+        CreateProjectDialog dialog = new CreateProjectDialog(primaryStage, project());
         dialog.showAndWait();
     }
 
     public void handleSettings() {
-        SettingsDialog dialog = new SettingsDialog(
-            settings,
-            primaryStage
-        );
+        SettingsDialog dialog = new SettingsDialog(settings, primaryStage);
         dialog.showAndWait();
     }
 
@@ -629,10 +478,9 @@ public class MainController {
         }
     }
 
-
     /** Lets the views open links in the system browser. */
     public void setHostServices(javafx.application.HostServices hostServices) {
-        fileModeController.setHostServices(hostServices);
+        workbench.setHostServices(hostServices);
     }
 
     public void setPrimaryStage(Stage stage) {

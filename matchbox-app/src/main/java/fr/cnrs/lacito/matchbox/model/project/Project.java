@@ -10,7 +10,7 @@ import fr.cnrs.lacito.matchbox.model.DocumentChange;
 import fr.cnrs.lacito.matchbox.model.DocumentListener;
 import fr.cnrs.lacito.matchbox.model.DocumentOptions;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
-import fr.cnrs.lacito.matchbox.model.TextHistory;
+import fr.cnrs.lacito.matchbox.model.EditJournal;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -82,8 +82,8 @@ public class Project {
 
     /** The same documents, by text id (spans and corpus texts refer to documents by id). */
     private final Map<TextId, TextDocument> documentById = new HashMap<>();
-    /** Undo history of each document, kept as long as the document is in the project. */
-    private final Map<TextId, TextHistory> historyById = new HashMap<>();
+    /** Undo journal of all the documents, kept as long as they are in the project. */
+    private final EditJournal journal = new EditJournal();
     /** Parses a document after a change that does not come from typing (view, assistant, undo…). */
     private final DocumentListener reparseOnChange = this::onDocumentChanged;
     private final ReadOnlyBooleanWrapper anyDocumentDirty = new ReadOnlyBooleanWrapper(false);
@@ -130,8 +130,7 @@ public class Project {
                     TextDocument removed = change.getValueRemoved();
                     derivedFileList.remove(removed);
                     documentById.remove(removed.getId());
-                    TextHistory history = historyById.remove(removed.getId());
-                    if (history != null) history.dispose();
+                    journal.untrack(removed);
                     removed.removeChangeListener(reparseOnChange);
                     removed.getCouldBeWrittenBooleanProperty().removeListener(dirtyListener);
                     corpus.remove(removed.getId());
@@ -140,7 +139,7 @@ public class Project {
                     TextDocument added = change.getValueAdded();
                     derivedFileList.add(added);
                     documentById.put(added.getId(), added);
-                    historyById.put(added.getId(), new TextHistory(added));
+                    journal.track(added);
                     added.addChangeListener(reparseOnChange);
                     added.getCouldBeWrittenBooleanProperty().addListener(dirtyListener);
                 }
@@ -475,9 +474,9 @@ public class Project {
         return Optional.ofNullable(documentById.get(id));
     }
 
-    /** Undo history of a document of the project. */
-    public Optional<TextHistory> history(TextId id) {
-        return Optional.ofNullable(historyById.get(id));
+    /** Undo journal of the project: the changes of all its documents, in order. */
+    public EditJournal journal() {
+        return journal;
     }
 
     /** Documents with unsaved changes, in file list order. */

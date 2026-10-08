@@ -187,7 +187,16 @@ The `tag-grammar` plugin reads inline tags, anywhere in a line, several per line
 - Avoid tags in the transcription and gloss lines of an IGT (they break the alignment) and in YAML
   metadata values (` #` starts a YAML comment there).
 
+## Modes, undo and navigation
+
+- **Modes** are the ways to browse the corpus in the main area of the window, chosen with the buttons of the toolbar or the View menu (Shortcut+1…). **File Mode** lists the files of the project, shows a file in the editor with the objects found in it and the parsing errors. Each mode keeps its state when you switch to another one, and adds its own menu next to View (e.g. "File Mode": search in the file, the AI assistant at the cursor, insert).
+- **Undo/Redo is project-wide**: Edit › Undo (or Ctrl+Z / ⌘Z) reverts the last change made anywhere in the project, typed in the editor or made in a table or a view, whatever the file. The menu says what will be undone and in which file, e.g. "Undo Edit Translation (notes.txt)". When the change was in a file that is not shown, the status bar says so, with a **Show** link.
+- **Nothing is saved automatically**: changes made by views or undo in files that are not displayed mark them as unsaved (`*` in the file list); use Save all files. You are asked about unsaved files before closing them or quitting.
+- **Back/Forward** (◀ ▶ in the toolbar, View menu, Shortcut+Alt+← / →) return to where you were before a jump, e.g. after "show in editor" from a view.
+
 ## Create parser for new conventions
+
+Each parser is a plugin that maps a notation to corpus objects: lexical entries, glossed sentences, sections, tags… Several plugins can offer different notations for the same kind of object, for instance a quick convention for writing lexical entries during a session and a more detailed syntax for full entries. Choose, for each type of file, the plugins that match the conventions you write in. The rest of the application (browsing, tags, exports) works the same whatever notation created the objects. See `matchbox-grammar-api/README.md`.
 
 ## 
 

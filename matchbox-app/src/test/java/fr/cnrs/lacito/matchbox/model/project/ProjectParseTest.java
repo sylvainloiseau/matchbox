@@ -146,7 +146,7 @@ class ProjectParseTest {
         assertFalse(project.anyDocumentDirtyProperty().get());
         assertEquals("bbbx", Files.readString(b));
         type(project, a, "aaax");
-        project.history(TextId.of(a)).orElseThrow().undo();
+        project.journal().undo();
         assertFalse(project.anyDocumentDirtyProperty().get(), "undo back to the saved text");
     }
 
