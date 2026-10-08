@@ -38,7 +38,7 @@
                     fx:id="editProjectMenuItem"
                     mnemonicParsing="true"
                     onAction="#handleEditProject"
-                    text="Edit projet…"
+                    text="Projet properties…"
                 />
             <Menu
                     fx:id="openRecentProjectsMenuItem"
