@@ -1,55 +1,30 @@
-# Tag grammar module
+# An import / export from Elan: annotation by dependant tiers in hierarchy, @media when needed.
 
-You will create a plan for a matchbox plugin module called matchbox-grammar-tag.
+# I18N
 
-This plugin will contain an ANTLR grammar matching tag, i.e. a '#' followed by a keyword, for instance #infinitive.
+# text view
 
-The sequence do not allow a whitespace. It can therefore not be confused with a markdown section title.
+Section, subsection... use title on file
 
-The sequence can appear anywhere in a line, not necessarily on line on its own. Several tags can appear on the same line.
+The file view is mostly devoted to checking that the file are correctly parsed,
+to update the text if necessary in order for all corpus object to be correctly
+recognized.
 
-In the matchbox-corpus module, a new interface "Tag" in the capability package and a new simpleTag class in the the simple package could be designed.
+# shortcut
 
-A plugin view is not ncessary: the first table displayed in the objectKindTabPane pane say it all. The fallback GenericObjectViewFactory will be used.
+alt-s for save
+
+# Plugin configuration system/Corpus object
+
+- color
+- shortcut
+- button
+
+# Order corpus file
 
 # CoNLL editable with drag and drop
 
 Create a detailled component
-
-# "Media reference" plugin
-
-You will create a plan for a grammar module that will match reference to sequence in milisecond in media file.
-
-This module will be called m
-
-You will look at the corresponding skill for writting plugins.
-
-An "media reference" is a one-line convention that indicates the start or end of
-media segment (audio and video). A media segment is a portion of a media file
-(audio or video).
-
-It has two forms: either it gives a file name, plus a start and end offsets in
-milliseconds, or it gives only a start and end time offset in milliseconds but
-no filename, and the filename is extracted from the text header. The file name
-can be relative (to the file parsed) or absolute (to the root of the file
-system).
-
-Which convention would you suggest for writing audio markers?
-
-You will create a class MediaMarker that extends CorpusObject, and contains a resolved path to the media file, and the start and end offsets in milliseconds.
-
-You will create a class MediaMarkerViewFactory that implements ObjectViewFactory<MediaMarker>.
-
-MediaMarkerViewFactory will be registerd as a service in
-resources/META-INF/services/fr.cnrs.lacito.matchbox.grammarfx.ObjectViewFactory
-
-The media marker view factory will contains a player for a sound file or a video file, using javafx media capabilities.
-
-In order to avoid reopening the file for each different media marker, a single
-player instance will be shared by all media marker views, and/or each media file
-refered to in the text file will be opened only once. Maybe, in order to achieve
-that, it will be necessary to use the TextHeader object: add method to the
-textheader object for accessing the list of all media files referenced in the text.
 
 # lift-patchbox view
 
@@ -64,8 +39,6 @@ is in the ../lift-patchbox directory. Please report if you cannot access it.
 
 
 # Corpus view
-
-matchbox-language -> matchbox-corpus
 
 - Search replace
 - undo redo
