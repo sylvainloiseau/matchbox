@@ -295,7 +295,7 @@ public final class TagBrowserMode extends AbstractMode {
 
     private String emptyTreeMessage() {
         boolean tagPlugin = PluginManager.getAvailableGrammars().stream().anyMatch(g -> g.getId().equals("tag-grammar"));
-        return "No tags in the project." + (tagPlugin ? "\nWrite #\"keyword\" in a note to tag it." : "");
+        return "No tags in the project." + (tagPlugin ? "\nWrite #\"keyword\" in a note to tag it,\nor check that a tag-parsing grammar\nis selected for this project (File->Project properties…)." : "");
     }
 
     // ------------------------------------------------------------------
