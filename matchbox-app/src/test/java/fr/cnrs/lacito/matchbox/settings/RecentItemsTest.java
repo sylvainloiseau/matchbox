@@ -13,16 +13,18 @@ import org.junit.jupiter.api.io.TempDir;
 
 class RecentItemsTest {
 
-    private static final Path A = Path.of("/data/a.txt");
-    private static final Path B = Path.of("/data/b.txt");
-    private static final Path C = Path.of("/data/c.txt");
+    // absolute on every OS (on Windows "/x" is not absolute)
+    private static final Path ROOT = Path.of("/").toAbsolutePath();
+    private static final Path A = ROOT.resolve("data/a.txt");
+    private static final Path B = ROOT.resolve("data/b.txt");
+    private static final Path C = ROOT.resolve("data/c.txt");
 
     @Test
     void mostRecentFirstWithoutDuplicates() {
         RecentItems r = new RecentItems(new SimpleIntegerProperty(10));
         r.add(A);
         r.add(B);
-        r.add(Path.of("/data/x/../a.txt")); // same as A once normalised
+        r.add(ROOT.resolve("data/x/../a.txt")); // same as A once normalised
         assertEquals(List.of(A, B), r.items());
     }
 
@@ -33,10 +35,10 @@ class RecentItemsTest {
         r.add(A);
         r.add(B);
         r.add(C);
-        r.add(Path.of("/data/d.txt"));
+        r.add(ROOT.resolve("data/d.txt"));
         assertEquals(3, r.items().size());
         max.set(1);
-        assertEquals(List.of(Path.of("/data/d.txt")), r.items());
+        assertEquals(List.of(ROOT.resolve("data/d.txt")), r.items());
     }
 
     @Test

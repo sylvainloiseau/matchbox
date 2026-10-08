@@ -14,6 +14,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 class UserSettingsTest {
 
+    // absolute on every OS (on Windows "/x" is not absolute)
+    private static final Path ROOT = Path.of("/").toAbsolutePath();
+
     @TempDir
     Path dir;
 
@@ -45,7 +48,7 @@ class UserSettingsTest {
         try (UserSettings s = load(50)) {
             s.igtColorProperty().set("#010203");
             s.openLastProjectProperty().set(true);
-            s.recentProjects().add(Path.of("/p/one.mbx"));
+            s.recentProjects().add(ROOT.resolve("p/one.mbx"));
             assertFalse(Files.exists(dirs.configDir().resolve("settings.json")), "not saved before the delay");
             Thread.sleep(400);
             assertTrue(Files.exists(dirs.configDir().resolve("settings.json")));
@@ -53,7 +56,7 @@ class UserSettingsTest {
         try (UserSettings reloaded = load(50)) {
             assertEquals("#010203", reloaded.igtColorProperty().get());
             assertTrue(reloaded.openLastProjectProperty().get(), "open last project is persisted");
-            assertEquals(List.of(Path.of("/p/one.mbx")), reloaded.recentProjects().items());
+            assertEquals(List.of(ROOT.resolve("p/one.mbx")), reloaded.recentProjects().items());
         }
     }
 

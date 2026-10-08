@@ -8,7 +8,9 @@ import org.junit.jupiter.api.Test;
 
 class AppDirectoriesTest {
 
-    private static final Path HOME = Path.of("/home/u");
+    // absolute on every OS ("/" on Unix, the current drive on Windows, where "/x" is not absolute)
+    private static final Path ROOT = Path.of("/").toAbsolutePath();
+    private static final Path HOME = ROOT.resolve("home/u");
 
     @Test
     void macOs() {
@@ -45,9 +47,10 @@ class AppDirectoriesTest {
     @Test
     void linuxXdgVariables() {
         AppDirectories d = AppDirectories.resolve("Linux",
-            Map.of("XDG_CONFIG_HOME", "/xdg/config", "XDG_STATE_HOME", "/xdg/state"), HOME, null);
-        assertEquals(Path.of("/xdg/config/matchbox"), d.configDir());
-        assertEquals(Path.of("/xdg/state/matchbox"), d.stateDir());
+            Map.of("XDG_CONFIG_HOME", ROOT.resolve("xdg/config").toString(),
+                "XDG_STATE_HOME", ROOT.resolve("xdg/state").toString()), HOME, null);
+        assertEquals(ROOT.resolve("xdg/config/matchbox"), d.configDir());
+        assertEquals(ROOT.resolve("xdg/state/matchbox"), d.stateDir());
     }
 
     @Test
@@ -60,9 +63,9 @@ class AppDirectoriesTest {
 
     @Test
     void overridePutsEverythingInOneDirectory() {
-        AppDirectories d = AppDirectories.resolve("Mac OS X", Map.of(), HOME, "/portable/settings");
-        assertEquals(Path.of("/portable/settings"), d.configDir());
-        assertEquals(Path.of("/portable/settings"), d.stateDir());
-        assertEquals(Path.of("/portable/settings/logs"), d.logDir());
+        AppDirectories d = AppDirectories.resolve("Mac OS X", Map.of(), HOME, ROOT.resolve("portable/settings").toString());
+        assertEquals(ROOT.resolve("portable/settings"), d.configDir());
+        assertEquals(ROOT.resolve("portable/settings"), d.stateDir());
+        assertEquals(ROOT.resolve("portable/settings/logs"), d.logDir());
     }
 }

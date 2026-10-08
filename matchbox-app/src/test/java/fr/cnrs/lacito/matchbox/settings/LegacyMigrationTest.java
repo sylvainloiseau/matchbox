@@ -14,6 +14,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 class LegacyMigrationTest {
 
+    // absolute on every OS (on Windows "/x" is not absolute)
+    private static final Path ROOT = Path.of("/").toAbsolutePath();
+
     @TempDir
     Path dir;
 
@@ -37,9 +40,9 @@ class LegacyMigrationTest {
             "max_recent_files=4",
             "open_last_project=true",
             "unknown_key=whatever"));
-        Files.writeString(legacyDir.resolve("matchbox.history"), "/data/a.txt\n/data/b.txt\n\n");
-        Files.writeString(legacyDir.resolve("matchbox.project.history"), "/p/one.mbx\n");
-        Files.writeString(legacyDir.resolve("matchbox.fileset.history"), "/sets/x\n");
+        Files.writeString(legacyDir.resolve("matchbox.history"), ROOT.resolve("data/a.txt") + "\n" + ROOT.resolve("data/b.txt") + "\n\n");
+        Files.writeString(legacyDir.resolve("matchbox.project.history"), ROOT.resolve("p/one.mbx") + "\n");
+        Files.writeString(legacyDir.resolve("matchbox.fileset.history"), ROOT.resolve("sets/x") + "\n");
         Files.writeString(home.resolve(".matchbox.log"), "<log/>");
     }
 
@@ -54,8 +57,8 @@ class LegacyMigrationTest {
             assertEquals(List.of("notes-*"), s.filePatterns());
             assertEquals(4, s.maxRecentFilesProperty().get());
             assertTrue(s.openLastProjectProperty().get());
-            assertEquals(List.of(Path.of("/data/a.txt"), Path.of("/data/b.txt")), s.recentFiles().items());
-            assertEquals(List.of(Path.of("/p/one.mbx")), s.recentProjects().items());
+            assertEquals(List.of(ROOT.resolve("data/a.txt"), ROOT.resolve("data/b.txt")), s.recentFiles().items());
+            assertEquals(List.of(ROOT.resolve("p/one.mbx")), s.recentProjects().items());
             assertTrue(s.getLoadWarnings().isEmpty(), () -> s.getLoadWarnings().toString());
         }
         assertTrue(Files.exists(dirs.configDir().resolve("settings.json")));
