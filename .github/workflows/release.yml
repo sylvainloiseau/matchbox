@@ -48,33 +48,12 @@ jobs:
           curl -fsSL "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz" | tar xz -C /tmp
           echo "/tmp/apache-maven-3.9.9/bin" >> "$GITHUB_PATH"
 
-      - name: install matchbox parent pom
+      # one build of all the modules, distribution included (jpackage writes build/target/installer).
+      # Do not rebuild the distribution with clean afterwards: on Windows the new .exe is still
+      # locked (antivirus scan) and cannot be deleted.
+      - name: Build, test and package
         shell: bash
-        run: mvn install -am
-
-      - name: install matchbox-corpus
-        shell: bash
-        run: mvn -pl matchbox-corpus install
-
-      - name: install matchbox-grammar-api
-        shell: bash
-        run: mvn -pl matchbox-grammar-api install
-
-      - name: install grammars plugin notebook
-        shell: bash
-        run: mvn -pl grammars/matchbox-grammar-notebook package
-
-      - name: install grammars plugin conll
-        shell: bash
-        run: mvn -pl grammars/matchbox-grammar-conll package
-
-      - name: install grammars plugin lex
-        shell: bash
-        run: mvn -pl grammars/matchbox-grammar-lex package
-
-      - name: install distribution
-        shell: bash
-        run: mvn -pl matchbox-distribution clean package
+        run: mvn install
 
       # the detailed test results, to debug a build that fails on one OS only
       - name: Upload test reports
