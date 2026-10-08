@@ -36,6 +36,8 @@ Check the built jar: `unzip -l build/plugins/matchbox-grammar-<grammar-name>-*.j
   - collects syntax errors with `new CollectingErrorListener(text, getId())` (`getDiagnostics()`);
   - catches `RuntimeException` and reports it as `Diagnostic.at(text, getId(), 0, 0, "Internal error of the grammar: " + e)` instead of printing it;
   - skips rules produced by ANTLR error recovery (`ctx.exception != null`, or missing tokens) instead of failing the whole file.
+- `getDisplayDescription()`: a one line description of the plugin
+- `getFormatDocumentation()`: Description of the notation recognised by the grammar (Markdown allowed). You will take care that this description do not drift apart from the actual behavior of the plugin.
 
 # Corpus objects
 
