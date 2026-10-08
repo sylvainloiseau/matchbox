@@ -161,7 +161,8 @@ public class SettingsDialog {
             current.logFile(),
             current.assist(),
             allowInvalidViewEditsCheckBox.isSelected(),
-            toHex(tagColorPicker.getValue())
+            toHex(tagColorPicker.getValue()),
+            current.tagBrowser()
         );
     }
 

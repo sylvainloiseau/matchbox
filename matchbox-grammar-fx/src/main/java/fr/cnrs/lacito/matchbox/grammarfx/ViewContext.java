@@ -36,6 +36,18 @@ public interface ViewContext {
      */
     void select(CorpusObject object);
 
+    /**
+     * Shows the object where all the objects like it are listed (e.g. a tag in the application's
+     * tag browser), whatever that place is; does nothing if {@link #canBrowse} is false.
+     */
+    default void browse(CorpusObject object) {
+    }
+
+    /** True if the application has a place listing the objects like this one (see {@link #browse}). */
+    default boolean canBrowse(CorpusObject object) {
+        return false;
+    }
+
     /** Highlight colour used in the editor for this object, as a CSS colour (e.g. {@code "#ffeeaa"}). */
     String highlightColor(CorpusObject object);
 

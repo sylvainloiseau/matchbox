@@ -14,7 +14,9 @@ import javafx.scene.layout.FlowPane;
 
 /**
  * The tags applying to an object (see {@code Text.targetOf}), as a line of badges
- * ({@code verb › infinitive}); clicking a badge selects the tag in the editor. Shared by the views.
+ * ({@code verb › infinitive}); clicking a badge selects the tag in the editor, its context menu
+ * shows all the tags like it ({@link ViewContext#browse}) when the application can. Shared by the
+ * views.
  */
 public final class TagBadges {
 
@@ -42,7 +44,23 @@ public final class TagBadges {
             Label badge = new Label(String.join(" › ", tag.getPath().isEmpty() ? List.of(tag.getName()) : tag.getPath()));
             badge.setStyle(BADGE);
             badge.setTooltip(new Tooltip("#\"" + tag.getName() + "\" — click to show it in the text"));
-            badge.setOnMouseClicked(e -> context.selectInEditor(tag.getTextCoordinate()));
+            javafx.scene.control.ContextMenu[] menu = {null};
+            badge.setOnMouseClicked(e -> {
+                if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) {
+                    context.selectInEditor(tag.getTextCoordinate());
+                } else if (e.getButton() == javafx.scene.input.MouseButton.SECONDARY && menu[0] != null) {
+                    menu[0].show(badge, e.getScreenX(), e.getScreenY());
+                }
+            });
+            if (context.canBrowse(tag)) {
+                javafx.scene.control.MenuItem show = new javafx.scene.control.MenuItem(
+                    "Show all #\"" + String.join("/", tag.getPath().isEmpty() ? List.of(tag.getName()) : tag.getPath()) + "\" tags");
+                show.setOnAction(e -> context.browse(tag));
+                javafx.scene.control.MenuItem inText = new javafx.scene.control.MenuItem("Show in the text");
+                inText.setOnAction(e -> context.selectInEditor(tag.getTextCoordinate()));
+                menu[0] = new javafx.scene.control.ContextMenu(show, inText);
+                badge.setTooltip(new Tooltip("#\"" + tag.getName() + "\" — click to show it in the text, right-click for all the tags like it"));
+            }
             pane.getChildren().add(badge);
         }
         return Optional.of(pane);

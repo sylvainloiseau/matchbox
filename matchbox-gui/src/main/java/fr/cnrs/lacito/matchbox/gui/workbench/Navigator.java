@@ -84,6 +84,20 @@ public final class Navigator {
         host.activate(Modes.FILE).reveal(focus);
     }
 
+    /** True if a mode lists the objects like this one. */
+    public boolean canBrowse(CorpusObject object) {
+        return host != null && host.descriptors().stream().anyMatch(d -> d.browses().test(object));
+    }
+
+    /** Shows the object in the first mode listing the objects like it (a jump, for Back). */
+    public void browse(CorpusObject object) {
+        if (host == null) return;
+        host.descriptors().stream().filter(d -> d.browses().test(object)).findFirst().ifPresent(d -> {
+            here().ifPresent(history::jumped);
+            host.activate(d.id()).reveal(Focus.of(object));
+        });
+    }
+
     public void back() {
         here().flatMap(history::back).ifPresent(this::go);
     }

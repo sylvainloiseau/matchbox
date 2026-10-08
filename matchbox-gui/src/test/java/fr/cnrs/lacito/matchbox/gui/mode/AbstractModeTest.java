@@ -59,6 +59,31 @@ class AbstractModeTest {
     }
 
     @Test
+    void aModeCreatedAfterTheProjectIsOpenBuildsItsContentOnActivation() {
+        ProjectSession opened = new ProjectSession(Runnable::run);
+        opened.setProject(newProject());
+        List<String> built = new ArrayList<>();
+        AbstractMode late = new AbstractMode(null, opened, new SelectionTracker(new EditHints())) {
+            @Override
+            public Node root() {
+                return null;
+            }
+
+            @Override
+            protected void onTextsChanged(Set<TextId> texts) {
+                built.add("texts");
+            }
+
+            @Override
+            protected void onProjectChanged() {
+                built.add("project");
+            }
+        };
+        late.activate();
+        assertEquals(List.of("project"), built);
+    }
+
+    @Test
     void changesArriveAtOnceWhileActive() {
         session.setProject(newProject());
         mode.activate();

@@ -27,7 +27,8 @@ public abstract class AbstractMode implements Mode {
     private final ObjectProperty<Optional<Focus>> focus = new SimpleObjectProperty<>(Optional.empty());
     private final ProjectSession session;
     private final Set<TextId> pendingTexts = new LinkedHashSet<>();
-    private boolean projectChanged;
+    /** True until the content is built for the current project (modes are created after it is open). */
+    private boolean projectChanged = true;
     private boolean active;
 
     private final CorpusListener corpusListener = (id, before, after) -> textChanged(id);

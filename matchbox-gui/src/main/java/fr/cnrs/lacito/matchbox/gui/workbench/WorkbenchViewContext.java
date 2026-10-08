@@ -34,6 +34,16 @@ final class WorkbenchViewContext implements ViewContext {
     }
 
     @Override
+    public void browse(CorpusObject object) {
+        workbench.navigator().browse(object);
+    }
+
+    @Override
+    public boolean canBrowse(CorpusObject object) {
+        return workbench.navigator().canBrowse(object);
+    }
+
+    @Override
     public String highlightColor(CorpusObject object) {
         return workbench.highlightStyles().colorFor(object);
     }

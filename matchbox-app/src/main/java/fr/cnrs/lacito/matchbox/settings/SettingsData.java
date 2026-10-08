@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
  * @param assist             settings of the AI assistant
  * @param allowInvalidViewEdits apply edits made in object views even if they add parse errors
  * @param tagColor           highlight colour of tags (CSS colour)
+ * @param tagBrowser         settings of the Tag Browser mode
  */
 public record SettingsData(
     Integer version,
@@ -47,7 +48,8 @@ public record SettingsData(
     String logFile,
     AssistSettingsData assist,
     Boolean allowInvalidViewEdits,
-    String tagColor
+    String tagColor,
+    TagBrowserSettingsData tagBrowser
 ) {
 
     public static final int CURRENT_VERSION = 2;
@@ -71,7 +73,8 @@ public record SettingsData(
             null,
             AssistSettingsData.defaults(),
             false,
-            "#ffd6e8"
+            "#ffd6e8",
+            TagBrowserSettingsData.defaults()
         );
     }
 
@@ -103,14 +106,23 @@ public record SettingsData(
             logFile == null || logFile.isBlank() ? null : logFile.strip(),
             assist == null ? d.assist : assist.validated(problems),
             allowInvalidViewEdits == null ? d.allowInvalidViewEdits : allowInvalidViewEdits,
-            color(tagColor, d.tagColor, "tagColor", problems)
+            color(tagColor, d.tagColor, "tagColor", problems),
+            tagBrowser == null ? d.tagBrowser : tagBrowser.validated(problems)
         );
     }
 
     /** Copy with other assistant settings. */
     public SettingsData withAssist(AssistSettingsData newAssist) {
         return new SettingsData(version, charset, igtColor, lexicalColor, morphemeSeparators, fileExtensions,
-            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist, allowInvalidViewEdits, tagColor);
+            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist, allowInvalidViewEdits, tagColor,
+            tagBrowser);
+    }
+
+    /** Copy with other Tag Browser settings. */
+    public SettingsData withTagBrowser(TagBrowserSettingsData newTagBrowser) {
+        return new SettingsData(version, charset, igtColor, lexicalColor, morphemeSeparators, fileExtensions,
+            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits, tagColor,
+            newTagBrowser);
     }
 
     /** Validated copy, problems ignored. */

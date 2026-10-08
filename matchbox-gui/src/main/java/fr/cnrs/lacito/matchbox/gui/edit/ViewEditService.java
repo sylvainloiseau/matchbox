@@ -77,6 +77,63 @@ public final class ViewEditService {
         return edit(object, "Remove " + describe(fieldName), e -> e.removeField(object, fieldName, contentOf(object)));
     }
 
+    /** Result of {@link #setFields}. */
+    public record BatchResult(boolean applied, int changes, int files, List<String> problems) {}
+
+    /**
+     * Sets fields of several objects, possibly in several files, all or nothing: one change per
+     * document, all of them one entry of the undo journal described by {@code description}. If
+     * anything cannot be changed (stale text, refused value, read-only file, new parse errors),
+     * nothing is applied and the result lists every problem.
+     */
+    public BatchResult setFields(List<FieldChange> changes, String description) {
+        Project p = project.get();
+        if (p == null) {
+            return new BatchResult(false, 0, 0, List.of("No project"));
+        }
+        return switch (batch(p).plan(changes)) {
+            case BatchEditPlanner.Failed f -> new BatchResult(false, 0, 0, f.problems());
+            case BatchEditPlanner.Ready r -> apply(p, r, changes.size(), description);
+        };
+    }
+
+    /** What would prevent {@link #setFields} from applying these changes; empty if nothing. */
+    public List<String> checkFields(List<FieldChange> changes) {
+        Project p = project.get();
+        if (p == null) return List.of("No project");
+        return batch(p).plan(changes) instanceof BatchEditPlanner.Failed f ? f.problems() : List.of();
+    }
+
+    private BatchEditPlanner batch(Project p) {
+        return new BatchEditPlanner(p.getCorpus(), planner(), (text, object) -> grammarOf(p, text, object),
+            d -> Files.isWritable(d.getFilePath()));
+    }
+
+    private BatchResult apply(Project p, BatchEditPlanner.Ready ready, int count, String description) {
+        boolean[] ok = {true};
+        p.journal().grouped(description, () -> {
+            for (ViewEditPlanner.Ready document : ready.documents()) {
+                if (!ok[0] || document.edits().isEmpty()) continue;
+                int offset = document.edits().stream().mapToInt(TextEdit::start).min().orElse(0);
+                hints.lastEdit(document.document().getId(), offset);
+                ok[0] = document.document().applyEdits(document.edits(), EditOrigin.of(EditOrigin.Kind.VIEW, this, description));
+            }
+        });
+        if (!ok[0]) {
+            // a document changed between the check and the change: revert what was applied
+            p.journal().undo();
+            return new BatchResult(false, 0, 0, List.of("The text changed: parse it again and retry"));
+        }
+        long files = ready.documents().stream().filter(d -> !d.edits().isEmpty()).count();
+        return new BatchResult(true, count, (int) files, List.of());
+    }
+
+    private static Optional<GrammarPlugin> grammarOf(Project p, Text text, CorpusObject object) {
+        return text.grammarIdOf(object).flatMap(id ->
+            p.document(text.id()).flatMap(d -> p.getGrammarsForFile(d.getFilePath()).stream()
+                .filter(g -> g.getId().equals(id)).findFirst()));
+    }
+
     /** A field name for the user: "freeTranslation" → "free translation". */
     static String describe(String fieldName) {
         return fieldName.replaceAll("([a-z0-9])([A-Z])", "$1 $2").toLowerCase(java.util.Locale.ROOT);
@@ -93,9 +150,7 @@ public final class ViewEditService {
         if (text.isEmpty()) {
             return new EditOutcome.Stale("The text changed: the object no longer exists");
         }
-        Optional<GrammarPlugin> grammar = text.get().grammarIdOf(object).flatMap(id ->
-            p.document(text.get().id()).flatMap(d -> p.getGrammarsForFile(d.getFilePath()).stream()
-                .filter(g -> g.getId().equals(id)).findFirst()));
+        Optional<GrammarPlugin> grammar = grammarOf(p, text.get(), object);
         if (grammar.isEmpty()) {
             return new EditOutcome.NotEditable("The grammar of this object is no longer applied to the file");
         }

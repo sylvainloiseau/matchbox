@@ -72,7 +72,8 @@ class UserSettingsTest {
         try (UserSettings s = load(60_000)) {
             SettingsData edited = s.snapshot();
             SettingsData changed = new SettingsData(edited.version(), "ISO-8859-1", "bad colour!", edited.lexicalColor(),
-                edited.morphemeSeparators(), List.of(".XML", "txt"), List.of(), 0, 3, true, edited.logFile(), edited.assist(), edited.allowInvalidViewEdits(), edited.tagColor());
+                edited.morphemeSeparators(), List.of(".XML", "txt"), List.of(), 0, 3, true, edited.logFile(), edited.assist(), edited.allowInvalidViewEdits(), edited.tagColor(),
+                new TagBrowserSettingsData(99, 3, "random", null));
             s.apply(changed);
             assertEquals(StandardCharsets.ISO_8859_1, s.charsetProperty().get());
             assertEquals(SettingsData.defaults().igtColor(), s.igtColorProperty().get());
@@ -80,6 +81,9 @@ class UserSettingsTest {
             assertEquals(10, s.maxRecentFilesProperty().get());
             assertEquals(3, s.maxRecentProjectsProperty().get());
             assertEquals(StandardCharsets.ISO_8859_1, s.documentOptions().charset());
+            // invalid Tag Browser values replaced by the defaults, valid ones kept
+            assertEquals(new TagBrowserSettingsData(5, 3, TagBrowserSettingsData.SORT_NAME, false),
+                s.tagBrowserProperty().get());
         }
     }
 
