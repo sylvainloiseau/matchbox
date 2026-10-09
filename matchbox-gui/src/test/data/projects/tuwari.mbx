@@ -2,6 +2,9 @@
 <project>
   <fileset>
     <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/tuwari.md"/>
+    <file path="/Users/sloiseau/workspace/igtcorpus/conll/0.conll"/>
+    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/notebook.md"/>
+    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/notebook2.md"/>
   </fileset>
   <pattern>
     <name>all</name>

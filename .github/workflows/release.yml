@@ -41,6 +41,12 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
+          # In order to install maven module installed on github:
+          # Writes ~/.m2/settings.xml with credentials for the "github" repository
+          # (GitHub Packages), read from the GITHUB_ACTOR / GITHUB_TOKEN env vars.
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
 
       - name: Install Maven 3.9.9
         shell: bash

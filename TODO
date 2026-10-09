@@ -28,14 +28,29 @@ Create a detailled component
 
 # lift-patchbox view
 
-I would you like to generate a plan for a new plugin (in the grammars
-directory). You will look at the corresponding skill for writting plugins.
+I would you like to generate a plan for a new plugin (in the grammars directory). You will look at the corresponding skill for writting plugins.
 
-The plugins will recognize and parse LiftPatchShort syntax, i.e. a syntax for
-expressing lexical information. a library containing a parser for this language
-is in the ../lift-patchbox directory. Please report if you cannot access it.
+The plugin will be called "liftpatchbox".
+
+The plugins will recognize and parse LiftPatchShort syntax, i.e. a mutation command language for editing a dictionary.
+
+The liftPatchShort syntax is defined in the lift-patchbox module, in the directory ../lift-patchbox. Please report if you cannot access this directory.
+
+The plugin's pom will declare a dependency towards this module.
+
+The lift-patchbox module already contains a parser for LiftPatchShort syntax. You will check that you will be able to wire this parser to the application.
+
+You will create a new CorpusObject subclass "LexiconEditCommand" in the capacity package and a LexiconCommandImpl in the simple package for holding a LiftPatchShort command. Note that two sub-types of commands exist: normal command (one liner) and "block" command (on several lines)
+
+As for the view:
+
+- in the objectKindTabPane tab, the summary table will give for each command the line it start on and the text of the command.
+
+- in the objectDetailPane, a new view will be created for LexiconEdit command. It will represent the command in LiftPathRef language, which is more verbose and complete.
 
 # Tooltip
+
+
 
 
 # Corpus view
