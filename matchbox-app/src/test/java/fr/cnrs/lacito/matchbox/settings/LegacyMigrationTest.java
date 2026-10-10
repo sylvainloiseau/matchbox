@@ -50,8 +50,6 @@ class LegacyMigrationTest {
     void importsValuesWritesNewFilesAndDeletesOldOnes() {
         try (UserSettings s = UserSettings.load(dirs, home, 10)) {
             assertEquals(StandardCharsets.ISO_8859_1, s.charsetProperty().get());
-            assertEquals("#AABBCC", s.igtColorProperty().get());
-            assertEquals("#112233", s.lexicalColorProperty().get());
             assertEquals("=", s.morphemeSeparatorsProperty().get());
             assertEquals(List.of("txt", "md", "xml"), s.fileExtensions());
             assertEquals(List.of("notes-*"), s.filePatterns());
@@ -93,9 +91,9 @@ class LegacyMigrationTest {
         UserSettings.load(dirs, home, 10).close();
         // an older version recreates its files with other values
         Files.createDirectories(legacyDir);
-        Files.writeString(legacyDir.resolve("configuration.txt"), "igt_paragraph_color=#000000\n");
+        Files.writeString(legacyDir.resolve("configuration.txt"), "morpheme_separators=#\n");
         try (UserSettings s = UserSettings.load(dirs, home, 10)) {
-            assertEquals("#AABBCC", s.igtColorProperty().get());
+            assertEquals("=", s.morphemeSeparatorsProperty().get());
         }
         assertFalse(Files.exists(legacyDir.resolve("configuration.txt")));
     }
@@ -106,7 +104,7 @@ class LegacyMigrationTest {
         Files.createDirectories(dir.resolve("new"));
         Files.writeString(dir.resolve("new/config"), "not a directory");
         try (UserSettings s = UserSettings.load(dirs, home, 10)) {
-            assertEquals("#AABBCC", s.igtColorProperty().get(), "imported values used for this session");
+            assertEquals("=", s.morphemeSeparatorsProperty().get(), "imported values used for this session");
             assertEquals(1, s.getLoadWarnings().size());
         }
         assertTrue(Files.exists(legacyDir.resolve("configuration.txt")));

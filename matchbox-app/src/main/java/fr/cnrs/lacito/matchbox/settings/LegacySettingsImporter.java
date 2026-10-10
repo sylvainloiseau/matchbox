@@ -50,7 +50,7 @@ final class LegacySettingsImporter {
 
     Imported read() {
         List<String> notes = new ArrayList<>();
-        String charset = null, igtColor = null, lexicalColor = null, separators = null, logFile = null;
+        String charset = null, separators = null, logFile = null;
         List<String> extensions = null, patterns = null;
         Integer maxRecentFiles = null;
         Boolean openLastProject = null;
@@ -59,10 +59,10 @@ final class LegacySettingsImporter {
             String value;
             if ((value = valueOf(line, "charset=")) != null) {
                 charset = value;
-            } else if ((value = valueOf(line, "igt_paragraph_color=")) != null) {
-                igtColor = value;
-            } else if ((value = valueOf(line, "lexical_description_color=")) != null) {
-                lexicalColor = value;
+            } else if ((value = valueOf(line, "igt_paragraph_color=")) != null
+                || (value = valueOf(line, "lexical_description_color=")) != null) {
+                // colours are now display styles of each project
+                notes.add("Ignored " + line.strip() + " (colours are set per project, in Project properties)");
             } else if ((value = valueOf(line, "morpheme_separators=")) != null) {
                 separators = value;
             } else if ((value = valueOf(line, "file_extension=")) != null) {
@@ -84,8 +84,8 @@ final class LegacySettingsImporter {
             }
         }
         SettingsData settings = new SettingsData(
-            SettingsData.CURRENT_VERSION, charset, igtColor, lexicalColor, separators,
-            extensions, patterns, maxRecentFiles, null, openLastProject, logFile, null, null, null, null
+            SettingsData.CURRENT_VERSION, charset, separators,
+            extensions, patterns, maxRecentFiles, null, openLastProject, logFile, null, null, null
         );
         RecentData recent = new RecentData(
             RecentData.CURRENT_VERSION,

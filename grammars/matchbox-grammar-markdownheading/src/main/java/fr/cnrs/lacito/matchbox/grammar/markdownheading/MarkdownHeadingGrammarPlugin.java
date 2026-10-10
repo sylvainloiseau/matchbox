@@ -41,6 +41,11 @@ public class MarkdownHeadingGrammarPlugin extends AbstractGrammarPlugin {
     }
 
     @Override
+    public List<String> getObjectKinds() {
+        return List.of(KIND_SECTION, KIND_HEADER);
+    }
+
+    @Override
     public String getDisplayName() {
         return "Markdown headings and metadata";
     }

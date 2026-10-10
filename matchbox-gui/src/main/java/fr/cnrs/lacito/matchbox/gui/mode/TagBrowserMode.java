@@ -264,7 +264,7 @@ public final class TagBrowserMode extends AbstractMode {
         stickyHeader.setManaged(false);
 
         list.setCellFactory(l -> new OccurrenceCell(() -> workbench.session().corpus(),
-            beforeSpinner::getValue, afterSpinner::getValue, () -> workbench.settings().tagColorProperty().get(), this::edit));
+            beforeSpinner::getValue, afterSpinner::getValue, workbench.highlightStyles()::colorFor, this::edit));
         list.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> {
             if (n instanceof OccurrenceRow.Occurrence occ) {
                 setFocus(Optional.of(Focus.of(occ.occurrence().tag())));

@@ -7,6 +7,7 @@ import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
 import fr.cnrs.lacito.matchbox.corpus.capability.Tag;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleTag;
+import fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle;
 import fr.cnrs.lacito.matchbox.grammarapi.AbstractGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.CollectingErrorListener;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
@@ -43,6 +44,16 @@ public class TagGrammarPlugin extends AbstractGrammarPlugin {
     @Override
     public int getApiVersion() {
         return API_VERSION;
+    }
+
+    @Override
+    public List<String> getObjectKinds() {
+        return List.of(KIND_TAG);
+    }
+
+    @Override
+    public DisplayStyle getDefaultDisplayStyle(String kind) {
+        return DisplayStyle.background("#ffd6e8");
     }
 
     @Override

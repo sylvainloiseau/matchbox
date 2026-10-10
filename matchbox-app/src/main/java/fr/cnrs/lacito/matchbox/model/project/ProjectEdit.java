@@ -15,7 +15,7 @@ import java.util.Set;
 
 /**
  * A working copy of the definition of a project (name, description, files and directories, file
- * types with their grammars), edited by the project properties dialog and applied to the project
+ * types with their grammars, display styles), edited by the project properties dialog and applied to the project
  * only on {@link #applyTo}: until then the project is unchanged, so cancelling discards everything.
  */
 public final class ProjectEdit {
@@ -98,12 +98,14 @@ public final class ProjectEdit {
     private String name;
     private String description;
     private boolean cloudAssistAllowed;
+    private DisplayStyles displayStyles;
     private final List<Path> paths;
     private final List<FileTypeDraft> fileTypes;
 
-    private ProjectEdit(String name, String description, boolean cloudAssistAllowed, List<Path> paths,
-                        List<FileTypeDraft> fileTypes) {
+    private ProjectEdit(String name, String description, boolean cloudAssistAllowed, DisplayStyles displayStyles,
+                        List<Path> paths, List<FileTypeDraft> fileTypes) {
         this.name = name;
+        this.displayStyles = displayStyles;
         this.description = description;
         this.cloudAssistAllowed = cloudAssistAllowed;
         this.paths = new ArrayList<>(paths);
@@ -117,7 +119,7 @@ public final class ProjectEdit {
             types.add(new FileTypeDraft(t, t.getName(), t.getRegex(), t.getGrammars()));
         }
         return new ProjectEdit(project.getName(), project.getDescription(), project.isCloudAssistAllowed(),
-            project.getDefinitionPaths(), types);
+            project.getDisplayStyles(), project.getDefinitionPaths(), types);
     }
 
     public String getName() {
@@ -144,6 +146,15 @@ public final class ProjectEdit {
         this.cloudAssistAllowed = allowed;
     }
 
+    /** Display styles by grammar and kind. */
+    public DisplayStyles getDisplayStyles() {
+        return displayStyles;
+    }
+
+    public void setDisplayStyles(DisplayStyles styles) {
+        this.displayStyles = Objects.requireNonNull(styles, "styles");
+    }
+
     /** Files and directories of the definition (mutable, in order). */
     public List<Path> getPaths() {
         return paths;
@@ -152,6 +163,23 @@ public final class ProjectEdit {
     /** File types (mutable, in order). */
     public List<FileTypeDraft> getFileTypes() {
         return fileTypes;
+    }
+
+    /** Ids of the grammars checked in at least one file type, in order of first use. */
+    public List<String> usedGrammarIds() {
+        Set<String> ids = new LinkedHashSet<>();
+        for (FileTypeDraft t : fileTypes) {
+            for (GrammarPlugin g : t.getGrammars()) ids.add(g.getId());
+        }
+        return List.copyOf(ids);
+    }
+
+    /** Names of the file types checking a grammar, in order. */
+    public List<String> fileTypesUsing(String grammarId) {
+        return fileTypes.stream()
+            .filter(t -> t.getGrammars().stream().anyMatch(g -> g.getId().equals(grammarId)))
+            .map(FileTypeDraft::toString)
+            .toList();
     }
 
     /** What prevents applying the edit (invalid regular expressions, unnamed file types). */
@@ -197,6 +225,7 @@ public final class ProjectEdit {
         if (!Objects.equals(name, project.getName())) project.setName(name);
         if (!Objects.equals(description, project.getDescription())) project.setDescription(description);
         project.setCloudAssistAllowed(cloudAssistAllowed);
+        project.setDisplayStyles(displayStyles);
 
         // file types first, so that added files are parsed with the new grammars
         Map<TextDocument, List<String>> grammarsBefore = new HashMap<>();

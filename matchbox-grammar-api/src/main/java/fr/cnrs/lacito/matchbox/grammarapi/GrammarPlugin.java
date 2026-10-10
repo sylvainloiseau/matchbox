@@ -67,6 +67,24 @@ public interface GrammarPlugin {
     }
 
     /**
+     * The kinds of the objects the grammar may produce ({@code "<id>:<name>"}), so that the user
+     * can give each one its own display style before any file contains it. Optional: the
+     * application also lists the kinds found in the corpus.
+     */
+    default List<String> getObjectKinds() {
+        return List.of();
+    }
+
+    /**
+     * Default display style of the objects of a kind, or of all the objects of the grammar when
+     * {@code kind} is null. The styles chosen in the project come first; the properties they do
+     * not set are taken from these defaults (kind first, then grammar).
+     */
+    default DisplayStyle getDefaultDisplayStyle(String kind) {
+        return DisplayStyle.EMPTY;
+    }
+
+    /**
      * Version of the contract the plugin was compiled against. Implement it as
      * {@code return API_VERSION;} in the plugin class itself: the constant is then compiled into
      * the plugin, which is what makes the check meaningful (a default method here would always

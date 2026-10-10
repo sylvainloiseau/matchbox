@@ -97,11 +97,11 @@ class MainWindowTest extends MainWindowFixture {
     @Test
     void theWindowShowsFileModeItsMenuAndTheModeButtons(FxRobot robot) {
         List<String> menus = menuBar(robot).getMenus().stream().map(Menu::getText).toList();
-        assertEquals(List.of("File", "Edit", "View", "File Mode", "Assistant", "Export"), menus);
+        assertEquals(List.of("File", "Current project", "Edit", "Mode", "File Mode", "Assistant", "Export"), menus);
         ToggleButton file = robot.lookup(".toggle-button").match((Node n) ->
             n instanceof ToggleButton b && "File".equals(b.getText())).queryAs(ToggleButton.class);
         assertTrue(file.isSelected());
-        assertEquals("File", menu(robot, "View").getItems().get(0).getText());
+        assertEquals("File", menu(robot, "Mode").getItems().get(0).getText());
         assertEquals(Modes.FILE, workbench().modes().orElseThrow().activeId().orElseThrow());
         // nothing displayed: the File Mode items acting on the file are disabled
         assertTrue(item(menu(robot, "File Mode"), "Search").isDisable());
@@ -205,7 +205,7 @@ class MainWindowTest extends MainWindowFixture {
         waitUntil(() -> workbench().focus().isEmpty());
         assertTrue(undo.isDisable(), "the journal is the new project's");
         assertEquals("", robot.lookup("#focusLabel").queryAs(Label.class).getText());
-        assertTrue(robot.lookup("#fileListView").queryListView().getItems().isEmpty());
+        assertTrue(robot.lookup("#fileTreeView").queryAs(javafx.scene.control.TreeView.class).getRoot().getChildren().isEmpty());
     }
 
     @Test

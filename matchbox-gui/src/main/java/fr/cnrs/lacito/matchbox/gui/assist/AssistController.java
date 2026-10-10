@@ -142,7 +142,7 @@ public final class AssistController {
                 return true;
             case DISABLED: {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION,
-                    "No AI provider is selected. Choose one in File › AI assistant…");
+                    "No AI provider is selected. Choose one in Assistant › AI assistant settings…");
                 alert.initOwner(owner.get());
                 alert.setHeaderText("AI assistant disabled");
                 alert.showAndWait();
@@ -150,8 +150,8 @@ public final class AssistController {
             }
             case BLOCKED_BY_PROJECT: {
                 Alert alert = new Alert(Alert.AlertType.WARNING,
-                    "This project allows local AI models only (see File › Edit project…). " +
-                    "Select Ollama in File › AI assistant…, or change the project settings.");
+                    "This project allows local AI models only (see Current project › Project properties…). " +
+                    "Select Ollama in Assistant › AI assistant settings…, or change the project settings.");
                 alert.initOwner(owner.get());
                 alert.setHeaderText("Cloud AI providers are not allowed for this project");
                 alert.showAndWait();
@@ -207,12 +207,12 @@ public final class AssistController {
     public String whyUnavailable() {
         ProviderKind kind = kind();
         if (kind == ProviderKind.NONE) {
-            return "No AI provider is selected (File › AI assistant…).";
+            return "No AI provider is selected (Assistant › AI assistant settings…).";
         }
         if (kind.needsApiKey() && keys.get(kind).isEmpty()) {
-            return "No API key for " + kind.displayName() + " (File › AI assistant…).";
+            return "No API key for " + kind.displayName() + " (Assistant › AI assistant settings…).";
         }
-        return "No model is selected for " + kind.displayName() + " (File › AI assistant…).";
+        return "No model is selected for " + kind.displayName() + " (Assistant › AI assistant settings…).";
     }
 
     /** Context of a request on the edited file. */

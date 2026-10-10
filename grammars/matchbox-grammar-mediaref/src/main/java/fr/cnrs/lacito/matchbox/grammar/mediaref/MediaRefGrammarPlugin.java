@@ -40,6 +40,11 @@ public class MediaRefGrammarPlugin extends AbstractGrammarPlugin {
     }
 
     @Override
+    public List<String> getObjectKinds() {
+        return List.of(KIND_MARKER);
+    }
+
+    @Override
     public String getDisplayName() {
         return "Media references";
     }

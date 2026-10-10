@@ -1,10 +1,13 @@
 package fr.cnrs.lacito.matchbox.model.project;
 
 import fr.cnrs.lacito.matchbox.PluginManager;
+import fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.model.DocumentOptions;
 import java.io.File;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.Transformer;
@@ -37,23 +40,43 @@ public class ProjectXMLSerializer {
         // Create root element
         Element rootElement = doc.createElement("project");
         doc.appendChild(rootElement);
+        if (project.getName() != null && !project.getName().isBlank()) {
+            rootElement.setAttribute("name", project.getName());
+        }
+        if (project.getDescription() != null && !project.getDescription().isBlank()) {
+            Element descriptionElement = doc.createElement("description");
+            descriptionElement.setTextContent(project.getDescription());
+            rootElement.appendChild(descriptionElement);
+        }
 
         // Add fileset element
         Element filesetElement = doc.createElement("fileset");
         rootElement.appendChild(filesetElement);
 
-        // Add files
-        for (String filePath : project.getFiles()) {
-            Element fileElement = doc.createElement("file");
-            fileElement.setAttribute("path", filePath);
-            filesetElement.appendChild(fileElement);
-        }
-
-        // Add directories
-        for (String dirPath : project.getDirectories()) {
-            Element dirElement = doc.createElement("directory");
-            dirElement.setAttribute("path", dirPath);
-            filesetElement.appendChild(dirElement);
+        // Files and directories, in the order of the definition (the top nodes of the file tree)
+        for (java.nio.file.Path path : project.getDefinitionPaths()) {
+            if (project.isDefinitionDirectory(path)) {
+                Element dirElement = doc.createElement("directory");
+                dirElement.setAttribute("path", path.toString());
+                project.directorySettings(path).ifPresent(settings -> {
+                    dirElement.setAttribute("recursive", String.valueOf(settings.recursive()));
+                    for (String include : settings.includes()) {
+                        Element e = doc.createElement("include");
+                        e.setTextContent(include);
+                        dirElement.appendChild(e);
+                    }
+                    for (String exclude : settings.excludes()) {
+                        Element e = doc.createElement("exclude");
+                        e.setTextContent(exclude);
+                        dirElement.appendChild(e);
+                    }
+                });
+                filesetElement.appendChild(dirElement);
+            } else if (java.nio.file.Files.isRegularFile(path)) {
+                Element fileElement = doc.createElement("file");
+                fileElement.setAttribute("path", path.toString());
+                filesetElement.appendChild(fileElement);
+            }
         }
 
         // Add patterns
@@ -88,6 +111,14 @@ public class ProjectXMLSerializer {
             rootElement.appendChild(assistantElement);
         }
 
+        // Display styles by grammar and kind (absent attribute: not set)
+        if (!project.getDisplayStyles().isEmpty()) {
+            Element stylesElement = doc.createElement("displayStyles");
+            rootElement.appendChild(stylesElement);
+            project.getDisplayStyles().asMap().forEach((key, style) ->
+                stylesElement.appendChild(styleElement(doc, key, style)));
+        }
+
         // Write to file
         TransformerFactory transformerFactory =
             TransformerFactory.newInstance();
@@ -101,6 +132,94 @@ public class ProjectXMLSerializer {
         DOMSource source = new DOMSource(doc);
         StreamResult result = new StreamResult(file);
         transformer.transform(source, result);
+        project.definitionChangedProperty().set(false);
+    }
+
+    /** The settings of a {@code <directory>}, null if it has none (older project files). */
+    private static DirectorySettings directorySettings(Element e, Project project) {
+        List<String> includes = childTexts(e, "include");
+        List<String> excludes = childTexts(e, "exclude");
+        if (!e.hasAttribute("recursive") && includes.isEmpty() && excludes.isEmpty()) return null;
+        DirectorySettings settings = new DirectorySettings(includes, excludes, "true".equals(e.getAttribute("recursive")));
+        List<String> problems = settings.problems();
+        if (!problems.isEmpty()) {
+            project.recordLoadProblem("Directory " + e.getAttribute("path") + ": " + String.join("; ", problems)
+                + ". Its invalid patterns are ignored.");
+            settings = new DirectorySettings(
+                includes.stream().filter(g -> Glob.problem(g) == null).toList(),
+                excludes.stream().filter(g -> Glob.problem(g) == null).toList(),
+                settings.recursive());
+        }
+        return settings;
+    }
+
+    private static List<String> childTexts(Element parent, String tag) {
+        List<String> texts = new java.util.ArrayList<>();
+        for (Node n = parent.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element e && e.getTagName().equals(tag)) texts.add(e.getTextContent());
+        }
+        return texts;
+    }
+
+    private static Element styleElement(Document doc, DisplayStyles.Key key, DisplayStyle style) {
+        Element e = doc.createElement("display");
+        e.setAttribute("grammar", key.grammarId());
+        if (key.kind() != null) e.setAttribute("kind", key.kind());
+        if (style.fontFamily() != null) e.setAttribute("fontFamily", style.fontFamily());
+        if (style.bold() != null) e.setAttribute("bold", style.bold().toString());
+        if (style.italic() != null) e.setAttribute("italic", style.italic().toString());
+        if (style.underline() != null) e.setAttribute("underline", style.underline().toString());
+        if (style.strikethrough() != null) e.setAttribute("strikethrough", style.strikethrough().toString());
+        if (style.textColor() != null) e.setAttribute("textColor", style.textColor());
+        if (style.backgroundColor() != null) e.setAttribute("background", style.backgroundColor());
+        return e;
+    }
+
+    /** The display styles of the project file; invalid values are dropped and reported. */
+    private static void loadDisplayStyles(Element rootElement, Project project) {
+        NodeList stylesList = rootElement.getElementsByTagName("displayStyles");
+        if (stylesList.getLength() == 0) return;
+        NodeList displayList = ((Element) stylesList.item(0)).getElementsByTagName("display");
+        Map<DisplayStyles.Key, DisplayStyle> styles = new LinkedHashMap<>();
+        for (int i = 0; i < displayList.getLength(); i++) {
+            Element e = (Element) displayList.item(i);
+            String grammar = e.getAttribute("grammar");
+            if (grammar.isBlank()) {
+                project.recordLoadProblem("A display style has no grammar: ignored");
+                continue;
+            }
+            DisplayStyles.Key key = new DisplayStyles.Key(grammar, e.hasAttribute("kind") ? e.getAttribute("kind") : null);
+            String where = "display style of " + (key.kind() == null ? grammar : key.kind());
+            DisplayStyle style = new DisplayStyle(
+                attribute(e, "fontFamily"),
+                bool(e, "bold", where, project),
+                bool(e, "italic", where, project),
+                bool(e, "underline", where, project),
+                bool(e, "strikethrough", where, project),
+                color(e, "textColor", where, project),
+                color(e, "background", where, project));
+            styles.put(key, style);
+        }
+        project.setDisplayStyles(DisplayStyles.of(styles));
+    }
+
+    private static String attribute(Element e, String name) {
+        return e.hasAttribute(name) ? e.getAttribute(name) : null;
+    }
+
+    private static Boolean bool(Element e, String name, String where, Project project) {
+        String value = attribute(e, name);
+        if (value == null) return null;
+        if (value.equals("true") || value.equals("false")) return Boolean.valueOf(value);
+        project.recordLoadProblem("Invalid value '" + value + "' for " + name + " in the " + where + ": ignored");
+        return null;
+    }
+
+    private static String color(Element e, String name, String where, Project project) {
+        String value = attribute(e, name);
+        if (value == null || DisplayStyle.isColor(value)) return value == null ? null : value.strip();
+        project.recordLoadProblem("Invalid colour '" + value + "' for " + name + " in the " + where + ": ignored");
+        return null;
     }
 
     /**
@@ -125,26 +244,34 @@ public class ProjectXMLSerializer {
         Document doc = builder.parse(file);
 
         Element rootElement = doc.getDocumentElement();
+        project.setName(rootElement.getAttribute("name"));
+        // a direct child (file types have their own elements)
+        for (Node n = rootElement.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element e && e.getTagName().equals("description")) {
+                project.setDescription(e.getTextContent());
+            }
+        }
 
         // Load fileset
         NodeList filesetList = rootElement.getElementsByTagName("fileset");
         if (filesetList.getLength() > 0) {
             Element filesetElement = (Element) filesetList.item(0);
 
-            // Load files
-            NodeList fileList = filesetElement.getElementsByTagName("file");
-            for (int i = 0; i < fileList.getLength(); i++) {
-                Element fileElement = (Element) fileList.item(i);
-                String path = fileElement.getAttribute("path");
-                project.addFile(path);
-            }
-
-            // Load directories
-            NodeList dirList = filesetElement.getElementsByTagName("directory");
-            for (int i = 0; i < dirList.getLength(); i++) {
-                Element dirElement = (Element) dirList.item(i);
-                String path = dirElement.getAttribute("path");
-                project.addDirectory(path);
+            // files and directories, in order
+            for (Node n = filesetElement.getFirstChild(); n != null; n = n.getNextSibling()) {
+                if (!(n instanceof Element e)) continue;
+                String path = e.getAttribute("path");
+                if (e.getTagName().equals("file")) {
+                    project.addFile(path);
+                } else if (e.getTagName().equals("directory")) {
+                    DirectorySettings settings = directorySettings(e, project);
+                    if (settings == null) {
+                        // written before directory settings: as it was loaded then
+                        project.addDirectory(path);
+                    } else {
+                        project.addDirectory(path, settings);
+                    }
+                }
             }
         }
 
@@ -204,6 +331,10 @@ public class ProjectXMLSerializer {
             project.setCloudAssistAllowed(!"false".equals(assistantElement.getAttribute("allowCloud")));
         }
 
+        loadDisplayStyles(rootElement, project);
+
+        // the project is what its file says
+        project.definitionChangedProperty().set(false);
         return project;
     }
 }

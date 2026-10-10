@@ -28,7 +28,7 @@ final class CloudConsentDialog {
             PrivacyPolicy.whatIsSent() + "\n\n" +
             "If your notes contain personal data of consultants or material under consent " +
             "restrictions, use a local model (Ollama), which keeps everything on this computer, or " +
-            "disallow cloud providers for the project (File › Edit project…).\n\n" +
+            "disallow cloud providers for the project (Current project › Project properties…).\n\n" +
             "This question is asked once per provider."
         );
         content.setWrapText(true);

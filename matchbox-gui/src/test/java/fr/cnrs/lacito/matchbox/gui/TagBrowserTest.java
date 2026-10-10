@@ -103,7 +103,7 @@ class TagBrowserTest extends MainWindowFixture {
     @Test
     void theTagsButtonShowsTheModeAndItsMenu(FxRobot robot) throws IOException {
         openTags(robot);
-        assertEquals(List.of("File", "Edit", "View", "Tag Browser", "Assistant", "Export"), menus(robot));
+        assertEquals(List.of("File", "Current project", "Edit", "Mode", "Tag Browser", "Assistant", "Export"), menus(robot));
         robot.press(KeyCode.SHORTCUT, KeyCode.DIGIT1).release(KeyCode.DIGIT1, KeyCode.SHORTCUT);
         waitUntil(() -> menus(robot).contains("File Mode"));
         assertEquals(Modes.FILE, workbench().modes().orElseThrow().activeId().orElseThrow());
@@ -161,7 +161,8 @@ class TagBrowserTest extends MainWindowFixture {
         waitUntil(() -> document(a).getCurrentText().contains("#\"pos/action\"")
             && document(b).getCurrentText().contains("#\"pos/action/transitive\""));
         assertTrue(document(a).getCurrentText().contains("#\"pos/noun\""), "other tags untouched");
-        MenuItem undo = robot.lookup(".menu-bar").queryAs(MenuBar.class).getMenus().get(1).getItems().get(0);
+        MenuItem undo = robot.lookup(".menu-bar").queryAs(MenuBar.class).getMenus().stream()
+            .filter(m -> "Edit".equals(m.getText())).findFirst().orElseThrow().getItems().get(0);
         assertEquals("Undo Rename tag pos/verb → pos/action (2 files)", undo.getText());
         assertTrue(robot.lookup("#statusMessageLabel").queryAs(Label.class).getText()
             .startsWith("Renamed 3 tags in 2 files (unsaved)"));
@@ -209,7 +210,8 @@ class TagBrowserTest extends MainWindowFixture {
         waitUntil(() -> document(a).getCurrentText().contains("#\"lexical/verb\"")
             && document(b).getCurrentText().contains("#\"lexical/verb/transitive\""));
         assertTrue(document(b).getCurrentText().contains("#\"lexical\"\n"), "the target keeps its own tag");
-        MenuItem undo = robot.lookup(".menu-bar").queryAs(MenuBar.class).getMenus().get(1).getItems().get(0);
+        MenuItem undo = robot.lookup(".menu-bar").queryAs(MenuBar.class).getMenus().stream()
+            .filter(m -> "Edit".equals(m.getText())).findFirst().orElseThrow().getItems().get(0);
         assertEquals("Undo Move tag pos/verb → lexical/verb (2 files)", undo.getText());
     }
 

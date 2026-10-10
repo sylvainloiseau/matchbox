@@ -25,6 +25,10 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
+import javafx.beans.property.ReadOnlyIntegerProperty;
+import javafx.beans.property.ReadOnlyIntegerWrapper;
+import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
@@ -62,8 +66,16 @@ public class Project {
     private final List<String> loadProblems = new ArrayList<>();
     private ExecutorService parserExecutor;
 
-    private SimpleBooleanProperty isProjectDefinitionOutdated =
-        new SimpleBooleanProperty(false);
+    /**
+     * True when the definition (name, description, files and directories, file types, display
+     * styles, assistant setting) differs from the project file: false after loading, creating and
+     * saving, true after a change.
+     */
+    private final SimpleBooleanProperty definitionChanged = new SimpleBooleanProperty(false);
+    private final ReadOnlyIntegerWrapper definitionRevision = new ReadOnlyIntegerWrapper(0);
+
+    /** How the objects of each grammar and kind are shown in the editor. */
+    private final ReadOnlyObjectWrapper<DisplayStyles> displayStyles = new ReadOnlyObjectWrapper<>(DisplayStyles.NONE);
 
     /** Whether the AI assistant may send text of this project to providers outside this computer. */
     private boolean cloudAssistAllowed = true;
@@ -99,6 +111,9 @@ public class Project {
      * Used in add directory and remove directory.
      */
     private Map<Path, List<Path>> filesByDir = new HashMap<>();
+
+    /** Settings of the directories of the definition. */
+    private final Map<Path, DirectorySettings> directorySettings = new HashMap<>();
 
     private SimpleObjectProperty<File> projectFile = new SimpleObjectProperty<>(
         null
@@ -209,12 +224,27 @@ public class Project {
                 markdownFiles.addGrammar(markdown);
                 project.fileTypes.add(markdownFiles);
             });
-        project.isProjectDefinitionOutdatedProperty().set(true);
+        project.definitionChanged.set(false);
         return project;
     }
 
-    public SimpleBooleanProperty isProjectDefinitionOutdatedProperty() {
-        return isProjectDefinitionOutdated;
+    /** See {@link #definitionChanged}; set it to false once the definition is saved. */
+    public SimpleBooleanProperty definitionChangedProperty() {
+        return definitionChanged;
+    }
+
+    private void markDefinitionChanged() {
+        definitionChanged.set(true);
+        definitionRevision.set(definitionRevision.get() + 1);
+    }
+
+    /**
+     * Incremented by every change of the definition (files, directories and their settings, file
+     * types…): listen to it to follow the definition, {@link #definitionChangedProperty()} staying
+     * true after the first change.
+     */
+    public ReadOnlyIntegerProperty definitionRevisionProperty() {
+        return definitionRevision.getReadOnlyProperty();
     }
 
     public void parseProject() {
@@ -349,7 +379,7 @@ public class Project {
 
     public void setName(String name) {
         this.name = name;
-        this.isProjectDefinitionOutdatedProperty().set(true);
+        markDefinitionChanged();
     }
 
     /** False if the AI assistant may only use providers on this computer for this project. */
@@ -360,7 +390,24 @@ public class Project {
     public void setCloudAssistAllowed(boolean allowed) {
         if (allowed != cloudAssistAllowed) {
             this.cloudAssistAllowed = allowed;
-            this.isProjectDefinitionOutdatedProperty().set(true);
+            markDefinitionChanged();
+        }
+    }
+
+    /** The display styles of the project (by grammar and kind). */
+    public DisplayStyles getDisplayStyles() {
+        return displayStyles.get();
+    }
+
+    public ReadOnlyObjectProperty<DisplayStyles> displayStylesProperty() {
+        return displayStyles.getReadOnlyProperty();
+    }
+
+    public void setDisplayStyles(DisplayStyles styles) {
+        Objects.requireNonNull(styles, "styles");
+        if (!styles.equals(displayStyles.get())) {
+            displayStyles.set(styles);
+            markDefinitionChanged();
         }
     }
 
@@ -370,7 +417,7 @@ public class Project {
 
     public void setDescription(String description) {
         this.description = description;
-        this.isProjectDefinitionOutdatedProperty().set(true);
+        markDefinitionChanged();
     }
 
     // ----------------------
@@ -387,47 +434,135 @@ public class Project {
     }
 
     /**
-     * Sets the current directory or file path and loads markdown/text files
+     * Adds a directory with the default settings: its own files (not those of its sub-directories)
+     * with the extensions of the document options.
      */
     public void addDirectory(Path path) throws IOException {
         addDirectory(path, false);
     }
 
-    /**
-     * Sets the current directory or file path and loads markdown/text files, optionally recursively.
-     */
+    /** Adds a directory with the default extensions, optionally with its sub-directories. */
     public void addDirectory(Path path, boolean recursive) throws IOException {
+        addDirectory(path, DirectorySettings.of(documentOptions.fileExtensions(), recursive));
+    }
+
+    /**
+     * Adds a directory: the files its settings select are added and parsed (files already in the
+     * project are kept as they are).
+     *
+     * @throws IOException listing the files that could not be read (the others are added)
+     */
+    public void addDirectory(Path path, DirectorySettings settings) throws IOException {
         if (!Files.isDirectory(path)) {
             throw new IllegalArgumentException(
                 "The provided path is not a directory."
             );
         }
-
         filesAndDirectories.add(path);
+        directorySettings.put(path, settings);
         List<Path> files = new ArrayList<>();
         List<String> failures = new ArrayList<>();
-
-        int depth = recursive ? Integer.MAX_VALUE : 1;
-        try (var stream = Files.walk(path, depth)) {
-            stream
-                .filter(Files::isRegularFile)
-                .filter(documentOptions::acceptsFile)
-                .sorted()
-                .forEach(p -> {
-                    try {
-                        addFileInternal(p);
-                        files.add(p);
-                    } catch (IOException e) {
-                        failures.add(e.getMessage());
-                    }
-                });
+        for (Path p : settings.scan(path)) {
+            if (textDocumentByPath.containsKey(p)) continue;
+            try {
+                addFileInternal(p);
+                files.add(p);
+            } catch (IOException e) {
+                failures.add(e.getMessage());
+            }
         }
         filesByDir.put(path, files);
-        this.isProjectDefinitionOutdatedProperty().set(true);
+        markDefinitionChanged();
         if (!failures.isEmpty()) {
             throw new IOException(
                 failures.size() + " file(s) of " + path + " could not be read:\n" + String.join("\n", failures)
             );
+        }
+    }
+
+    /** The settings of a directory of the project definition. */
+    public Optional<DirectorySettings> directorySettings(Path directory) {
+        return Optional.ofNullable(directorySettings.get(directory));
+    }
+
+    /** Directories of the project definition, in order. */
+    public List<Path> getDefinitionDirectories() {
+        return filesAndDirectories.stream().filter(directorySettings::containsKey).toList();
+    }
+
+    /** The files a directory of the project gives, sorted. */
+    public List<Path> filesOf(Path directory) {
+        return List.copyOf(filesByDir.getOrDefault(directory, List.of()));
+    }
+
+    /** The directory of the project definition a file comes from; empty for a file added alone. */
+    public Optional<Path> directoryOf(Path file) {
+        return filesByDir.entrySet().stream().filter(e -> e.getValue().contains(file)).map(Map.Entry::getKey).findFirst();
+    }
+
+    /**
+     * Files of the project that new settings of a directory would remove (to ask about unsaved
+     * changes first).
+     */
+    public List<TextDocument> documentsRemovedBy(Path directory, DirectorySettings settings) throws IOException {
+        List<Path> kept = settings.scan(directory);
+        return filesOf(directory).stream().filter(f -> !kept.contains(f))
+            .map(textDocumentByPath::get).filter(Objects::nonNull).toList();
+    }
+
+    /**
+     * Gives a directory new settings, then scans it again: the files it now selects are added and
+     * parsed, those it no longer selects leave the project (unsaved changes are lost: ask first,
+     * see {@link #documentsRemovedBy}).
+     *
+     * @return the files added and removed
+     */
+    public DirectoryChange setDirectorySettings(Path directory, DirectorySettings settings) throws IOException {
+        if (!directorySettings.containsKey(directory)) {
+            throw new IllegalArgumentException("Not a directory of the project: " + directory);
+        }
+        List<Path> before = filesOf(directory);
+        List<Path> selected = settings.scan(directory);
+        List<Path> removed = before.stream().filter(f -> !selected.contains(f)).toList();
+        List<Path> added = new ArrayList<>();
+        List<Path> files = new ArrayList<>();
+        List<String> failures = new ArrayList<>();
+        removed.forEach(textDocumentByPath::remove);
+        for (Path p : selected) {
+            if (before.contains(p)) {
+                files.add(p);
+            } else if (!textDocumentByPath.containsKey(p)) {
+                try {
+                    addFileInternal(p);
+                    files.add(p);
+                    added.add(p);
+                } catch (IOException e) {
+                    failures.add(e.getMessage());
+                }
+            }
+        }
+        filesByDir.put(directory, files);
+        if (!settings.equals(directorySettings.put(directory, settings))) {
+            markDefinitionChanged();
+        }
+        if (!failures.isEmpty()) {
+            throw new IOException(
+                failures.size() + " file(s) of " + directory + " could not be read:\n" + String.join("\n", failures)
+            );
+        }
+        return new DirectoryChange(added, removed);
+    }
+
+    /** Scans a directory again with its settings (files created or deleted on the disk). */
+    public DirectoryChange rescanDirectory(Path directory) throws IOException {
+        return setDirectorySettings(directory, directorySettings.get(directory));
+    }
+
+    /** Files added to and removed from the project by a change of a directory. */
+    public record DirectoryChange(List<Path> added, List<Path> removed) {
+        public DirectoryChange {
+            added = List.copyOf(added);
+            removed = List.copyOf(removed);
         }
     }
 
@@ -436,7 +571,7 @@ public class Project {
         textDocumentByPath.put(filePath, textParser);
         parseTextObject(textParser);
         //isDesynchronized = true;
-        this.isProjectDefinitionOutdatedProperty().set(true);
+        markDefinitionChanged();
     }
 
     /**
@@ -500,7 +635,7 @@ public class Project {
     public void removeFile(Path selected) {
         filesAndDirectories.remove(selected);
         textDocumentByPath.remove(selected);
-        this.isProjectDefinitionOutdatedProperty().set(true);
+        markDefinitionChanged();
     }
 
     /** Files and directories of the project definition, as given (including missing ones), in order. */
@@ -510,7 +645,7 @@ public class Project {
 
     /** True if the path was added as a directory of the project definition. */
     public boolean isDefinitionDirectory(Path path) {
-        return filesByDir.containsKey(path) || Files.isDirectory(path);
+        return directorySettings.containsKey(path) || filesByDir.containsKey(path) || Files.isDirectory(path);
     }
 
     public List<String> getFiles() {
@@ -536,6 +671,15 @@ public class Project {
             .filter(p -> Files.isDirectory(p))
             .map(p -> p.toString())
             .collect(Collectors.toList());
+    }
+
+    /** Adds a directory of the project definition with its settings; failures are recorded in {@link #getLoadProblems()}. */
+    public void addDirectory(String dirPath, DirectorySettings settings) {
+        try {
+            addDirectory(Path.of(dirPath), settings);
+        } catch (IOException | RuntimeException e) {
+            recordLoadProblem(dirPath, e);
+        }
     }
 
     /** Adds a directory of the project definition; failures are recorded in {@link #getLoadProblems()}. */
@@ -573,13 +717,15 @@ public class Project {
 
     public void removeDirectory(Path dirPath) {
         filesAndDirectories.remove(dirPath);
+        directorySettings.remove(dirPath);
         for (Path p : filesByDir.getOrDefault(
             dirPath,
             Collections.emptyList()
         )) {
             textDocumentByPath.remove(p);
         }
-        this.isProjectDefinitionOutdatedProperty().set(true);
+        filesByDir.remove(dirPath);
+        markDefinitionChanged();
     }
 
     public void removeDirectory(String dirPath) {
@@ -609,7 +755,7 @@ public class Project {
     public void addFileType(FileType type) {
         fileTypes.add(type);
         isDesynchronized = true;
-        this.isProjectDefinitionOutdatedProperty().set(true);
+        markDefinitionChanged();
     }
 
     /** Replaces the file types (order = precedence of their grammars). */
@@ -617,13 +763,13 @@ public class Project {
         fileTypes.clear();
         fileTypes.addAll(types);
         isDesynchronized = true;
-        this.isProjectDefinitionOutdatedProperty().set(true);
+        markDefinitionChanged();
     }
 
     public void removeFileType(FileType type) {
         fileTypes.remove(type);
         isDesynchronized = true;
-        this.isProjectDefinitionOutdatedProperty().set(true);
+        markDefinitionChanged();
     }
 
     public Corpus getCorpus() {

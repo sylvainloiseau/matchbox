@@ -6,6 +6,7 @@ import fr.cnrs.lacito.matchbox.gui.UnsavedChangesDialog;
 import fr.cnrs.lacito.matchbox.gui.mode.ModeHost;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.SegmentAtCaret;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
+import fr.cnrs.lacito.matchbox.model.project.DirectorySettings;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import java.io.File;
 import java.io.IOException;
@@ -15,8 +16,10 @@ import java.util.Optional;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.MenuItem;
-import javafx.stage.DirectoryChooser;
 
 /**
  * The commands of the window's menus. They mean the same in every mode: they act on the project,
@@ -28,8 +31,15 @@ public final class WorkbenchCommands {
     private final Workbench workbench;
     /** True while the focused text has unsaved changes. */
     private final BooleanProperty focusedDirty = new SimpleBooleanProperty(false);
-    /** True while a text is focused. */
-    private final BooleanProperty textFocused = new SimpleBooleanProperty(false);
+    /** True while a file added alone is focused (a file of a directory cannot be removed alone). */
+    private final BooleanProperty removableFocused = new SimpleBooleanProperty(false);
+    /** True while the project has directories. */
+    private final BooleanProperty projectHasDirectories = new SimpleBooleanProperty(false);
+    private final javafx.beans.InvalidationListener definitionListener = o -> {
+        projectHasDirectories.set(this.boundProject != null && !this.boundProject.getDefinitionDirectories().isEmpty());
+        bindFocus();
+    };
+    private Project boundProject;
     /** True while the project has files. */
     private final BooleanProperty projectHasFiles = new SimpleBooleanProperty(false);
     /** True while a document of the project has unsaved changes. */
@@ -50,19 +60,24 @@ public final class WorkbenchCommands {
     private void bindProject(Project project) {
         projectHasFiles.unbind();
         anyDirty.unbind();
+        if (boundProject != null) boundProject.definitionRevisionProperty().removeListener(definitionListener);
+        boundProject = project;
         if (project == null) {
             projectHasFiles.set(false);
             anyDirty.set(false);
+            projectHasDirectories.set(false);
         } else {
             projectHasFiles.bind(Bindings.isNotEmpty(project.getDerivedFileList()));
             anyDirty.bind(project.anyDocumentDirtyProperty());
+            project.definitionRevisionProperty().addListener(definitionListener);
+            projectHasDirectories.set(!project.getDefinitionDirectories().isEmpty());
         }
     }
 
     private void bindFocus() {
         focusedDirty.unbind();
         Optional<TextDocument> document = focusedDocument();
-        textFocused.set(document.isPresent());
+        removableFocused.set(document.map(workbench.files()::isRemovable).orElse(false));
         if (document.isPresent()) {
             focusedDirty.bind(document.get().getCouldBeWrittenBooleanProperty());
         } else {
@@ -71,12 +86,13 @@ public final class WorkbenchCommands {
     }
 
     /** Binds the enabled state and the labels of the window's menu items. */
-    public void bindMenus(MenuItem saveCurrentFile, MenuItem saveAll, MenuItem closeFile, MenuItem closeAllFiles,
-                          MenuItem undo, MenuItem redo, MenuItem back, MenuItem forward) {
+    public void bindMenus(MenuItem saveCurrentFile, MenuItem saveAll, MenuItem removeFile, MenuItem removeDirectory,
+                          MenuItem removeAllFiles, MenuItem undo, MenuItem redo, MenuItem back, MenuItem forward) {
         saveCurrentFile.disableProperty().bind(focusedDirty.not());
         saveAll.disableProperty().bind(anyDirty.not());
-        closeFile.disableProperty().bind(textFocused.not());
-        closeAllFiles.disableProperty().bind(projectHasFiles.not());
+        removeFile.disableProperty().bind(removableFocused.not());
+        removeDirectory.disableProperty().bind(projectHasDirectories.not());
+        removeAllFiles.disableProperty().bind(projectHasFiles.not());
         var journal = workbench.journal();
         undo.disableProperty().bind(journal.undoAvailableProperty().not());
         undo.textProperty().bind(Bindings.when(journal.undoAvailableProperty())
@@ -106,7 +122,8 @@ public final class WorkbenchCommands {
         if (f == null || project == null) return;
         try {
             if (f.isDirectory()) {
-                project.addDirectory(f.toPath(), true);
+                project.addDirectory(f.toPath(),
+                    DirectorySettings.of(workbench.settings().fileExtensions(), true));
             } else {
                 project.addFile(f.toPath());
             }
@@ -116,12 +133,9 @@ public final class WorkbenchCommands {
         }
     }
 
-    /** Chooses a directory and adds its files to the project. */
+    /** Chooses a directory, then its settings, and adds it to the project. */
     public void addDirectory() {
-        File selected = new DirectoryChooser().showDialog(workbench.window());
-        if (selected != null) {
-            addFileOrDirectory(selected);
-        }
+        workbench.files().addDirectory();
     }
 
     public void saveCurrentFile() {
@@ -138,22 +152,33 @@ public final class WorkbenchCommands {
         workbench.saveAll();
     }
 
-    /** Removes the focused text's file from the project, after confirmation if it is unsaved. */
-    public void closeFile() {
-        Project project = workbench.session().project();
-        Optional<TextDocument> document = focusedDocument();
-        if (project == null || document.isEmpty()) return;
-        if (UnsavedChangesDialog.confirm(workbench.window(), List.of(document.get()), "closing the file")) {
-            project.removeFile(document.get().getFilePath());
-        }
+    /** Removes the focused file from the project if it was added alone (asks about unsaved changes). */
+    public void removeFile() {
+        focusedDocument().ifPresent(workbench.files()::removeFile);
     }
 
-    /** Removes every file and directory from the project, after confirmation for unsaved files. */
-    public void closeAllFiles() {
+    /**
+     * Removes every file and directory from the project, after confirmation (the files stay on
+     * the disk), then for unsaved files.
+     */
+    public void removeAllFiles() {
         Project project = workbench.session().project();
         if (project == null) return;
+        int files = project.getDerivedFileList().size();
+        long directories = project.getDefinitionPaths().stream().filter(project::isDefinitionDirectory).count();
+        ButtonType remove = new ButtonType("Remove", ButtonBar.ButtonData.OK_DONE);
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "", remove, ButtonType.CANCEL);
+        if (workbench.window() != null) alert.initOwner(workbench.window());
+        alert.setTitle("Remove all files from project");
+        alert.setHeaderText("Remove all the files from the project?");
+        alert.setContentText("Removes " + files + (files == 1 ? " file" : " files")
+            + (directories == 0 ? "" : " (" + directories + (directories == 1 ? " directory" : " directories") + ")")
+            + " from the project. The files are not deleted from the disk.");
+        if (alert.showAndWait().orElse(ButtonType.CANCEL) != remove) {
+            return;
+        }
         if (!UnsavedChangesDialog.confirm(workbench.window(), List.copyOf(project.getDerivedFileList()),
-                "closing all the files")) {
+                "removing all the files from the project")) {
             return;
         }
         for (Path p : project.getDefinitionPaths()) {

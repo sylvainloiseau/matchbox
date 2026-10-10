@@ -57,6 +57,8 @@ public abstract class AbstractMode implements Mode {
 
     private void projectChanged() {
         selection.set(null);
+        // the focus referred to a text of the previous project
+        focus.set(Optional.empty());
         pendingTexts.clear();
         if (active) {
             onProjectChanged();

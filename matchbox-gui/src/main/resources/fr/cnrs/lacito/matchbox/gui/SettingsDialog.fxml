@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.scene.shape.Rectangle?>
 <VBox
     spacing="10.0"
     xmlns="http://javafx.com/javafx/8.0.171"
@@ -10,53 +9,6 @@
   <children>
     <TabPane fx:id="tabs">
       <tabs>
-        <Tab text="Color" closable="false">
-          <content>
-            <VBox spacing="8.0">
-              <children>
-                <HBox spacing="10.0" style="-fx-padding: 15;">
-                  <children>
-                    <Label text="igt paragraph" />
-                    <Rectangle
-                                            fx:id="igtColorPreview"
-                                            width="24.0"
-                                            height="16.0"
-                                        />
-                    <ColorPicker fx:id="igtColorPicker" />
-                  </children>
-                </HBox>
-                <HBox spacing="10.0" style="-fx-padding: 5 0 0 0;">
-                  <children>
-                    <Label
-                                            text="lexical description"
-                                            style="-fx-font-weight: bold;"
-                                        />
-                    <Rectangle
-                                            fx:id="lexicalColorPreview"
-                                            width="24.0"
-                                            height="16.0"
-                                        />
-                    <ColorPicker fx:id="lexicalColorPicker" />
-                  </children>
-                </HBox>
-                <HBox spacing="10.0" style="-fx-padding: 5 0 0 0;">
-                  <children>
-                    <Label
-                                            text="tag"
-                                            style="-fx-font-weight: bold;"
-                                        />
-                    <Rectangle
-                                            fx:id="tagColorPreview"
-                                            width="24.0"
-                                            height="16.0"
-                                        />
-                    <ColorPicker fx:id="tagColorPicker" />
-                  </children>
-                </HBox>
-              </children>
-            </VBox>
-          </content>
-        </Tab>
         <Tab text="Grammar" closable="false">
           <content>
             <VBox spacing="10.0" style="-fx-padding: 15;">
@@ -85,7 +37,7 @@
                                     style="-fx-font-size: 0.9em; -fx-text-fill: #666666;"
                                 />
                 <Label
-                                    text="Extensions of the files added from a directory (one per line; empty: all files):"
+                                    text="Default file extensions of new directories (one per line; empty: all files). Each directory then has its own patterns (Directory settings, in File Mode):"
                                     wrapText="true"
                                     style="-fx-font-weight: bold;"
                                 />

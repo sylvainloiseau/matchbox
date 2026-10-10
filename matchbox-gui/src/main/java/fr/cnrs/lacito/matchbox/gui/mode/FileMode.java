@@ -8,11 +8,11 @@ import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
 import fr.cnrs.lacito.matchbox.gui.SearchDialog;
-import fr.cnrs.lacito.matchbox.gui.UnsavedChangesDialog;
 import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
 import fr.cnrs.lacito.matchbox.gui.assist.GhostTextController;
 import fr.cnrs.lacito.matchbox.gui.assist.SuggestionPanelController;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.FileTree;
 import fr.cnrs.lacito.matchbox.gui.view.ErrorFilter;
 import fr.cnrs.lacito.matchbox.gui.view.GrammarNames;
 import fr.cnrs.lacito.matchbox.gui.view.Kinds;
@@ -25,6 +25,7 @@ import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,8 +49,9 @@ import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
+import javafx.scene.control.TreeCell;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
@@ -78,7 +80,7 @@ import org.fxmisc.richtext.InlineCssTextArea;
 public class FileMode implements Mode {
 
     @FXML
-    private ListView<TextDocument> fileListView;
+    private TreeView<FileTree.Node> fileTreeView;
 
     @FXML
     private TextField filterFileTextField;
@@ -143,16 +145,28 @@ public class FileMode implements Mode {
     private EditorController editorController;
     private GhostTextController ghostText;
     private SuggestionPanelController suggestionPanel;
-    private FilteredList<TextDocument> filteredFiles;
+    /** Expanded state of the directory nodes, by path (top directories expanded at first). */
+    private final Map<java.nio.file.Path, Boolean> expanded = new HashMap<>();
+    /** The dirty state of the documents shown changes the look of their directories. */
+    private final List<javafx.beans.property.ReadOnlyBooleanProperty> watchedDirty = new ArrayList<>();
+    private final javafx.beans.InvalidationListener dirtyRefresh = o -> fileTreeView.refresh();
+    private final javafx.beans.InvalidationListener definitionListener = o -> rebuildTree();
+    /** True while the tree is rebuilt (its selection changes are not the user's). */
+    private boolean rebuilding;
+    /** True while a directory node, or a node inside one, is selected. */
+    private final javafx.beans.property.BooleanProperty directorySelected = new javafx.beans.property.SimpleBooleanProperty();
+    /** True while the displayed file was added alone (it can be removed from the project). */
+    private final javafx.beans.property.BooleanProperty displayedRemovable = new javafx.beans.property.SimpleBooleanProperty();
     private Menu menu;
     /** What the window's commands target: the displayed file, the caret and the selected object. */
     private final ObjectProperty<Optional<Focus>> focus = new SimpleObjectProperty<>(Optional.empty());
-    /** Shows the first file when files are added while none is displayed. */
+    /** Rebuilds the tree; shows the first file when files are added while none is displayed. */
     private final ListChangeListener<TextDocument> filesAdded = change -> {
-        if (editorController.getSelectedDocument().isEmpty() && !fileListView.getItems().isEmpty()) {
+        rebuildTree();
+        if (editorController.getSelectedDocument().isEmpty()) {
             Platform.runLater(() -> {
-                if (fileListView.getSelectionModel().isEmpty() && !fileListView.getItems().isEmpty()) {
-                    fileListView.getSelectionModel().select(0);
+                if (editorController.getSelectedDocument().isEmpty()) {
+                    firstFile(fileTreeView.getRoot()).ifPresent(this::selectItem);
                 }
             });
         }
@@ -203,21 +217,28 @@ public class FileMode implements Mode {
         setupFocus();
         this.menu = buildMenu();
         saveButton.disableProperty().bind(editorController.getCurrentTextCouldBeWrittenDownProperty().not());
-        closeButton.disableProperty().bind(editorController.getClosableProperty().not());
+        // a file of a directory is excluded in the directory settings, not removed alone
+        closeButton.disableProperty().bind(editorController.getClosableProperty().not().or(displayedRemovable.not()));
+        closeButton.setTooltip(new Tooltip("Remove the displayed file from the project (files added alone; "
+            + "exclude a file of a directory in its settings)"));
         parseButton.disableProperty().bind(editorController.getCurrentTextCouldBeParsedAgainProperty().not());
     }
 
-    /** Shows the files of a new project; nothing is displayed until a file is chosen. */
+    /** Shows the files of a new project (none if null); nothing is displayed until a file is chosen. */
     private void setProject(Project project) {
         if (this.project != null) {
             this.project.getDerivedFileList().removeListener(filesAdded);
+            this.project.definitionRevisionProperty().removeListener(definitionListener);
         }
         this.project = project;
         editorController.setProject(project);
-        filteredFiles = new FilteredList<>(project.getDerivedFileList());
-        applyFileFilter(filterFileTextField.getText());
-        fileListView.setItems(filteredFiles);
-        project.getDerivedFileList().addListener(filesAdded);
+        expanded.clear();
+        if (project != null) {
+            project.getDerivedFileList().addListener(filesAdded);
+            project.definitionRevisionProperty().addListener(definitionListener);
+        }
+        // no project: an empty tree (the start page covers the mode)
+        rebuildTree();
     }
 
     // ------------------------------------------------------------------
@@ -245,9 +266,9 @@ public class FileMode implements Mode {
         if (project == null) return false;
         if (!isDisplayed(target)) {
             project.document(target.text()).ifPresent(d -> {
-                // the file may be hidden by the filter of the list
-                if (!fileListView.getItems().contains(d)) filterFileTextField.clear();
-                fileListView.getSelectionModel().select(d);
+                // the file may be hidden by the filter of the tree
+                if (find(fileTreeView.getRoot(), d.getFilePath()).isEmpty()) filterFileTextField.clear();
+                find(fileTreeView.getRoot(), d.getFilePath()).ifPresent(this::selectItem);
             });
         }
         if (!isDisplayed(target)) return false;
@@ -310,8 +331,17 @@ public class FileMode implements Mode {
             new MenuItem("Insert intermorphemic gloss"),
             new MenuItem("Insert lexical information"));
 
+        MenuItem directorySettings = item("Directory settings…",
+            () -> selectedDirectory().ifPresent(workbench.files()::editSettings));
+        MenuItem removeDirectory = item("Remove directory from project",
+            () -> selectedDirectory().ifPresent(workbench.files()::removeDirectory));
+        directorySettings.disableProperty().bind(directorySelected.not());
+        removeDirectory.disableProperty().bind(directorySelected.not());
+
         Menu result = new Menu("File Mode", null,
             search, parse,
+            new SeparatorMenuItem(),
+            directorySettings, removeDirectory,
             new SeparatorMenuItem(),
             suggest, inline, explain, reviewBlock, reviewSelection, reviewFile, panel,
             new SeparatorMenuItem(),
@@ -423,44 +453,215 @@ public class FileMode implements Mode {
     // ------------------------------------------------------------------
 
     private void setupFileListView() {
-        filterFileTextField.textProperty().addListener((obs, oldValue, newValue) -> applyFileFilter(newValue));
-        fileListView.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(TextDocument item, boolean empty) {
-                super.updateItem(item, empty);
-                textProperty().unbind();
-                styleProperty().unbind();
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                } else {
-                    // unsaved documents (possibly changed by a view) are marked
-                    String path = item.getFilePath().toString();
-                    var dirty = item.getCouldBeWrittenBooleanProperty();
-                    textProperty().bind(Bindings.when(dirty).then("* " + path).otherwise(path));
-                    styleProperty().bind(Bindings.when(dirty)
-                        .then("-fx-font-weight: bold; -fx-font-style: italic;").otherwise(""));
-                }
-            }
-        });
-        fileListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                editorController.selectEditedFile(newVal.getFilePath());
-            } else {
+        fileTreeView.setRoot(new TreeItem<>());
+        fileTreeView.setShowRoot(false);
+        filterFileTextField.textProperty().addListener((obs, oldValue, newValue) -> rebuildTree());
+        fileTreeView.setCellFactory(tree -> new FileTreeCell());
+        fileTreeView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            updateSelectionState();
+            if (rebuilding) return;
+            if (newVal != null && newVal.getValue() instanceof FileTree.FileNode f) {
+                editorController.selectEditedFile(f.path());
+            } else if (newVal == null) {
                 editorController.clearEditor();
             }
+            // a directory selected: the editor keeps its file
             updateFocus();
         });
     }
 
-    private void applyFileFilter(String filter) {
-        if (filteredFiles == null) return;
-        if (filter == null || filter.isEmpty()) {
-            filteredFiles.setPredicate(item -> true);
-        } else {
-            String lower = filter.toLowerCase();
-            filteredFiles.setPredicate(item -> item.getFilePath().toString().toLowerCase().contains(lower));
+    /** Builds the tree again from the project, keeping the expanded nodes and the selection. */
+    private void rebuildTree() {
+        if (fileTreeView == null) return;
+        watchedDirty.forEach(p -> p.removeListener(dirtyRefresh));
+        watchedDirty.clear();
+        String filter = filterFileTextField.getText();
+        boolean filtering = filter != null && !filter.isBlank();
+        TreeItem<FileTree.Node> selected = fileTreeView.getSelectionModel().getSelectedItem();
+        java.nio.file.Path selectedPath = selected == null || selected.getValue() == null ? null : selected.getValue().path();
+        List<TreeItem<FileTree.Node>> items = new ArrayList<>();
+        if (project != null) {
+            for (FileTree.Entry e : FileTree.build(project, filter)) items.add(item(e, filtering));
+            project.getDerivedFileList().forEach(d -> {
+                watchedDirty.add(d.getCouldBeWrittenBooleanProperty());
+                d.getCouldBeWrittenBooleanProperty().addListener(dirtyRefresh);
+            });
         }
+        rebuilding = true;
+        try {
+            fileTreeView.getRoot().getChildren().setAll(items);
+            if (selectedPath != null) {
+                find(fileTreeView.getRoot(), selectedPath).ifPresentOrElse(this::selectItem,
+                    () -> fileTreeView.getSelectionModel().clearSelection());
+            }
+        } finally {
+            rebuilding = false;
+        }
+        updateSelectionState();
+    }
+
+    private TreeItem<FileTree.Node> item(FileTree.Entry entry, boolean filtering) {
+        TreeItem<FileTree.Node> item = new TreeItem<>(entry.node());
+        for (FileTree.Entry child : entry.children()) item.getChildren().add(item(child, filtering));
+        if (!(entry.node() instanceof FileTree.FileNode)) {
+            java.nio.file.Path path = entry.node().path();
+            if (filtering) {
+                item.setExpanded(true);
+            } else {
+                item.setExpanded(expanded.computeIfAbsent(path, p -> entry.node() instanceof FileTree.TopDirectory));
+                item.expandedProperty().addListener((obs, o, n) -> {
+                    if (!rebuilding && (filterFileTextField.getText() == null || filterFileTextField.getText().isBlank())) {
+                        expanded.put(path, n);
+                    }
+                });
+            }
+        }
+        return item;
+    }
+
+    /** Selects a node, expanding its ancestors, and scrolls to it. */
+    private void selectItem(TreeItem<FileTree.Node> item) {
+        for (TreeItem<FileTree.Node> p = item.getParent(); p != null; p = p.getParent()) p.setExpanded(true);
+        fileTreeView.getSelectionModel().select(item);
+        int row = fileTreeView.getRow(item);
+        if (row >= 0) fileTreeView.scrollTo(row);
+    }
+
+    private static Optional<TreeItem<FileTree.Node>> find(TreeItem<FileTree.Node> item, java.nio.file.Path path) {
+        if (item == null) return Optional.empty();
+        if (item.getValue() != null && item.getValue().path().equals(path)) return Optional.of(item);
+        for (TreeItem<FileTree.Node> child : item.getChildren()) {
+            Optional<TreeItem<FileTree.Node>> found = find(child, path);
+            if (found.isPresent()) return found;
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<TreeItem<FileTree.Node>> firstFile(TreeItem<FileTree.Node> item) {
+        if (item == null) return Optional.empty();
+        if (item.getValue() instanceof FileTree.FileNode) return Optional.of(item);
+        for (TreeItem<FileTree.Node> child : item.getChildren()) {
+            Optional<TreeItem<FileTree.Node>> found = firstFile(child);
+            if (found.isPresent()) return found;
+        }
+        return Optional.empty();
+    }
+
+    /** The directory of the project the selected node belongs to (itself, or its top directory). */
+    public Optional<java.nio.file.Path> selectedDirectory() {
+        TreeItem<FileTree.Node> item = fileTreeView.getSelectionModel().getSelectedItem();
+        if (item == null || item.getValue() == null) return Optional.empty();
+        return switch (item.getValue()) {
+            case FileTree.TopDirectory d -> Optional.of(d.path());
+            case FileTree.SubDirectory d -> Optional.of(d.top());
+            case FileTree.FileNode f -> f.directory();
+        };
+    }
+
+    private void updateSelectionState() {
+        directorySelected.set(selectedDirectory().isPresent());
+        displayedRemovable.set(editorController != null
+            && editorController.getSelectedDocument().map(workbench.files()::isRemovable).orElse(false));
+    }
+
+    /**
+     * A node of the file tree: a file (its name, "* " and bold italic when unsaved; a file added
+     * alone also shows its directory) or a directory (name, number of files, bold when a file
+     * below is unsaved), with its context menu.
+     */
+    private final class FileTreeCell extends TreeCell<FileTree.Node> {
+        @Override
+        protected void updateItem(FileTree.Node node, boolean empty) {
+            super.updateItem(node, empty);
+            textProperty().unbind();
+            styleProperty().unbind();
+            setGraphic(null);
+            setTooltip(null);
+            setContextMenu(null);
+            if (empty || node == null) {
+                setText(null);
+                setStyle("");
+                return;
+            }
+            switch (node) {
+                case FileTree.FileNode f -> {
+                    var dirty = f.document().getCouldBeWrittenBooleanProperty();
+                    textProperty().bind(Bindings.when(dirty).then("* " + f.name()).otherwise(f.name()));
+                    styleProperty().bind(Bindings.when(dirty)
+                        .then("-fx-font-weight: bold; -fx-font-style: italic;").otherwise(""));
+                    if (f.directory().isEmpty() && f.path().getParent() != null) {
+                        Label where = new Label(abbreviate(f.path().getParent()));
+                        where.setStyle("-fx-text-fill: #888888; -fx-font-size: 0.9em;");
+                        setGraphic(where);
+                        setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+                    }
+                    setTooltip(new Tooltip(f.path().toString()));
+                    setContextMenu(fileMenu(f));
+                }
+                case FileTree.TopDirectory d -> {
+                    directoryLook(abbreviate(d.path()));
+                    String settings = project == null ? "" : project.directorySettings(d.path()).map(FileMode::describe).orElse("");
+                    setTooltip(new Tooltip(d.path() + (settings.isEmpty() ? "" : "\n" + settings)));
+                    setContextMenu(topDirectoryMenu(d));
+                }
+                case FileTree.SubDirectory d -> {
+                    directoryLook(d.name());
+                    setTooltip(new Tooltip(d.path().toString()));
+                    setContextMenu(subDirectoryMenu(d));
+                }
+            }
+        }
+
+        private void directoryLook(String name) {
+            setText("📁 " + name);
+            List<TextDocument> below = getTreeItem() == null ? List.of() : documentsBelow(getTreeItem()).toList();
+            Label count = new Label("(" + below.size() + ")");
+            count.setStyle("-fx-text-fill: #888888;");
+            setGraphic(count);
+            setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+            setStyle(below.stream().anyMatch(TextDocument::getCouldBeWritten) ? "-fx-font-weight: bold;" : "");
+        }
+    }
+
+    private static java.util.stream.Stream<TextDocument> documentsBelow(TreeItem<FileTree.Node> item) {
+        if (item.getValue() instanceof FileTree.FileNode f) return java.util.stream.Stream.of(f.document());
+        return item.getChildren().stream().flatMap(FileMode::documentsBelow);
+    }
+
+    /** "*.txt, *.md · excludes drafts/** · recursive". */
+    static String describe(fr.cnrs.lacito.matchbox.model.project.DirectorySettings s) {
+        String in = s.includes().isEmpty() ? "every file" : String.join(", ", s.includes());
+        String out = s.excludes().isEmpty() ? "" : " · excludes " + String.join(", ", s.excludes());
+        return in + out + (s.recursive() ? " · with sub-directories" : " · without sub-directories");
+    }
+
+    private static String abbreviate(java.nio.file.Path dir) {
+        String home = System.getProperty("user.home");
+        String s = dir.toString();
+        return home != null && !home.isEmpty() && s.startsWith(home) ? "~" + s.substring(home.length()) : s;
+    }
+
+    private ContextMenu topDirectoryMenu(FileTree.TopDirectory d) {
+        return new ContextMenu(
+            item("Edit directory settings…", () -> workbench.files().editSettings(d.path())),
+            item("Rescan directory", () -> workbench.files().rescan(d.path())),
+            new SeparatorMenuItem(),
+            item("Remove this directory from the project", () -> workbench.files().removeDirectory(d.path())));
+    }
+
+    private ContextMenu subDirectoryMenu(FileTree.SubDirectory d) {
+        return new ContextMenu(
+            item("Exclude this sub-directory", () -> workbench.files().excludeSubdirectory(d.top(), d.path())));
+    }
+
+    private ContextMenu fileMenu(FileTree.FileNode f) {
+        MenuItem remove = item("Remove file from project", () -> workbench.files().removeFile(f.document()));
+        if (f.directory().isPresent()) {
+            remove.setDisable(true);
+            return new ContextMenu(remove,
+                item("Exclude this file", () -> workbench.files().excludeFile(f.document())));
+        }
+        return new ContextMenu(remove);
     }
 
     // ------------------------------------------------------------------
@@ -679,15 +880,15 @@ public class FileMode implements Mode {
         });
     }
 
+    /** Removes the displayed file from the project if it was added alone. */
     @FXML
     public void handleCloseFile() {
-        TextDocument selected = fileListView.getSelectionModel().getSelectedItem();
-        if (selected != null && UnsavedChangesDialog.confirm(window(), List.of(selected), "closing the file")) {
-            project.removeFile(selected.getFilePath());
-            if (!project.getDerivedFileList().isEmpty()) {
-                fileListView.getSelectionModel().select(0);
+        editorController.getSelectedDocument().ifPresent(d -> {
+            workbench.files().removeFile(d);
+            if (project != null && !project.getDerivedFileList().contains(d)) {
+                firstFile(fileTreeView.getRoot()).ifPresent(this::selectItem);
             }
-        }
+        });
     }
 
     @FXML

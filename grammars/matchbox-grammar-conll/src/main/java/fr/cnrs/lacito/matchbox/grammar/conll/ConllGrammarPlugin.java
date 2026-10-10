@@ -36,6 +36,11 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
         return API_VERSION;
     }
 
+    @Override
+    public List<String> getObjectKinds() {
+        return List.of(KIND_SENTENCE);
+    }
+
     /** CoNLL-U columns after ID. */
     static final List<String> FIELDS = List.of(
         "FORM", "LEMMA", "UPOS", "XPOS", "FEATS", "HEAD", "DEPREL", "DEPS", "MISC"

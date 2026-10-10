@@ -12,6 +12,7 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <VBox
     fx:id="mainBorderPane"
@@ -20,125 +21,70 @@
     xmlns:fx="http://javafx.com/fxml/1"
 >
         <MenuBar fx:id="menuBar" VBox.vgrow="NEVER">
+            <!-- File: the project file and the application; Current project: the project's content -->
             <Menu fx:id="fileMenu" text="File">
             <items>
-            <MenuItem
+               <MenuItem
                     fx:id="newProjectMenuItem"
-                    mnemonicParsing="true"
                     onAction="#handleNewProject"
-                    text="New project"
-                />
+                    text="_New project"
+                >
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="N" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
                <MenuItem
                     fx:id="openProjectMenuItem"
-                    mnemonicParsing="true"
                     onAction="#handleOpenProject"
-                    text="Open projet…"
-                />
-                <MenuItem
-                    fx:id="editProjectMenuItem"
-                    mnemonicParsing="true"
-                    onAction="#handleEditProject"
-                    text="Projet properties…"
-                />
-            <Menu
+                    text="_Open project…"
+                >
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="O" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
+               <Menu
                     fx:id="openRecentProjectsMenuItem"
                     mnemonicParsing="false"
-                    onAction="#handleOpenRecentFileset"
                     text="Open recent project"
                 >
-              <items>
-                <MenuItem mnemonicParsing="false" text="Action 1" />
-              </items>
-            </Menu>
-            <MenuItem
+                 <items>
+                   <MenuItem mnemonicParsing="false" text="No recent projects" />
+                 </items>
+               </Menu>
+               <SeparatorMenuItem mnemonicParsing="false" />
+               <MenuItem
                     fx:id="saveProjectMenuItem"
                     mnemonicParsing="false"
                     onAction="#handleSaveCurrentProject"
                     text="Save project"
                 />
-                <MenuItem
+               <MenuItem
                     fx:id="saveAsProjectMenuItem"
-                    mnemonicParsing="true"
+                    mnemonicParsing="false"
                     onAction="#handleSaveAsProject"
                     text="Save project as…"
                 />
                <MenuItem
                     fx:id="closeCurrentProjectMenuItem"
-                    mnemonicParsing="true"
+                    mnemonicParsing="false"
                     onAction="#handleCloseCurrentProject"
                     text="Close project"
-                />
-            <SeparatorMenuItem mnemonicParsing="false" />
-
-            <!--
-            -->
-               <MenuItem
-                    fx:id="openFileMenu"
-                    mnemonicParsing="true"
-                    onAction="#handleOpenFileWithFileChooser"
-                    text="Add _File"
                 >
                   <accelerator>
-                     <KeyCodeCombination
-                            alt="UP"
-                            code="O"
-                            control="ANY"
-                            meta="UP"
-                            shift="UP"
-                            shortcut="UP"
-                        />
+                     <KeyCodeCombination alt="UP" code="W" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
                   </accelerator>
                </MenuItem>
-               <MenuItem
-                    fx:id="openDirItem"
-                    mnemonicParsing="true"
-                    onAction="#handleOpenDirectory"
-                    text="Add files in _Directory"
-                />
-               <Menu
-                    fx:id="openRecentMenu"
-                    mnemonicParsing="false"
-                    text="Add recent"
-                >
-                 <items>
-                   <MenuItem mnemonicParsing="false" text="Action 1" />
-                 </items>
-               </Menu>
-               <MenuItem
-                    fx:id="saveCurrentFileMenuItem"
-                    onAction="#handleSaveCurrentFile"
-                    text="_Save current file"
-                />
-               <MenuItem
-                    fx:id="saveAllFilesMenuItem"
-                    onAction="#handleSaveAllFiles"
-                    text="Save all files"
-                />
-               <MenuItem
-                    fx:id="closeFileMenuItem"
-                    mnemonicParsing="true"
-                    onAction="#handleCloseFile"
-                    text="_Close file"
-                />
-               <MenuItem
-                    fx:id="closeAllFilesItem"
-                    mnemonicParsing="true"
-                    onAction="#handleCloseAllFiles"
-                    text="Close all file"
-                />
-            <SeparatorMenuItem mnemonicParsing="false" />
+               <SeparatorMenuItem mnemonicParsing="false" />
                <MenuItem
                     fx:id="settingsItem"
                     mnemonicParsing="false"
                     onAction="#handleSettings"
-                    text="Settings"
-                />
-               <MenuItem
-                    fx:id="aiAssistantItem"
-                    mnemonicParsing="false"
-                    onAction="#handleAiAssistant"
-                    text="AI assistant…"
-                />
+                    text="Settings…"
+                >
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="COMMA" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
                <MenuItem
                     fx:id="quitItem"
                     mnemonicParsing="false"
@@ -146,16 +92,79 @@
                     text="Quit"
                 >
                   <accelerator>
-                     <KeyCodeCombination
-                            alt="ANY"
-                            code="Q"
-                            control="UP"
-                            meta="UP"
-                            shift="UP"
-                            shortcut="UP"
-                        />
+                     <KeyCodeCombination alt="ANY" code="Q" control="UP" meta="UP" shift="UP" shortcut="UP" />
                   </accelerator>
                </MenuItem>
+            </items></Menu>
+            <Menu fx:id="currentProjectMenu" text="Current project">
+            <items>
+               <MenuItem
+                    fx:id="editProjectMenuItem"
+                    mnemonicParsing="false"
+                    onAction="#handleEditProject"
+                    text="Project properties…"
+                />
+               <SeparatorMenuItem mnemonicParsing="false" />
+               <MenuItem
+                    fx:id="openFileMenu"
+                    mnemonicParsing="true"
+                    onAction="#handleOpenFileWithFileChooser"
+                    text="Add _file…"
+                />
+               <MenuItem
+                    fx:id="openDirItem"
+                    mnemonicParsing="true"
+                    onAction="#handleOpenDirectory"
+                    text="Add files in _directory…"
+                />
+               <Menu
+                    fx:id="openRecentMenu"
+                    mnemonicParsing="false"
+                    text="Add recent"
+                >
+                 <items>
+                   <MenuItem mnemonicParsing="false" text="No recent files" />
+                 </items>
+               </Menu>
+               <SeparatorMenuItem mnemonicParsing="false" />
+               <MenuItem
+                    fx:id="saveCurrentFileMenuItem"
+                    onAction="#handleSaveCurrentFile"
+                    text="_Save current file"
+                >
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="S" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
+               <MenuItem
+                    fx:id="saveAllFilesMenuItem"
+                    mnemonicParsing="false"
+                    onAction="#handleSaveAllFiles"
+                    text="Save all files"
+                >
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="S" control="UP" meta="UP" shift="DOWN" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
+               <SeparatorMenuItem mnemonicParsing="false" />
+               <MenuItem
+                    fx:id="removeFileMenuItem"
+                    mnemonicParsing="false"
+                    onAction="#handleRemoveFile"
+                    text="Remove file from project"
+                />
+               <MenuItem
+                    fx:id="removeDirectoryMenuItem"
+                    mnemonicParsing="false"
+                    onAction="#handleRemoveDirectory"
+                    text="Remove directory from project…"
+                />
+               <MenuItem
+                    fx:id="removeAllFilesMenuItem"
+                    mnemonicParsing="false"
+                    onAction="#handleRemoveAllFiles"
+                    text="Remove all files from project…"
+                />
             </items></Menu>
               <Menu fx:id="editMenu" text="Edit">
                 <items>
@@ -180,7 +189,7 @@
                 </items>
               </Menu>
               <!-- the modes are listed first (ModeHost); the active mode's menu follows this menu -->
-              <Menu fx:id="viewMenu" text="View">
+              <Menu fx:id="modeMenu" text="Mode">
                 <items>
                   <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem
@@ -200,6 +209,7 @@
             <Menu fx:id="assistantMenu" text="Assistant">
               <items>
                 <MenuItem
+                    fx:id="refreshExamplesItem"
                     mnemonicParsing="false"
                     onAction="#handleRefreshExamples"
                     text="Refresh project examples"
@@ -238,10 +248,10 @@
             <Separator orientation="VERTICAL" />
           </items>
         </ToolBar>
-   <AnchorPane
-        fx:id="viewPane"
-        VBox.vgrow="ALWAYS"
-    />
+   <!-- the active mode (viewPane), or the start page while no project is open (MainController) -->
+   <StackPane fx:id="mainArea" VBox.vgrow="ALWAYS">
+      <AnchorPane fx:id="viewPane" />
+   </StackPane>
    <!-- status bar: messages of the status line (left), focus and assistant status (right) -->
    <HBox
         id="HBox"

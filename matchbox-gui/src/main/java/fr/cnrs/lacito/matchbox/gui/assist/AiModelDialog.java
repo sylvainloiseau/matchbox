@@ -34,7 +34,7 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 
 /**
- * Choice of the AI provider and models (File › AI assistant…). Values are applied on OK; API
+ * Choice of the AI provider and models (Assistant › AI assistant settings…). Values are applied on OK; API
  * keys are stored by {@link ApiKeyStore}, never in the settings file.
  */
 final class AiModelDialog {

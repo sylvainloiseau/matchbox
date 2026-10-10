@@ -37,8 +37,8 @@ class SettingsStoreTest {
     void roundTrip() throws IOException {
         AssistSettingsData assist = new AssistSettingsData("ollama", "http://localhost:11434", "llama3.2",
             "qwen3:8b", false, AssistSettingsData.AUTO, 600, 3000, 500, true, false, "French", List.of("anthropic"));
-        SettingsData data = new SettingsData(SettingsData.CURRENT_VERSION, "ISO-8859-1", "#123456", "red", "-",
-            List.of("txt"), List.of("notes-*"), 5, 7, true, "/tmp/m.log", assist, true, "#abcdef",
+        SettingsData data = new SettingsData(SettingsData.CURRENT_VERSION, "ISO-8859-1", "-",
+            List.of("txt"), List.of("notes-*"), 5, 7, true, "/tmp/m.log", assist, true,
             new TagBrowserSettingsData(2, 8, TagBrowserSettingsData.SORT_COUNT, true));
         store.saveSettings(data);
         store.saveRecent(new RecentData(1, List.of("/a.txt", "/b"), List.of("/p.mbx")));
@@ -68,10 +68,10 @@ class SettingsStoreTest {
     @Test
     void unknownKeysAreIgnoredAndMissingKeysGetDefaults() throws IOException {
         Files.createDirectories(store.settingsFile().getParent());
-        Files.writeString(store.settingsFile(), "{ \"igtColor\": \"#abcdef\", \"futureOption\": [1, 2] }");
+        Files.writeString(store.settingsFile(), "{ \"morphemeSeparators\": \"=\", \"igtColor\": \"#abcdef\", \"futureOption\": [1, 2] }");
         var loaded = store.loadSettings();
-        assertEquals("#abcdef", loaded.value().igtColor());
-        assertEquals(SettingsData.defaults().lexicalColor(), loaded.value().lexicalColor());
+        assertEquals("=", loaded.value().morphemeSeparators());
+        assertEquals(SettingsData.defaults().charset(), loaded.value().charset());
         assertEquals(List.of("txt", "md"), loaded.value().fileExtensions());
         assertTrue(loaded.problems().isEmpty());
     }
@@ -80,11 +80,11 @@ class SettingsStoreTest {
     void invalidValuesAreReplacedAndReported() throws IOException {
         Files.createDirectories(store.settingsFile().getParent());
         Files.writeString(store.settingsFile(),
-            "{ \"charset\": \"NO-SUCH-CHARSET\", \"igtColor\": \"not a colour!\", \"maxRecentFiles\": 0," +
+            "{ \"charset\": \"NO-SUCH-CHARSET\", \"maxRecentProjects\": -1, \"maxRecentFiles\": 0," +
             "  \"fileExtensions\": [\".TXT\", \" md \", \"txt\", \"\"] }");
         var loaded = store.loadSettings();
         assertEquals("UTF-8", loaded.value().charset());
-        assertEquals("#fff1c1", loaded.value().igtColor());
+        assertEquals(10, loaded.value().maxRecentProjects());
         assertEquals(10, loaded.value().maxRecentFiles());
         assertEquals(List.of("txt", "md"), loaded.value().fileExtensions());
         assertEquals(3, loaded.problems().size());
@@ -105,7 +105,7 @@ class SettingsStoreTest {
 
     @Test
     void blankLogFileBecomesNull() {
-        SettingsData d = new SettingsData(null, null, null, null, null, null, null, null, null, null, "  ", null, null, null, null).validated();
+        SettingsData d = new SettingsData(null, null, null, null, null, null, null, null, "  ", null, null, null).validated();
         assertNull(d.logFile());
         assertEquals(SettingsData.defaults(), d);
     }

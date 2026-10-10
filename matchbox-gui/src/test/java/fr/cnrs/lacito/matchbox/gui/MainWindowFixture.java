@@ -1,6 +1,11 @@
 package fr.cnrs.lacito.matchbox.gui;
 
 import fr.cnrs.lacito.matchbox.PluginManager;
+import fr.cnrs.lacito.matchbox.gui.close.CloseChoice;
+import fr.cnrs.lacito.matchbox.gui.close.ProjectCloser;
+import fr.cnrs.lacito.matchbox.gui.close.UnsavedProjectState;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.FileTree;
+import fr.cnrs.lacito.matchbox.model.project.DirectorySettings;
 import fr.cnrs.lacito.matchbox.gui.workbench.Workbench;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
 import fr.cnrs.lacito.matchbox.model.project.Project;
@@ -9,6 +14,9 @@ import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
@@ -57,7 +65,17 @@ abstract class MainWindowFixture {
     Path dir;
     protected MainController controller;
     protected Stage stage;
-    private UserSettings settings;
+    protected UserSettings settings;
+    /** The questions asked before a project was closed (the dialog is not shown in tests). */
+    protected final List<UnsavedProjectState> closeQuestions = new ArrayList<>();
+    /** The answer to those questions: by default, save nothing and go on. */
+    protected Optional<CloseChoice> closeAnswer = Optional.of(new CloseChoice(false, List.of()));
+    /** The directory "chosen" by Add files in directory… (no file chooser in tests). */
+    protected java.io.File chosenDirectory;
+    /** The answer of the directory settings dialog: by default, the settings it was given. */
+    protected java.util.function.UnaryOperator<DirectorySettings> directorySettingsAnswer = s -> s;
+    /** The confirmations asked by the project files service (all accepted). */
+    protected final List<String> confirmations = new ArrayList<>();
 
     /** Builds the window; call it from the test class's {@code @Start} method (TestFX ignores inherited ones). */
     protected void startWindow(Stage stage) throws IOException {
@@ -76,8 +94,31 @@ abstract class MainWindowFixture {
         loader.setController(controller);
         Parent root = loader.load();
         controller.setPrimaryStage(stage);
+        controller.setCloser(new ProjectCloser((state, action) -> {
+            closeQuestions.add(state);
+            return closeAnswer;
+        }, p -> true, (title, e) -> {
+            throw new AssertionError(title, e);
+        }));
+        controller.workbench().files().setDialogs(
+            (directory, initial, current, adding) -> Optional.ofNullable(directorySettingsAnswer.apply(initial)),
+            (title, header, content, action) -> confirmations.add(header),
+            (documents, action) -> true,
+            () -> chosenDirectory);
+        if (openProjectAtStart()) {
+            controller.workbench().session().setProject(
+                Project.createDefaultProject(PluginManager.loadPlugins(), settings.documentOptions()));
+        }
         stage.setScene(new Scene(root, 1200, 800));
         stage.show();
+    }
+
+    /**
+     * True (default) to start with a new project, as most tests need; false to start like the
+     * application without "Reopen the last project": the start page.
+     */
+    protected boolean openProjectAtStart() {
+        return true;
     }
 
     /** Call it from the test class's {@code @Stop} method. */
@@ -123,12 +164,16 @@ abstract class MainWindowFixture {
         }
     }
 
-    /** Shows a file in File Mode by clicking it in the file list. */
+    /** The cell of a node of File Mode's file tree (it must be visible). */
+    protected Node treeCell(FxRobot robot, Path path) {
+        return robot.lookup("#fileTreeView .tree-cell").match((Node n) ->
+            n instanceof javafx.scene.control.TreeCell<?> c && c.getItem() instanceof FileTree.Node node
+                && node.path().equals(path)).query();
+    }
+
+    /** Shows a file in File Mode by clicking it in the file tree. */
     protected void showFile(FxRobot robot, Path file) {
-        Node cell = robot.lookup(".list-cell").match((Node n) ->
-            n instanceof javafx.scene.control.ListCell<?> c && c.getText() != null && c.getText().endsWith(file.toString()))
-            .query();
-        robot.clickOn(cell);
+        robot.clickOn(treeCell(robot, file));
         waitUntil(() -> workbench().focus().map(f -> f.text().equals(document(file).getId())).orElse(false));
     }
 }

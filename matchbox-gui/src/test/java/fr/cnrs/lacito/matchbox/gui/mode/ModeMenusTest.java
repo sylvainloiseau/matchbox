@@ -12,13 +12,13 @@ class ModeMenusTest {
 
     @Test
     void theModeMenuTakesThePlaceOfThePreviousOne() {
-        List<String> menus = new ArrayList<>(List.of("File", "Edit", "View", "Assistant"));
+        List<String> menus = new ArrayList<>(List.of("File", "Edit", "Mode", "Assistant"));
         ModeMenus.replace(menus, Optional.empty(), Optional.of("File Mode"), 3);
-        assertEquals(List.of("File", "Edit", "View", "File Mode", "Assistant"), menus);
+        assertEquals(List.of("File", "Edit", "Mode", "File Mode", "Assistant"), menus);
         ModeMenus.replace(menus, Optional.of("File Mode"), Optional.of("Tag Mode"), 3);
-        assertEquals(List.of("File", "Edit", "View", "Tag Mode", "Assistant"), menus);
+        assertEquals(List.of("File", "Edit", "Mode", "Tag Mode", "Assistant"), menus);
         ModeMenus.replace(menus, Optional.of("Tag Mode"), Optional.empty(), 3);
-        assertEquals(List.of("File", "Edit", "View", "Assistant"), menus);
+        assertEquals(List.of("File", "Edit", "Mode", "Assistant"), menus);
     }
 
     @Test

@@ -10,8 +10,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -24,24 +22,6 @@ public class SettingsDialog {
     private final UserSettings settings;
     private Stage parentStage;
     private Stage stage;
-
-    @FXML
-    private Rectangle igtColorPreview;
-
-    @FXML
-    private ColorPicker igtColorPicker;
-
-    @FXML
-    private Rectangle lexicalColorPreview;
-
-    @FXML
-    private ColorPicker lexicalColorPicker;
-
-    @FXML
-    private Rectangle tagColorPreview;
-
-    @FXML
-    private ColorPicker tagColorPicker;
 
     @FXML
     private TextField separatorsField;
@@ -112,10 +92,6 @@ public class SettingsDialog {
     }
 
     private void initFromSettings(SettingsData current) {
-        initColor(igtColorPicker, igtColorPreview, current.igtColor());
-        initColor(lexicalColorPicker, lexicalColorPreview, current.lexicalColor());
-        initColor(tagColorPicker, tagColorPreview, current.tagColor());
-
         separatorsField.setText(current.morphemeSeparators());
 
         charsetComboBox.getItems().setAll(Charset.availableCharsets().keySet());
@@ -150,8 +126,6 @@ public class SettingsDialog {
         return new SettingsData(
             current.version(),
             charset,
-            toHex(igtColorPicker.getValue()),
-            toHex(lexicalColorPicker.getValue()),
             separatorsField.getText(),
             SettingsData.normalizeExtensions(splitItems(fileExtensionsArea.getText(), "[,\\s]+")),
             splitItems(filePatternsArea.getText(), "\\R"),
@@ -161,30 +135,7 @@ public class SettingsDialog {
             current.logFile(),
             current.assist(),
             allowInvalidViewEditsCheckBox.isSelected(),
-            toHex(tagColorPicker.getValue()),
             current.tagBrowser()
-        );
-    }
-
-    /** The picker only changes the preview; the value is applied on OK. */
-    private static void initColor(ColorPicker picker, Rectangle preview, String css) {
-        Color color;
-        try {
-            color = Color.web(css);
-        } catch (IllegalArgumentException e) {
-            color = Color.WHITE;
-        }
-        picker.setValue(color);
-        preview.setFill(color);
-        picker.setOnAction(ev -> preview.setFill(picker.getValue()));
-    }
-
-    private static String toHex(Color c) {
-        return String.format(
-            "#%02X%02X%02X",
-            (int) Math.round(c.getRed() * 255),
-            (int) Math.round(c.getGreen() * 255),
-            (int) Math.round(c.getBlue() * 255)
         );
     }
 

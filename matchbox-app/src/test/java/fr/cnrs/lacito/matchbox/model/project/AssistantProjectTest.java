@@ -27,7 +27,7 @@ class AssistantProjectTest {
         Project p = emptyProject();
         assertTrue(p.isCloudAssistAllowed());
         p.setCloudAssistAllowed(false);
-        assertTrue(p.isProjectDefinitionOutdatedProperty().get());
+        assertTrue(p.definitionChangedProperty().get());
         Path file = dir.resolve("p.mbx");
         p.setFile(file.toFile());
         ProjectXMLSerializer.save(p);

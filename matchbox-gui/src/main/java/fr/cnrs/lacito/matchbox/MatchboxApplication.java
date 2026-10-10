@@ -77,7 +77,6 @@ public class MatchboxApplication extends Application {
                 e.consume();
             }
         });
-        primaryStage.setTitle("Notebook Application");
         primaryStage.show();
 
         List<String> warnings = settings.getLoadWarnings();

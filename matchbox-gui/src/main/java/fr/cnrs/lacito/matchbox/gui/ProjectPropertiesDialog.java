@@ -2,14 +2,15 @@ package fr.cnrs.lacito.matchbox.gui;
 
 import fr.cnrs.lacito.matchbox.PluginManager;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchbox.model.TextDocument;
+import fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle;
+import fr.cnrs.lacito.matchbox.gui.view.DisplayStyleCss;
+import fr.cnrs.lacito.matchbox.gui.view.HighlightStyles;
+import fr.cnrs.lacito.matchbox.gui.view.KindCatalog;
+import fr.cnrs.lacito.matchbox.model.project.DisplayStyles;
 import fr.cnrs.lacito.matchbox.model.project.FileType;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.model.project.ProjectEdit;
 import fr.cnrs.lacito.matchbox.model.project.ProjectEdit.FileTypeDraft;
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import javafx.collections.FXCollections;
@@ -26,18 +27,19 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.stage.DirectoryChooser;
-import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 /**
- * Edits the definition of a project: name, description, files and directories, file types (a
- * regular expression on file names and the grammars applied, in rank order), AI assistant.
+ * Edits the definition of a project: name, description, file types (a regular expression on file
+ * names and the grammars applied, in rank order), plugin parameters (display styles, shared by all
+ * the file types), AI assistant. Files and directories are added with the Current project menu and
+ * listed in File Mode.
  *
  * <p>The dialog edits a {@link ProjectEdit} working copy: the project is changed only by Save
  * (documents whose grammars changed are then parsed again); Cancel discards everything.
@@ -52,9 +54,10 @@ public class ProjectPropertiesDialog {
     private Stage stage;
     private boolean saved = false;
 
-    private final ObservableList<Path> paths = FXCollections.observableArrayList();
     private final ObservableList<FileTypeDraft> fileTypes = FXCollections.observableArrayList();
     private final ObservableList<GrammarPlugin> grammarRows = FXCollections.observableArrayList();
+    private final ObservableList<PluginRow> pluginRows = FXCollections.observableArrayList();
+    private ListView<PluginRow> pluginList;
     private ListView<FileTypeDraft> fileTypeList;
     private ListView<GrammarPlugin> grammarList;
     private TextField fileTypeNameField;
@@ -71,15 +74,27 @@ public class ProjectPropertiesDialog {
     }
 
     public void showAndWait() {
+        build(true).showAndWait();
+    }
+
+    /** Shows the dialog without waiting and without blocking its owner (for the GUI tests). */
+    Stage show() {
+        Stage s = build(false);
+        s.show();
+        return s;
+    }
+
+    private Stage build(boolean modal) {
         stage = new Stage();
-        stage.initModality(Modality.WINDOW_MODAL);
+        if (modal) stage.initModality(Modality.WINDOW_MODAL);
         stage.initOwner(parentStage);
         stage.setTitle("Project properties");
         stage.setWidth(900);
         stage.setHeight(750);
 
         VBox root = new VBox(10,
-            nameSection(), descriptionSection(), filesetSection(), fileTypesSection(), assistantSection(), buttons());
+            nameSection(), descriptionSection(), fileTypesSection(), pluginParametersSection(), assistantSection(),
+            buttons());
         root.setPadding(new Insets(15));
         ScrollPane scroll = new ScrollPane(root);
         scroll.setFitToWidth(true);
@@ -89,7 +104,8 @@ public class ProjectPropertiesDialog {
         } else {
             showFileType(null);
         }
-        stage.showAndWait();
+        refreshPluginRows();
+        return stage;
     }
 
     public boolean isSaved() {
@@ -125,58 +141,6 @@ public class ProjectPropertiesDialog {
         return section("Project description", description);
     }
 
-    private VBox filesetSection() {
-        paths.setAll(edit.getPaths());
-        ListView<Path> list = new ListView<>(paths);
-        list.setPrefHeight(110);
-        list.setCellFactory(lv -> new ListCell<>() {
-            @Override
-            protected void updateItem(Path p, boolean empty) {
-                super.updateItem(p, empty);
-                if (empty || p == null) {
-                    setText(null);
-                    setStyle("");
-                } else {
-                    boolean missing = !Files.exists(p);
-                    setText(p + (Files.isDirectory(p) ? "   (directory)" : "") + (missing ? "   (missing)" : ""));
-                    setStyle(missing ? "-fx-text-fill: #b00020;" : "");
-                }
-            }
-        });
-        Button addFile = new Button("Add file…");
-        addFile.setOnAction(e -> {
-            FileChooser chooser = new FileChooser();
-            chooser.setTitle("Add a file");
-            List<File> files = chooser.showOpenMultipleDialog(stage);
-            if (files != null) files.forEach(f -> addPath(f.toPath()));
-        });
-        Button addDirectory = new Button("Add directory…");
-        addDirectory.setOnAction(e -> {
-            DirectoryChooser chooser = new DirectoryChooser();
-            chooser.setTitle("Add a directory");
-            File d = chooser.showDialog(stage);
-            if (d != null) addPath(d.toPath());
-        });
-        Button remove = new Button("Remove");
-        remove.disableProperty().bind(list.getSelectionModel().selectedItemProperty().isNull());
-        remove.setOnAction(e -> {
-            Path p = list.getSelectionModel().getSelectedItem();
-            paths.remove(p);
-            edit.getPaths().remove(p);
-        });
-        HBox buttons = new HBox(5, addFile, addDirectory, remove);
-        buttons.setAlignment(Pos.CENTER_LEFT);
-        return section("Fileset", list, buttons);
-    }
-
-    private void addPath(Path p) {
-        Path absolute = p.toAbsolutePath().normalize();
-        if (!edit.getPaths().contains(absolute)) {
-            edit.getPaths().add(absolute);
-            paths.add(absolute);
-        }
-    }
-
     private VBox fileTypesSection() {
         fileTypes.setAll(edit.getFileTypes());
         fileTypeList = new ListView<>(fileTypes);
@@ -187,6 +151,7 @@ public class ProjectPropertiesDialog {
             FileTypeDraft draft = new FileTypeDraft("New file type", ".+", List.of());
             edit.getFileTypes().add(draft);
             fileTypes.add(draft);
+            refreshPluginRows();
             fileTypeList.getSelectionModel().select(draft);
             fileTypeNameField.requestFocus();
             fileTypeNameField.selectAll();
@@ -197,6 +162,7 @@ public class ProjectPropertiesDialog {
             FileTypeDraft draft = fileTypeList.getSelectionModel().getSelectedItem();
             edit.getFileTypes().remove(draft);
             fileTypes.remove(draft);
+            refreshPluginRows();
         });
         VBox left = new VBox(5, new Label("File types:"), fileTypeList, new HBox(5, add, remove));
         VBox.setVgrow(fileTypeList, Priority.ALWAYS);
@@ -223,6 +189,7 @@ public class ProjectPropertiesDialog {
         grammarList = new ListView<>(grammarRows);
         grammarList.setPrefHeight(150);
         grammarList.setCellFactory(lv -> new GrammarCell());
+        grammarList.setId("grammarList");
         Button up = new Button("Up");
         up.setOnAction(e -> moveSelectedGrammar(-1));
         Button down = new Button("Down");
@@ -246,6 +213,134 @@ public class ProjectPropertiesDialog {
         Label l = new Label(text);
         l.setStyle("-fx-font-weight: bold;");
         return l;
+    }
+
+    // ------------------------------------------------------------------
+    // Plugin parameters
+    // ------------------------------------------------------------------
+
+    /** A plugin of the Plugin parameters section; {@code plugin} is null if it is not installed. */
+    private record PluginRow(String grammarId, GrammarPlugin plugin) {}
+
+    private VBox pluginParametersSection() {
+        pluginList = new ListView<>(pluginRows);
+        pluginList.setId("pluginParameters");
+        pluginList.setPrefHeight(170);
+        pluginList.setCellFactory(lv -> new PluginCell());
+        Label help = new Label("The display of a plugin is the same in every file type using it. "
+            + "Check a plugin in a file type to edit its display.");
+        help.setWrapText(true);
+        help.setStyle("-fx-text-fill: #666666;");
+        return section("Plugin parameters", pluginList, help);
+    }
+
+    /**
+     * Installed plugins, those used by a file type first (order of first use), then the others by
+     * name; then the plugins that are not installed but have display styles in the project.
+     */
+    private void refreshPluginRows() {
+        if (pluginList == null) return;
+        List<GrammarPlugin> installed = PluginManager.getAvailableGrammars();
+        List<String> used = edit.usedGrammarIds();
+        List<PluginRow> rows = new ArrayList<>();
+        for (String id : used) {
+            installed.stream().filter(g -> g.getId().equals(id)).findFirst()
+                .ifPresent(g -> rows.add(new PluginRow(id, g)));
+        }
+        installed.stream().filter(g -> !used.contains(g.getId()))
+            .sorted(java.util.Comparator.comparing(GrammarPlugin::getDisplayName, String.CASE_INSENSITIVE_ORDER))
+            .forEach(g -> rows.add(new PluginRow(g.getId(), g)));
+        edit.getDisplayStyles().asMap().keySet().stream().map(DisplayStyles.Key::grammarId).distinct()
+            .filter(id -> installed.stream().noneMatch(g -> g.getId().equals(id)))
+            .sorted()
+            .forEach(id -> rows.add(new PluginRow(id, null)));
+        pluginRows.setAll(rows);
+    }
+
+    /**
+     * Name and description (shortened with an ellipsis), a sample of the plugin's display, the file
+     * types using it and, right aligned, Display… (enabled when the plugin is used) or Forget (a
+     * plugin that is not installed).
+     */
+    private class PluginCell extends ListCell<PluginRow> {
+        private final Label name = new Label();
+        private final Label description = new Label();
+        private final Label swatch = new Label("Aa");
+        private final Label usedIn = new Label();
+        private final Button button = new Button();
+        private final HBox box;
+
+        PluginCell() {
+            name.setStyle("-fx-font-weight: bold;");
+            name.setMinWidth(Region.USE_PREF_SIZE);
+            description.setStyle("-fx-text-fill: #555555;");
+            description.setMinWidth(0);
+            description.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(description, Priority.ALWAYS);
+            swatch.setMinWidth(Region.USE_PREF_SIZE);
+            usedIn.setMinWidth(0);
+            usedIn.setPrefWidth(150);
+            usedIn.setMaxWidth(150);
+            button.setMinWidth(Region.USE_PREF_SIZE);
+            box = new HBox(10, name, description, swatch, usedIn, button);
+            box.setAlignment(Pos.CENTER_LEFT);
+            box.setMinWidth(0);
+            // no horizontal scrolling: the cell is as wide as the list
+            setPrefWidth(0);
+        }
+
+        @Override
+        protected void updateItem(PluginRow row, boolean empty) {
+            super.updateItem(row, empty);
+            if (empty || row == null) {
+                setGraphic(null);
+                return;
+            }
+            DisplayStyle style = edit.getDisplayStyles().get(DisplayStyles.Key.grammar(row.grammarId()));
+            if (row.plugin() == null) {
+                name.setText(row.grammarId());
+                description.setText("(not installed)");
+                swatch.setStyle("-fx-padding: 0 4 0 4;" + DisplayStyleCss.label(style));
+                usedIn.setText("");
+                usedIn.setTooltip(null);
+                button.setText("Forget");
+                button.setDisable(false);
+                button.setTooltip(new Tooltip("Remove the display styles of this plugin from the project"));
+                button.setOnAction(e -> forgetStyles(row.grammarId()));
+                description.setTooltip(null);
+                swatch.setTooltip(null);
+                name.setStyle("-fx-font-weight: bold; -fx-text-fill: #888888;");
+            } else {
+                GrammarPlugin g = row.plugin();
+                name.setText(g.getDisplayName());
+                name.setStyle("-fx-font-weight: bold;");
+                description.setText(g.getDisplayDescription());
+                description.setTooltip(new Tooltip(g.getDisplayName() + " — " + g.getDisplayDescription()));
+                swatch.setStyle("-fx-padding: 0 4 0 4;"
+                    + DisplayStyleCss.label(style.over(HighlightStyles.defaultStyle(g, null))));
+                swatch.setTooltip(new Tooltip("Display of all the objects of this plugin; some kinds may have their own"));
+                List<String> types = edit.fileTypesUsing(g.getId());
+                usedIn.setText(types.isEmpty() ? "not used" : String.join(", ", types));
+                usedIn.setStyle(types.isEmpty() ? "-fx-text-fill: #888888;" : "");
+                usedIn.setTooltip(new Tooltip(types.isEmpty() ? "Checked in no file type"
+                    : "Checked in: " + String.join(", ", types)));
+                button.setText("Display…");
+                button.setDisable(types.isEmpty());
+                button.setTooltip(new Tooltip(types.isEmpty() ? "Check this plugin in a file type first"
+                    : "Font and colours of the objects of this plugin in the editor"));
+                button.setOnAction(e -> editDisplay(g));
+            }
+            setGraphic(box);
+        }
+    }
+
+    private void forgetStyles(String grammarId) {
+        DisplayStyles styles = edit.getDisplayStyles();
+        for (DisplayStyles.Key key : List.copyOf(styles.asMap().keySet())) {
+            if (key.grammarId().equals(grammarId)) styles = styles.with(key, DisplayStyle.EMPTY);
+        }
+        edit.setDisplayStyles(styles);
+        refreshPluginRows();
     }
 
     private VBox assistantSection() {
@@ -333,10 +428,14 @@ public class ProjectPropertiesDialog {
         private final HBox box;
 
         GrammarCell() {
-            Region spacer = new Region();
-            HBox.setHgrow(spacer, Priority.ALWAYS);
-            box = new HBox(10, check, label, spacer);
+            // shortened with an ellipsis rather than scrolled sideways
+            label.setMinWidth(0);
+            label.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(label, Priority.ALWAYS);
+            box = new HBox(10, check, label);
             box.setAlignment(Pos.CENTER_LEFT);
+            box.setMinWidth(0);
+            setPrefWidth(0);
         }
 
         @Override
@@ -352,10 +451,29 @@ public class ProjectPropertiesDialog {
             check.setOnAction(e -> {
                 current.setUsed(g, check.isSelected());
                 refreshGrammarRows();
+                refreshPluginRows();
             });
-            label.setText((used ? (rank + 1) + ". " : "") + g.getDisplayName() + " — " + g.getDisplayDescription());
+            String text = (used ? (rank + 1) + ". " : "") + g.getDisplayName() + " — " + g.getDisplayDescription();
+            label.setText(text);
+            label.setTooltip(new Tooltip(text));
             setGraphic(box);
         }
+    }
+
+    /** Edits the display styles of a grammar in the working copy (applied by Save). */
+    private void editDisplay(GrammarPlugin g) {
+        List<String> declared;
+        try {
+            declared = g.getObjectKinds();
+        } catch (RuntimeException | LinkageError e) {
+            declared = List.of();
+        }
+        List<String> kinds = KindCatalog.kinds(g.getId(), declared, project.getCorpus(), edit.getDisplayStyles());
+        new DisplayStyleDialog(g, kinds, edit.getDisplayStyles()).showAndWait(stage)
+            .ifPresent(styles -> {
+                edit.setDisplayStyles(styles);
+                refreshPluginRows();
+            });
     }
 
     // ------------------------------------------------------------------
@@ -370,10 +488,6 @@ public class ProjectPropertiesDialog {
             alert.setTitle("Project properties");
             alert.setHeaderText("The project cannot be saved");
             alert.showAndWait();
-            return;
-        }
-        List<TextDocument> dropped = edit.droppedDocuments(project);
-        if (!UnsavedChangesDialog.confirm(stage, dropped, "removing them from the project")) {
             return;
         }
         ProjectEdit.Result result = edit.applyTo(project);

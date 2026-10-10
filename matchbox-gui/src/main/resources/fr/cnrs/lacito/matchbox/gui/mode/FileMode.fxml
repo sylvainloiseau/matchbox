@@ -6,6 +6,7 @@
 <?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.TreeView?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.Tab?>
@@ -22,7 +23,7 @@
   <VBox style="-fx-background-color: #cccccc;">
       <Label style="-fx-font-weight: bold; -fx-padding: 5;" text="Files" />
       <TextField fx:id="filterFileTextField" promptText="Filter" />
-      <ListView fx:id="fileListView" VBox.vgrow="ALWAYS" />
+      <TreeView fx:id="fileTreeView" VBox.vgrow="ALWAYS" />
   </VBox>
   <SplitPane fx:id="topSplitPane" dividerPositions="0.5" orientation="VERTICAL">
     <VBox style="-fx-background-color: #cccccc;">

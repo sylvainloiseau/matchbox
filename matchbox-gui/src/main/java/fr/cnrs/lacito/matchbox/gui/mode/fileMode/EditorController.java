@@ -12,7 +12,10 @@ import fr.cnrs.lacito.matchbox.grammarfx.EditOutcome;
 import fr.cnrs.lacito.matchbox.grammarfx.TextAction;
 import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
 import fr.cnrs.lacito.matchbox.corpus.capability.MediaSegment;
+import fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle;
+import fr.cnrs.lacito.matchbox.gui.view.DisplayStyleCss;
 import fr.cnrs.lacito.matchbox.gui.view.HighlightStyles;
+import fr.cnrs.lacito.matchbox.gui.view.StyleLayers;
 import fr.cnrs.lacito.matchbox.gui.workbench.SelectionTracker;
 import fr.cnrs.lacito.matchbox.gui.workbench.Workbench;
 import fr.cnrs.lacito.matchbox.model.DocumentChange;
@@ -48,6 +51,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.input.KeyCombination;
 import org.fxmisc.richtext.InlineCssTextArea;
 import org.fxmisc.richtext.MultiChangeBuilder;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.fxmisc.richtext.model.TwoDimensional;
 import org.fxmisc.richtext.model.PlainTextChange;
 import org.fxmisc.richtext.util.UndoUtils;
@@ -92,7 +96,7 @@ public class EditorController {
     /** Style of the temporary highlight of a suggestion's range. */
     private static final String PREVIEW_STYLE = "-rtfx-background-color: #ffd8a8;";
     /** Style of the line of a media segment while it plays. */
-    private static final String PLAYING_STYLE = "-rtfx-background-color: #c8f0c8;";
+    private static final DisplayStyle PLAYING_STYLE = DisplayStyle.background("#c8f0c8");
     private final DocumentListener mirror = this::mirror;
 
     /** Top-level corpus objects of the current file, grammars in rank order. */
@@ -125,11 +129,8 @@ public class EditorController {
             .subscribe(this::forward);
 
         this.highlightStyles = workbench.highlightStyles();
-        var settings = workbench.settings();
-        // show colour changes made in the settings immediately
-        settings.igtColorProperty().addListener((obs, o, n) -> highlightText());
-        settings.lexicalColorProperty().addListener((obs, o, n) -> highlightText());
-        settings.tagColorProperty().addListener((obs, o, n) -> highlightText());
+        // show the display styles edited in the project properties immediately
+        highlightStyles.addListener(this::highlightText);
         clearEditor();
         workbench.session().addCorpusListener((id, before, after) -> onCorpusTextChanged(id));
         // play buttons and the highlight follow what is playing
@@ -144,7 +145,7 @@ public class EditorController {
     public void setProject(Project project) {
         clearEditor();
         this.project = project;
-        this.corpus = project.getCorpus();
+        this.corpus = project == null ? null : project.getCorpus();
     }
 
     public HighlightStyles getHighlightStyles() {
@@ -360,35 +361,31 @@ public class EditorController {
         // spans refer to the real text: remove provisional text first
         dismissGhost();
         int length = textArea.getLength();
-        if (length > 0) {
-            textArea.clearStyle(0, length);
-        }
-        // tags last: a tag inside an IGT or an entry stays visible
+        // parents before children, tags last (a tag inside an IGT or an entry stays visible); each
+        // layer overrides only the properties it sets
+        StyleLayers layers = new StyleLayers();
         displayedText().ifPresent(text -> java.util.stream.Stream.concat(
             text.flatten().filter(o -> !(o instanceof fr.cnrs.lacito.matchbox.corpus.capability.Tag)),
             text.flatten().filter(o -> o instanceof fr.cnrs.lacito.matchbox.corpus.capability.Tag)
         ).forEach(o -> {
-            String color = highlightStyles.colorFor(o);
             TextCoordinate span = o.getTextCoordinate();
             // spans refer to the parsed text; the editor text may have changed since
-            if (color != null && span.stopIndex() < length) {
-                textArea.setStyle(
-                    span.startIndex(),
-                    span.stopIndex() + 1,
-                    "-rtfx-background-color: " + color + ";"
-                );
+            if (span.stopIndex() < length) {
+                layers.add(span.startIndex(), span.stopIndex() + 1, highlightStyles.styleFor(text, o));
             }
         }));
         // the media segments being played
         displayedText().ifPresent(text -> text.objectsOf(MediaSegment.class).stream()
             .filter(workbench.playback()::isPlaying)
-            .forEach(s -> {
-                TextCoordinate span = s.getTextCoordinate();
-                int end = Math.min(length, span.stopIndex() + 1);
-                if (span.startIndex() < end) {
-                    textArea.setStyle(span.startIndex(), end, PLAYING_STYLE);
-                }
-            }));
+            .forEach(s -> layers.add(s.getTextCoordinate().startIndex(),
+                Math.min(length, s.getTextCoordinate().stopIndex() + 1), PLAYING_STYLE)));
+        if (length > 0) {
+            StyleSpansBuilder<String> spans = new StyleSpansBuilder<>();
+            for (StyleLayers.Run run : layers.runs(length)) {
+                spans.add(DisplayStyleCss.editor(run.style()), run.length());
+            }
+            textArea.setStyleSpans(0, spans.create());
+        }
     }
 
     // ------------------------------------------------------------------

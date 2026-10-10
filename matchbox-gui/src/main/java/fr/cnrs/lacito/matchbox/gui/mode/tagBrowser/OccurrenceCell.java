@@ -8,6 +8,7 @@ import fr.cnrs.lacito.matchbox.corpus.capability.Tag;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import javafx.geometry.Insets;
@@ -37,16 +38,16 @@ public final class OccurrenceCell extends ListCell<OccurrenceRow> {
     private final Supplier<CorpusView> corpus;
     private final IntSupplier before;
     private final IntSupplier after;
-    private final Supplier<String> tagColor;
+    private final Function<CorpusObject, String> tagColor;
     private final Consumer<TagOccurrence> edit;
 
     /**
      * @param before   lines shown before the tag
      * @param after    lines shown after the tag
-     * @param tagColor highlight colour of tags (CSS)
+     * @param tagColor highlight colour of a tag (CSS), null for none
      * @param edit     shows an occurrence in File Mode
      */
-    public OccurrenceCell(Supplier<CorpusView> corpus, IntSupplier before, IntSupplier after, Supplier<String> tagColor,
+    public OccurrenceCell(Supplier<CorpusView> corpus, IntSupplier before, IntSupplier after, Function<CorpusObject, String> tagColor,
                           Consumer<TagOccurrence> edit) {
         this.corpus = corpus;
         this.before = before;
@@ -94,7 +95,7 @@ public final class OccurrenceCell extends ListCell<OccurrenceRow> {
         // the other tags of the same object
         text.ifPresent(t -> otherTags(t, o).forEach(other -> {
             Label badge = new Label(String.join(" › ", TagOccurrence.pathOf(other)));
-            badge.setStyle("-fx-background-color: " + tagColor.get() + "; -fx-background-radius: 8; -fx-padding: 0 5 0 5; -fx-font-size: 0.85em;");
+            badge.setStyle("-fx-background-color: " + color(other) + "; -fx-background-radius: 8; -fx-padding: 0 5 0 5; -fx-font-size: 0.85em;");
             header.getChildren().add(badge);
         }));
         Region spacer = new Region();
@@ -115,7 +116,7 @@ public final class OccurrenceCell extends ListCell<OccurrenceRow> {
             int digits = Integer.toString(excerpt.lines().get(excerpt.lines().size() - 1).number()).length();
             Optional<TextCoordinate> target = o.target().map(CorpusObject::getTextCoordinate);
             for (ContextExcerpt.Line line : excerpt.lines()) {
-                lines.getChildren().add(line(line, digits, tagStart, tagEnd, target));
+                lines.getChildren().add(line(line, digits, tagStart, tagEnd, target, color(o.tag())));
             }
         } else {
             lines.getChildren().add(new Label("The text is no longer in the project"));
@@ -127,8 +128,14 @@ public final class OccurrenceCell extends ListCell<OccurrenceRow> {
         return box;
     }
 
+    private String color(CorpusObject tag) {
+        String c = tagColor.apply(tag);
+        return c == null ? "transparent" : c;
+    }
+
     /** A line: its number, then its text with the tag highlighted; tinted if it belongs to the target. */
-    private HBox line(ContextExcerpt.Line line, int digits, int tagStart, int tagEnd, Optional<TextCoordinate> target) {
+    private HBox line(ContextExcerpt.Line line, int digits, int tagStart, int tagEnd, Optional<TextCoordinate> target,
+                      String color) {
         Label number = new Label(String.format("%" + digits + "d", line.number()));
         number.setStyle(MONO + "-fx-text-fill: #999999;");
         number.setMinWidth(Region.USE_PREF_SIZE);
@@ -139,7 +146,7 @@ public final class OccurrenceCell extends ListCell<OccurrenceRow> {
         if (from > 0) flow.getChildren().add(plain(s.substring(0, from)));
         if (to > from) {
             Label tag = new Label(s.substring(from, to));
-            tag.setStyle(MONO + "-fx-background-color: " + tagColor.get() + ";");
+            tag.setStyle(MONO + "-fx-background-color: " + color + ";");
             flow.getChildren().add(tag);
         }
         if (to < s.length()) flow.getChildren().add(plain(s.substring(to)));

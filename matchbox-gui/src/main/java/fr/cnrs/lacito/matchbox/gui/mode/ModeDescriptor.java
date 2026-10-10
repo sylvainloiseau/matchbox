@@ -8,10 +8,10 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import javafx.scene.input.KeyCombination;
 
 /**
- * A mode the window can show: what the toolbar and the View menu need, without creating the mode.
+ * A mode the window can show: what the toolbar and the Mode menu need, without creating the mode.
  *
  * @param id          stable identifier ("file", "corpus", "tag")
- * @param title       toolbar button and View menu item ("File")
+ * @param title       toolbar button and Mode menu item ("File")
  * @param menuTitle   title of the mode's menu in the menu bar ("File Mode")
  * @param description tooltip of the button
  * @param shortcut    switches to the mode (Shortcut+1, Shortcut+2…); null for none

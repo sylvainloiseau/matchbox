@@ -47,8 +47,6 @@ public final class UserSettings implements AutoCloseable {
     private final List<LoadMessage> loadReport;
 
     private final ObjectProperty<Charset> charset = new SimpleObjectProperty<>();
-    private final StringProperty igtColor = new SimpleStringProperty();
-    private final StringProperty lexicalColor = new SimpleStringProperty();
     private final StringProperty morphemeSeparators = new SimpleStringProperty();
     private final ObservableList<String> fileExtensions = FXCollections.observableArrayList();
     private final ObservableList<String> filePatterns = FXCollections.observableArrayList();
@@ -56,7 +54,6 @@ public final class UserSettings implements AutoCloseable {
     private final IntegerProperty maxRecentProjects = new SimpleIntegerProperty();
     private final BooleanProperty openLastProject = new SimpleBooleanProperty();
     private final BooleanProperty allowInvalidViewEdits = new SimpleBooleanProperty();
-    private final StringProperty tagColor = new SimpleStringProperty();
     private final ObjectProperty<TagBrowserSettingsData> tagBrowser = new SimpleObjectProperty<>();
     private String logFile;
     private final ObjectProperty<AssistSettingsData> assist = new SimpleObjectProperty<>();
@@ -88,9 +85,9 @@ public final class UserSettings implements AutoCloseable {
         recentProjects.setAllFromStrings(recent.recentProjects());
         updating = false;
 
-        for (Observable o : List.<Observable>of(charset, igtColor, lexicalColor, morphemeSeparators,
+        for (Observable o : List.<Observable>of(charset, morphemeSeparators,
                 fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, assist,
-                allowInvalidViewEdits, tagColor, tagBrowser)) {
+                allowInvalidViewEdits, tagBrowser)) {
             o.addListener(obs -> settingsChanged());
         }
         recentFiles.items().addListener((Observable obs) -> recentChanged());
@@ -166,9 +163,6 @@ public final class UserSettings implements AutoCloseable {
     // ------------------------------------------------------------------
 
     public ObjectProperty<Charset> charsetProperty() { return charset; }
-    public StringProperty igtColorProperty() { return igtColor; }
-    public StringProperty lexicalColorProperty() { return lexicalColor; }
-    public StringProperty tagColorProperty() { return tagColor; }
     /** Settings of the Tag Browser mode (replace the whole value to change them). */
     public ObjectProperty<TagBrowserSettingsData> tagBrowserProperty() { return tagBrowser; }
     public StringProperty morphemeSeparatorsProperty() { return morphemeSeparators; }
@@ -213,8 +207,6 @@ public final class UserSettings implements AutoCloseable {
         return new SettingsData(
             SettingsData.CURRENT_VERSION,
             charset.get().name(),
-            igtColor.get(),
-            lexicalColor.get(),
             morphemeSeparators.get(),
             List.copyOf(fileExtensions),
             List.copyOf(filePatterns),
@@ -224,7 +216,6 @@ public final class UserSettings implements AutoCloseable {
             logFile,
             assist.get(),
             allowInvalidViewEdits.get(),
-            tagColor.get(),
             tagBrowser.get()
         );
     }
@@ -242,8 +233,6 @@ public final class UserSettings implements AutoCloseable {
 
     private void set(SettingsData d) {
         charset.set(d.charsetValue());
-        igtColor.set(d.igtColor());
-        lexicalColor.set(d.lexicalColor());
         morphemeSeparators.set(d.morphemeSeparators());
         if (!fileExtensions.equals(d.fileExtensions())) fileExtensions.setAll(d.fileExtensions());
         if (!filePatterns.equals(d.filePatterns())) filePatterns.setAll(d.filePatterns());
@@ -253,7 +242,6 @@ public final class UserSettings implements AutoCloseable {
         logFile = d.logFile();
         assist.set(d.assist());
         allowInvalidViewEdits.set(d.allowInvalidViewEdits());
-        tagColor.set(d.tagColor());
         tagBrowser.set(d.tagBrowser());
     }
 

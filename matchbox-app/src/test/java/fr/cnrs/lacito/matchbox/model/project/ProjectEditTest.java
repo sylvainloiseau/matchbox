@@ -130,6 +130,20 @@ class ProjectEditTest {
         assertFalse(new ProjectEdit.FileTypeDraft("t", ".+", List.of()).uses(other));
     }
 
+    @Test
+    void usedGrammarsFollowTheDraftsOfTheFileTypes() {
+        ProjectEdit edit = ProjectEdit.of(project);
+        assertEquals(List.of(Project.DEFAULT_PLUGIN_ID, "other-grammar"), edit.usedGrammarIds());
+        assertEquals(List.of("all"), edit.fileTypesUsing("other-grammar"));
+        edit.getFileTypes().get(0).setUsed(other, true);
+        assertEquals(List.of("All files", "all"), edit.fileTypesUsing("other-grammar"));
+        edit.getFileTypes().get(0).setUsed(notebook, false);
+        assertEquals(List.of("other-grammar"), edit.usedGrammarIds(), "order of first use");
+        edit.getFileTypes().clear();
+        assertTrue(edit.usedGrammarIds().isEmpty());
+        assertTrue(edit.fileTypesUsing("other-grammar").isEmpty());
+    }
+
     private static List<String> ids(List<GrammarPlugin> grammars) {
         return grammars.stream().map(GrammarPlugin::getId).toList();
     }

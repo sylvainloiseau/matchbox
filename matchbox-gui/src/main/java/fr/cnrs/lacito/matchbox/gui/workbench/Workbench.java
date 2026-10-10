@@ -1,5 +1,6 @@
 package fr.cnrs.lacito.matchbox.gui.workbench;
 
+import fr.cnrs.lacito.matchbox.PluginManager;
 import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
 import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
 import fr.cnrs.lacito.matchbox.gui.edit.ViewEditService;
@@ -40,6 +41,7 @@ public final class Workbench implements AutoCloseable {
     private final HighlightStyles highlightStyles;
     private final ViewContext viewContext;
     private final SegmentPlayback playback;
+    private final ProjectFiles files;
     private HostServices hostServices;
 
     /**
@@ -60,9 +62,10 @@ public final class Workbench implements AutoCloseable {
         this.edits = new ViewEditService(session::project, editHints, settings);
         this.navigator = new Navigator(session);
         this.viewRegistry = viewRegistry;
-        this.highlightStyles = new HighlightStyles(settings);
+        this.highlightStyles = new HighlightStyles(session, PluginManager::getPluginById);
         this.viewContext = new WorkbenchViewContext(this);
         this.playback = new SegmentPlayback(viewContext, status);
+        this.files = new ProjectFiles(this);
         // the players and the hints belong to the files of the previous project
         session.onProjectChanging(() -> {
             mediaPlayers.closeAll();
@@ -112,6 +115,11 @@ public final class Workbench implements AutoCloseable {
 
     public ViewContext viewContext() {
         return viewContext;
+    }
+
+    /** The files and directories of the project (add, settings, remove). */
+    public ProjectFiles files() {
+        return files;
     }
 
     public SegmentPlayback playback() {

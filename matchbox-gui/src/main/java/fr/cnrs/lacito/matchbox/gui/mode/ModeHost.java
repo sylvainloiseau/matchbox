@@ -9,8 +9,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.scene.Node;
@@ -27,8 +29,8 @@ import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 
 /**
- * Shows the modes of the window: one toolbar button and one View menu item per mode, the active
- * mode's content in the main area and its menu in the menu bar (after the View menu). Modes are
+ * Shows the modes of the window: one toolbar button and one Mode menu item per mode, the active
+ * mode's content in the main area and its menu in the menu bar (after the Mode menu). Modes are
  * created the first time they are shown and kept; File Mode is created at once (it owns the
  * editor). The focus of the active mode is the window's {@link #focusProperty() focus}.
  */
@@ -40,12 +42,14 @@ public final class ModeHost {
     private final ModeSwitcher switcher;
     private final Pane viewPane;
     private final MenuBar menuBar;
-    private final Menu viewMenu;
+    private final Menu modeMenu;
     private final ToggleGroup buttons = new ToggleGroup();
-    private final ToggleGroup viewItems = new ToggleGroup();
+    private final ToggleGroup modeItems = new ToggleGroup();
     private final Map<String, ToggleButton> buttonById = new HashMap<>();
     private final Map<String, RadioMenuItem> itemById = new HashMap<>();
     private final ReadOnlyObjectWrapper<String> activeId = new ReadOnlyObjectWrapper<>();
+    /** False while the modes cannot be shown (no project open): buttons and items are disabled. */
+    private final BooleanProperty enabled = new SimpleBooleanProperty(true);
     private final ReadOnlyObjectWrapper<Optional<Focus>> focus = new ReadOnlyObjectWrapper<>(Optional.empty());
     private final ChangeListener<Optional<Focus>> focusFollower = (obs, o, n) -> focus.set(n);
     private ObservableValue<Optional<Focus>> followedFocus;
@@ -55,15 +59,15 @@ public final class ModeHost {
 
     /**
      * @param toolBar  receives one toggle button per mode
-     * @param viewMenu receives one item per mode (at its start); the mode menu goes after it
+     * @param modeMenu receives one item per mode (at its start); the mode menu goes after it
      */
     public ModeHost(Workbench workbench, List<ModeDescriptor> modes, Pane viewPane, ToolBar toolBar,
-                    MenuBar menuBar, Menu viewMenu) {
+                    MenuBar menuBar, Menu modeMenu) {
         this.workbench = workbench;
         this.switcher = new ModeSwitcher(modes, d -> d.factory().apply(workbench));
         this.viewPane = viewPane;
         this.menuBar = menuBar;
-        this.viewMenu = viewMenu;
+        this.modeMenu = modeMenu;
         int index = 0;
         for (ModeDescriptor d : modes) {
             ToggleButton button = new ToggleButton(d.title());
@@ -72,14 +76,16 @@ public final class ModeHost {
             button.setTooltip(new Tooltip(d.description()
                 + (d.shortcut() == null ? "" : " (" + d.shortcut().getDisplayText() + ")")));
             button.setOnAction(e -> choose(d.id(), button.isSelected()));
+            button.disableProperty().bind(enabled.not());
             toolBar.getItems().add(button);
             buttonById.put(d.id(), button);
 
             RadioMenuItem item = new RadioMenuItem(d.title());
-            item.setToggleGroup(viewItems);
+            item.setToggleGroup(modeItems);
             item.setAccelerator(d.shortcut());
             item.setOnAction(e -> choose(d.id(), true));
-            viewMenu.getItems().add(index++, item);
+            item.disableProperty().bind(enabled.not());
+            modeMenu.getItems().add(index++, item);
             itemById.put(d.id(), item);
         }
     }
@@ -118,23 +124,25 @@ public final class ModeHost {
     }
 
     private void showMenu(Optional<Menu> menu) {
-        int slot = menuBar.getMenus().indexOf(viewMenu) + 1;
+        int slot = menuBar.getMenus().indexOf(modeMenu) + 1;
         ModeMenus.replace(menuBar.getMenus(), shownMenu, menu, slot);
+        shownMenu.ifPresent(m -> m.disableProperty().unbind());
+        menu.ifPresent(m -> m.disableProperty().bind(enabled.not()));
         shownMenu = menu;
         menu.ifPresent(this::checkAccelerators);
     }
 
     /** Logs the accelerators of a mode menu that the window's menus already use. */
-    private void checkAccelerators(Menu modeMenu) {
+    private void checkAccelerators(Menu shown) {
         Set<KeyCombination> window = new HashSet<>();
         for (Menu m : menuBar.getMenus()) {
-            if (m != modeMenu) accelerators(m, window);
+            if (m != shown) accelerators(m, window);
         }
         Set<KeyCombination> mode = new HashSet<>();
-        accelerators(modeMenu, mode);
+        accelerators(shown, mode);
         Set<KeyCombination> clash = ModeMenus.collisions(window, mode);
         if (!clash.isEmpty()) {
-            logger.warning("The menu " + modeMenu.getText() + " uses accelerators of the window's menus: " + clash);
+            logger.warning("The menu " + shown.getText() + " uses accelerators of the window's menus: " + clash);
         }
     }
 
@@ -149,7 +157,7 @@ public final class ModeHost {
         syncing = true;
         try {
             buttons.selectToggle(id == null ? null : buttonById.get(id));
-            viewItems.selectToggle(id == null ? null : itemById.get(id));
+            modeItems.selectToggle(id == null ? null : itemById.get(id));
         } finally {
             syncing = false;
         }
@@ -179,6 +187,11 @@ public final class ModeHost {
 
     public ReadOnlyObjectProperty<Optional<Focus>> focusProperty() {
         return focus.getReadOnlyProperty();
+    }
+
+    /** Bind it to disable the toolbar buttons and the Mode menu items of the modes. */
+    public BooleanProperty enabledProperty() {
+        return enabled;
     }
 
     public List<ModeDescriptor> descriptors() {

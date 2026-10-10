@@ -3,6 +3,7 @@ package fr.cnrs.lacito.matchbox.grammar.notebook;
 import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookParser.ExampleContext;
 import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookParser.SenseContext;
 import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookLexer;
+import fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle;
 import fr.cnrs.lacito.matchbox.grammarapi.AbstractGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.CollectingErrorListener;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarExample;
@@ -53,6 +54,19 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
     @Override
     public int getApiVersion() {
         return API_VERSION;
+    }
+
+    @Override
+    public List<String> getObjectKinds() {
+        return List.of(KIND_IGT, KIND_ENTRY, KIND_SENSE, KIND_EXAMPLE);
+    }
+
+    /** Interlinear glossed texts and lexical entries keep their former highlight colours. */
+    @Override
+    public DisplayStyle getDefaultDisplayStyle(String kind) {
+        if (KIND_IGT.equals(kind)) return DisplayStyle.background("#fff1c1");
+        if (KIND_ENTRY.equals(kind)) return DisplayStyle.background("#dfe7fd");
+        return DisplayStyle.EMPTY;
     }
 
     @Override

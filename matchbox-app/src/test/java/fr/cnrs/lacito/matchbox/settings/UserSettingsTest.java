@@ -46,7 +46,7 @@ class UserSettingsTest {
     @Test
     void changesAreSavedAfterTheDelay() throws Exception {
         try (UserSettings s = load(50)) {
-            s.igtColorProperty().set("#010203");
+            s.morphemeSeparatorsProperty().set("+");
             s.openLastProjectProperty().set(true);
             s.recentProjects().add(ROOT.resolve("p/one.mbx"));
             assertFalse(Files.exists(dirs.configDir().resolve("settings.json")), "not saved before the delay");
@@ -54,7 +54,7 @@ class UserSettingsTest {
             assertTrue(Files.exists(dirs.configDir().resolve("settings.json")));
         }
         try (UserSettings reloaded = load(50)) {
-            assertEquals("#010203", reloaded.igtColorProperty().get());
+            assertEquals("+", reloaded.morphemeSeparatorsProperty().get());
             assertTrue(reloaded.openLastProjectProperty().get(), "open last project is persisted");
             assertEquals(List.of(ROOT.resolve("p/one.mbx")), reloaded.recentProjects().items());
         }
@@ -74,12 +74,11 @@ class UserSettingsTest {
     void applyValidatesAndKeepsLogFile() {
         try (UserSettings s = load(60_000)) {
             SettingsData edited = s.snapshot();
-            SettingsData changed = new SettingsData(edited.version(), "ISO-8859-1", "bad colour!", edited.lexicalColor(),
-                edited.morphemeSeparators(), List.of(".XML", "txt"), List.of(), 0, 3, true, edited.logFile(), edited.assist(), edited.allowInvalidViewEdits(), edited.tagColor(),
+            SettingsData changed = new SettingsData(edited.version(), "ISO-8859-1",
+                edited.morphemeSeparators(), List.of(".XML", "txt"), List.of(), 0, 3, true, edited.logFile(), edited.assist(), edited.allowInvalidViewEdits(),
                 new TagBrowserSettingsData(99, 3, "random", null));
             s.apply(changed);
             assertEquals(StandardCharsets.ISO_8859_1, s.charsetProperty().get());
-            assertEquals(SettingsData.defaults().igtColor(), s.igtColorProperty().get());
             assertEquals(List.of("xml", "txt"), s.fileExtensions());
             assertEquals(10, s.maxRecentFilesProperty().get());
             assertEquals(3, s.maxRecentProjectsProperty().get());
