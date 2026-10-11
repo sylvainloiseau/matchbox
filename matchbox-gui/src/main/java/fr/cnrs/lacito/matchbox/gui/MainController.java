@@ -504,9 +504,9 @@ public class MainController {
             reportOpenFailure(f.toPath(), e);
             return;
         }
+        // the files were parsed with their grammars when the project was loaded
         workbench.session().setProject(project);
         settings.recentProjects().add(f.toPath());
-        project.parseProject();
         modes.activate(Modes.FILE);
         reportLoadProblems();
     }

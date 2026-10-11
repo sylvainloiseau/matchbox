@@ -253,6 +253,7 @@ Managed by `fr.cnrs.lacito.matchbox.settings` (matchbox-app):
   - Fileset (files and directories in definition order; a directory with its settings: `recursive`, `<include>`, `<exclude>` globs; a `<directory>` without settings loads as before: non-recursive, global extensions).
   - File type patterns (regex + associated grammars).
   - Display styles by grammar and kind (attributes absent = not set; unknown grammars kept).
+  - Loading reads the file types before the fileset, so each file is parsed once, with its grammars, when it is added: a loaded project needs no `parseProject()`.
   - Example structure:
     ```xml
     <project name="Fieldwork">

@@ -461,4 +461,10 @@ plugins, `EditorController`, `OccurrenceCell`,
 - Not covered by GUI tests: the modal dialogs (`showAndWait`: Project properties with its Display…
   button, Display style, Settings, the close dialog itself — the fixture replaces the latter
   through `MainController.setCloser`), file choosers and drag and drop of a `.mbx` file.
+- **Fixed after the implementation**: a project reopened at startup ("Reopen the last project")
+  was not highlighted. `ProjectXMLSerializer.load` added (and parsed) the files before reading the
+  file types, so they were parsed with no grammar; Open project hid it by calling
+  `parseProject()` afterwards, the startup path did not (an older bug, made visible by the start
+  page's check box). The loader now reads the file types first; `openProject` no longer parses
+  again (`ProjectLoadParseTest`).
 

@@ -252,30 +252,7 @@ public class ProjectXMLSerializer {
             }
         }
 
-        // Load fileset
-        NodeList filesetList = rootElement.getElementsByTagName("fileset");
-        if (filesetList.getLength() > 0) {
-            Element filesetElement = (Element) filesetList.item(0);
-
-            // files and directories, in order
-            for (Node n = filesetElement.getFirstChild(); n != null; n = n.getNextSibling()) {
-                if (!(n instanceof Element e)) continue;
-                String path = e.getAttribute("path");
-                if (e.getTagName().equals("file")) {
-                    project.addFile(path);
-                } else if (e.getTagName().equals("directory")) {
-                    DirectorySettings settings = directorySettings(e, project);
-                    if (settings == null) {
-                        // written before directory settings: as it was loaded then
-                        project.addDirectory(path);
-                    } else {
-                        project.addDirectory(path, settings);
-                    }
-                }
-            }
-        }
-
-        // Load patterns
+        // File types first: each file is parsed with its grammars when it is added
         NodeList patternList = rootElement.getElementsByTagName("pattern");
         for (int i = 0; i < patternList.getLength(); i++) {
             Element patternElement = (Element) patternList.item(i);
@@ -323,6 +300,29 @@ public class ProjectXMLSerializer {
             }
 
             project.addFileType(pattern);
+        }
+
+        // Load fileset
+        NodeList filesetList = rootElement.getElementsByTagName("fileset");
+        if (filesetList.getLength() > 0) {
+            Element filesetElement = (Element) filesetList.item(0);
+
+            // files and directories, in order
+            for (Node n = filesetElement.getFirstChild(); n != null; n = n.getNextSibling()) {
+                if (!(n instanceof Element e)) continue;
+                String path = e.getAttribute("path");
+                if (e.getTagName().equals("file")) {
+                    project.addFile(path);
+                } else if (e.getTagName().equals("directory")) {
+                    DirectorySettings settings = directorySettings(e, project);
+                    if (settings == null) {
+                        // written before directory settings: as it was loaded then
+                        project.addDirectory(path);
+                    } else {
+                        project.addDirectory(path, settings);
+                    }
+                }
+            }
         }
 
         NodeList assistantList = rootElement.getElementsByTagName("assistant");
