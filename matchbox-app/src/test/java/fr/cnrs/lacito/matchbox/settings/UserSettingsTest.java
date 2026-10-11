@@ -76,7 +76,8 @@ class UserSettingsTest {
             SettingsData edited = s.snapshot();
             SettingsData changed = new SettingsData(edited.version(), "ISO-8859-1",
                 edited.morphemeSeparators(), List.of(".XML", "txt"), List.of(), 0, 3, true, edited.logFile(), edited.assist(), edited.allowInvalidViewEdits(),
-                new TagBrowserSettingsData(99, 3, "random", null));
+                new TagBrowserSettingsData(99, 3, "random", null),
+                new EditorSettingsData(null, false, 99, " ", null, null, null, List.of("a", "a", "")));
             s.apply(changed);
             assertEquals(StandardCharsets.ISO_8859_1, s.charsetProperty().get());
             assertEquals(List.of("xml", "txt"), s.fileExtensions());
@@ -86,6 +87,9 @@ class UserSettingsTest {
             // invalid Tag Browser values replaced by the defaults, valid ones kept
             assertEquals(new TagBrowserSettingsData(5, 3, TagBrowserSettingsData.SORT_NAME, false),
                 s.tagBrowserProperty().get());
+            // font size clamped, blank family = default, recent characters cleaned
+            assertEquals(new EditorSettingsData(false, false, EditorSettingsData.MAX_FONT_SIZE, null, true, false, true,
+                List.of("a")), s.editorProperty().get());
         }
     }
 

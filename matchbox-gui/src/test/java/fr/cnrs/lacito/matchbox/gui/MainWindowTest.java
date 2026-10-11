@@ -104,7 +104,7 @@ class MainWindowTest extends MainWindowFixture {
         assertEquals("File", menu(robot, "Mode").getItems().get(0).getText());
         assertEquals(Modes.FILE, workbench().modes().orElseThrow().activeId().orElseThrow());
         // nothing displayed: the File Mode items acting on the file are disabled
-        assertTrue(item(menu(robot, "File Mode"), "Search").isDisable());
+        assertTrue(item(menu(robot, "File Mode"), "Find…").isDisable());
         assertTrue(item(menu(robot, "Edit"), "Undo").isDisable());
     }
 
@@ -230,18 +230,14 @@ class MainWindowTest extends MainWindowFixture {
     @Test
     void theFileModeMenuActsOnTheDisplayedFile(FxRobot robot) throws Exception {
         Menu fileMode = menu(robot, "File Mode");
-        assertTrue(item(fileMode, "Search").isDisable(), "no file displayed");
+        assertTrue(item(fileMode, "Find…").isDisable(), "no file displayed");
         // the first file added is displayed
         Path a = addFile(robot, "a.txt", IGT);
         waitUntil(() -> workbench().focus().map(f -> f.text().equals(document(a).getId())).orElse(false));
-        MenuItem search = item(fileMode, "Search");
-        assertFalse(search.isDisable());
+        MenuItem find = item(fileMode, "Find…");
+        assertFalse(find.isDisable());
         assertFalse(item(fileMode, "Review whole file").isDisable());
-        robot.interact(search::fire);
-        waitUntil(() -> Window.getWindows().stream()
-            .anyMatch(w -> w instanceof javafx.stage.Stage s && "Search / Replace".equals(s.getTitle()) && s.isShowing()));
-        robot.interact(() -> Window.getWindows().stream()
-            .filter(w -> w instanceof javafx.stage.Stage s && "Search / Replace".equals(s.getTitle()))
-            .toList().forEach(Window::hide));
+        robot.interact(find::fire);
+        waitUntil(() -> robot.lookup("#findBar").query().isVisible());
     }
 }

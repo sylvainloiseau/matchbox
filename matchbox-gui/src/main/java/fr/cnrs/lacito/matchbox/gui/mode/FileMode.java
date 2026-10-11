@@ -7,12 +7,16 @@ import fr.cnrs.lacito.matchbox.PluginManager;
 import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
-import fr.cnrs.lacito.matchbox.gui.SearchDialog;
 import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
 import fr.cnrs.lacito.matchbox.gui.assist.GhostTextController;
 import fr.cnrs.lacito.matchbox.gui.assist.SuggestionPanelController;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorKeymap;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.ErrorRuler;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.FileTree;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.FindBar;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.ShortcutsWindow;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.SpecialCharacterPopup;
 import fr.cnrs.lacito.matchbox.gui.view.ErrorFilter;
 import fr.cnrs.lacito.matchbox.gui.view.GrammarNames;
 import fr.cnrs.lacito.matchbox.gui.view.Kinds;
@@ -87,6 +91,14 @@ public class FileMode implements Mode {
 
     @FXML
     private InlineCssTextArea fileContentCodeArea;
+
+    @FXML
+    private javafx.scene.control.ToolBar editorToolBar;
+
+    private FindBar findBar;
+    private ErrorRuler errorRuler;
+    /** "Ln 12, Col 5 (34 selected)"; a click opens Go to line. */
+    private final javafx.scene.control.Hyperlink positionLink = new javafx.scene.control.Hyperlink();
 
     @FXML
     private TabPane objectKindTabPane;
@@ -210,6 +222,7 @@ public class FileMode implements Mode {
     public void initialize() {
         this.editorController = new EditorController(fileContentCodeArea, workbench);
         editorController.setTextActions(PluginManager.loadServices(TextActionProvider.class));
+        setupEditorArea();
         setupFileListView();
         setupObjectsTab();
         setupErrorTab();
@@ -222,6 +235,114 @@ public class FileMode implements Mode {
         closeButton.setTooltip(new Tooltip("Remove the displayed file from the project (files added alone; "
             + "exclude a file of a directory in its settings)"));
         parseButton.disableProperty().bind(editorController.getCurrentTextCouldBeParsedAgainProperty().not());
+    }
+
+    /**
+     * The editor in a scroll pane, the error ruler beside it, the find bar above, an empty state
+     * when no file is displayed, and the caret position in the toolbar.
+     */
+    private void setupEditorArea() {
+        findBar = new FindBar(editorController, workbench.status()::info);
+        var scroll = new org.fxmisc.flowless.VirtualizedScrollPane<>(fileContentCodeArea);
+        scroll.setId("editorScrollPane");
+        errorRuler = new ErrorRuler(line -> goToLine(line + 1));
+        javafx.scene.layout.HBox.setHgrow(scroll, javafx.scene.layout.Priority.ALWAYS);
+        var withRuler = new javafx.scene.layout.HBox(scroll, errorRuler);
+        Label empty = new Label("Choose a file in the list, or add files with Current project › Add file…");
+        empty.setId("editorEmptyState");
+        empty.setStyle("-fx-text-fill: #888888; -fx-font-size: 1.1em;");
+        empty.setMouseTransparent(true);
+        empty.visibleProperty().bind(editorController.getClosableProperty().not());
+        var stack = new javafx.scene.layout.StackPane(withRuler, empty);
+        javafx.scene.layout.VBox.setVgrow(stack, javafx.scene.layout.Priority.ALWAYS);
+        var editorBox = new javafx.scene.layout.VBox(findBar, stack);
+        int index = editorSplitPane.getItems().indexOf(fileContentCodeArea);
+        editorSplitPane.getItems().set(index, editorBox);
+        editorController.markersProperty().addListener((obs, o, n) -> errorRuler.setMarkers(n, editorController.lineCount()));
+
+        positionLink.setId("caretPosition");
+        positionLink.setTooltip(new Tooltip("Go to line… (" + shortcut(KeyCode.L).getDisplayText() + ")"));
+        positionLink.setOnAction(e -> {
+            positionLink.setVisited(false);
+            goToLine();
+        });
+        positionLink.visibleProperty().bind(editorController.getClosableProperty());
+        var spacer = new javafx.scene.layout.Region();
+        javafx.scene.layout.HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+        editorToolBar.getItems().addAll(spacer, positionLink);
+        fileContentCodeArea.caretPositionProperty().addListener((obs, o, n) -> updatePosition());
+        fileContentCodeArea.selectionProperty().addListener((obs, o, n) -> updatePosition());
+    }
+
+    private void updatePosition() {
+        int selected = fileContentCodeArea.getSelection().getLength();
+        positionLink.setText("Ln " + (fileContentCodeArea.getCurrentParagraph() + 1) + ", Col "
+            + (fileContentCodeArea.getCaretColumn() + 1) + (selected > 0 ? " (" + selected + " selected)" : ""));
+    }
+
+    /** Asks for a line number and goes there (recorded for Back). */
+    public void goToLine() {
+        if (editorController.getSelectedDocument().isEmpty()) return;
+        int count = editorController.lineCount();
+        var dialog = new javafx.scene.control.TextInputDialog(String.valueOf(fileContentCodeArea.getCurrentParagraph() + 1));
+        dialog.initOwner(window());
+        dialog.setTitle("Go to line");
+        dialog.setHeaderText(null);
+        dialog.setContentText("Line (1–" + count + "):");
+        dialog.showAndWait().ifPresent(text -> {
+            try {
+                goToLine(Integer.parseInt(text.strip()));
+            } catch (NumberFormatException e) {
+                workbench.status().warn("Not a line number: " + text);
+            }
+        });
+    }
+
+    /** Goes to the start of a line (1-based, clamped), recorded for Back. */
+    public void goToLine(int line) {
+        editorController.getSelectedDocument().ifPresent(d ->
+            workbench.navigator().showInEditor(Focus.at(d.getId(), editorController.offsetOfLine(line))));
+    }
+
+    /** Opens the special character palette at the caret. */
+    public void insertSpecialCharacter() {
+        if (editorController.getSelectedDocument().isEmpty()) return;
+        var bounds = fileContentCodeArea.getCaretBounds();
+        double x = bounds.map(javafx.geometry.Bounds::getMinX).orElseGet(() -> fileContentCodeArea.localToScreen(0, 0).getX() + 40);
+        double y = bounds.map(javafx.geometry.Bounds::getMaxY).orElseGet(() -> fileContentCodeArea.localToScreen(0, 0).getY() + 40);
+        SpecialCharacterPopup.show(window(), x, y, settings.editorProperty().get().recentCharacters(), c -> {
+            editorController.insertText(c);
+            settings.editorProperty().set(settings.editorProperty().get().withRecentCharacter(c));
+        });
+    }
+
+    private void showShortcuts() {
+        javafx.scene.control.MenuBar bar = fileContentCodeArea.getScene() == null ? null
+            : (javafx.scene.control.MenuBar) fileContentCodeArea.getScene().lookup(".menu-bar");
+        ShortcutsWindow.show(window(), bar);
+    }
+
+    /** The platform's shortcut key with a key (and other modifiers). */
+    private static KeyCombination shortcut(KeyCode code, KeyCombination.Modifier... others) {
+        KeyCombination.Modifier[] modifiers = java.util.Arrays.copyOf(others, others.length + 1);
+        modifiers[others.length] = KeyCombination.SHORTCUT_DOWN;
+        return new KeyCodeCombination(code, modifiers);
+    }
+
+    private void changeOptions(java.util.function.UnaryOperator<fr.cnrs.lacito.matchbox.settings.EditorSettingsData> change) {
+        settings.editorProperty().set(change.apply(settings.editorProperty().get()));
+    }
+
+    /** A check item showing and changing a boolean option of the editor. */
+    private CheckMenuItem option(String text,
+                                 java.util.function.Predicate<fr.cnrs.lacito.matchbox.settings.EditorSettingsData> value,
+                                 java.util.function.BiFunction<fr.cnrs.lacito.matchbox.settings.EditorSettingsData, Boolean,
+                                     fr.cnrs.lacito.matchbox.settings.EditorSettingsData> with) {
+        CheckMenuItem item = new CheckMenuItem(text);
+        item.setSelected(value.test(settings.editorProperty().get()));
+        settings.editorProperty().addListener((obs, o, n) -> item.setSelected(value.test(n)));
+        item.setOnAction(e -> changeOptions(opts -> with.apply(opts, item.isSelected())));
+        return item;
     }
 
     /** Shows the files of a new project (none if null); nothing is displayed until a file is chosen. */
@@ -313,7 +434,45 @@ public class FileMode implements Mode {
     // ------------------------------------------------------------------
 
     private Menu buildMenu() {
-        MenuItem search = item("Search…", this::openSearch);
+        MenuItem search = item("Find…", this::openSearch);
+        search.setAccelerator(shortcut(KeyCode.F));
+        MenuItem findNext = item("Find next", () -> findBar.next());
+        findNext.setAccelerator(shortcut(KeyCode.G));
+        MenuItem findPrevious = item("Find previous", () -> findBar.previous());
+        findPrevious.setAccelerator(shortcut(KeyCode.G, KeyCombination.SHIFT_DOWN));
+        MenuItem replace = item("Replace…", () -> findBar.open(true));
+        replace.setAccelerator(EditorKeymap.Platform.current() == EditorKeymap.Platform.MAC
+            ? shortcut(KeyCode.F, KeyCombination.ALT_DOWN) : shortcut(KeyCode.H));
+        MenuItem goToLine = item("Go to line…", this::goToLine);
+        goToLine.setAccelerator(shortcut(KeyCode.L));
+        MenuItem specialCharacter = item("Insert special character…", this::insertSpecialCharacter);
+        specialCharacter.setAccelerator(shortcut(KeyCode.I, KeyCombination.SHIFT_DOWN));
+
+        MenuItem duplicate = item("Duplicate line", () -> editorController.duplicateLines());
+        duplicate.setAccelerator(shortcut(KeyCode.D));
+        MenuItem deleteLine = item("Delete line", () -> editorController.deleteLines());
+        deleteLine.setAccelerator(shortcut(KeyCode.K, KeyCombination.SHIFT_DOWN));
+        MenuItem moveUp = item("Move line up", () -> editorController.moveLinesUp());
+        moveUp.setAccelerator(new KeyCodeCombination(KeyCode.UP, KeyCombination.ALT_DOWN));
+        MenuItem moveDown = item("Move line down", () -> editorController.moveLinesDown());
+        moveDown.setAccelerator(new KeyCodeCombination(KeyCode.DOWN, KeyCombination.ALT_DOWN));
+        Menu lines = new Menu("Lines", null, duplicate, deleteLine, moveUp, moveDown);
+
+        MenuItem zoomIn = item("Zoom in", () -> changeOptions(o -> o.withFontSize(o.fontSize() + 1)));
+        zoomIn.setAccelerator(shortcut(KeyCode.EQUALS));
+        MenuItem zoomOut = item("Zoom out", () -> changeOptions(o -> o.withFontSize(o.fontSize() - 1)));
+        zoomOut.setAccelerator(shortcut(KeyCode.MINUS));
+        MenuItem actualSize = item("Actual size",
+            () -> changeOptions(o -> o.withFontSize(fr.cnrs.lacito.matchbox.settings.EditorSettingsData.DEFAULT_FONT_SIZE)));
+        actualSize.setAccelerator(shortcut(KeyCode.DIGIT0));
+        Menu editorOptions = new Menu("Editor", null,
+            option("Wrap lines", o -> o.wrapLines(), (o, v) -> o.withWrapLines(v)),
+            option("Show line numbers", o -> o.lineNumbers(), (o, v) -> o.withLineNumbers(v)),
+            option("Highlight current line", o -> o.highlightCurrentLine(), (o, v) -> o.withHighlightCurrentLine(v)),
+            option("Show invisible characters", o -> o.showInvisibles(), (o, v) -> o.withShowInvisibles(v)),
+            option("Auto-indent", o -> o.autoIndent(), (o, v) -> o.withAutoIndent(v)),
+            new SeparatorMenuItem(), zoomIn, zoomOut, actualSize);
+        MenuItem shortcuts = item("Keyboard shortcuts", this::showShortcuts);
         MenuItem parse = item("Parse file", this::handleParseText);
         MenuItem suggest = item("Suggest completion (Ctrl+Space)", this::requestCompletion);
         CheckMenuItem inline = new CheckMenuItem("Inline suggestions");
@@ -339,7 +498,9 @@ public class FileMode implements Mode {
         removeDirectory.disableProperty().bind(directorySelected.not());
 
         Menu result = new Menu("File Mode", null,
-            search, parse,
+            search, findNext, findPrevious, replace, goToLine, specialCharacter, parse,
+            new SeparatorMenuItem(),
+            lines, editorOptions,
             new SeparatorMenuItem(),
             directorySettings, removeDirectory,
             new SeparatorMenuItem(),
@@ -348,7 +509,9 @@ public class FileMode implements Mode {
             insert);
         // everything acts on the displayed file
         var noFile = editorController.getClosableProperty().not();
-        for (MenuItem i : List.of(search, suggest, explain, reviewBlock, reviewFile, insert)) {
+        result.getItems().addAll(new SeparatorMenuItem(), shortcuts);
+        for (MenuItem i : List.of(search, findNext, findPrevious, replace, goToLine, specialCharacter, lines,
+                suggest, explain, reviewBlock, reviewFile, insert)) {
             i.disableProperty().bind(noFile);
         }
         parse.disableProperty().bind(editorController.getCurrentTextCouldBeParsedAgainProperty().not());
@@ -363,9 +526,9 @@ public class FileMode implements Mode {
         return item;
     }
 
-    /** Find and replace in the displayed file; the replacements are one undoable change. */
+    /** Find (and replace) in the displayed file, in the find bar above the editor. */
     public void openSearch() {
-        new SearchDialog(fileContentCodeArea, editorController::applySearchEdits, window()).show();
+        if (editorController.getSelectedDocument().isPresent()) findBar.open(false);
     }
 
     // ------------------------------------------------------------------

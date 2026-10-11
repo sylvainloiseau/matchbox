@@ -29,6 +29,7 @@ import java.util.function.Consumer;
  * @param assist             settings of the AI assistant
  * @param allowInvalidViewEdits apply edits made in object views even if they add parse errors
  * @param tagBrowser         settings of the Tag Browser mode
+ * @param editor             settings of the text editor of File Mode
  */
 public record SettingsData(
     Integer version,
@@ -42,7 +43,8 @@ public record SettingsData(
     String logFile,
     AssistSettingsData assist,
     Boolean allowInvalidViewEdits,
-    TagBrowserSettingsData tagBrowser
+    TagBrowserSettingsData tagBrowser,
+    EditorSettingsData editor
 ) {
 
     public static final int CURRENT_VERSION = 2;
@@ -61,7 +63,8 @@ public record SettingsData(
             null,
             AssistSettingsData.defaults(),
             false,
-            TagBrowserSettingsData.defaults()
+            TagBrowserSettingsData.defaults(),
+            EditorSettingsData.defaults()
         );
     }
 
@@ -91,7 +94,8 @@ public record SettingsData(
             logFile == null || logFile.isBlank() ? null : logFile.strip(),
             assist == null ? d.assist : assist.validated(problems),
             allowInvalidViewEdits == null ? d.allowInvalidViewEdits : allowInvalidViewEdits,
-            tagBrowser == null ? d.tagBrowser : tagBrowser.validated(problems)
+            tagBrowser == null ? d.tagBrowser : tagBrowser.validated(problems),
+            editor == null ? d.editor : editor.validated(problems)
         );
     }
 
@@ -99,14 +103,21 @@ public record SettingsData(
     public SettingsData withAssist(AssistSettingsData newAssist) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist, allowInvalidViewEdits,
-            tagBrowser);
+            tagBrowser, editor);
     }
 
     /** Copy with other Tag Browser settings. */
     public SettingsData withTagBrowser(TagBrowserSettingsData newTagBrowser) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
-            newTagBrowser);
+            newTagBrowser, editor);
+    }
+
+    /** Copy with other editor settings. */
+    public SettingsData withEditor(EditorSettingsData newEditor) {
+        return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
+            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
+            tagBrowser, newEditor);
     }
 
     /** Validated copy, problems ignored. */

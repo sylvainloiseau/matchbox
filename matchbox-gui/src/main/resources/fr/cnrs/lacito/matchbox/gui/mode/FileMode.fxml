@@ -27,7 +27,7 @@
   </VBox>
   <SplitPane fx:id="topSplitPane" dividerPositions="0.5" orientation="VERTICAL">
     <VBox style="-fx-background-color: #cccccc;">
-        <ToolBar prefHeight="40.0" prefWidth="200.0">
+        <ToolBar fx:id="editorToolBar" prefHeight="40.0" prefWidth="200.0">
           <items>
             <Button fx:id="saveButton" mnemonicParsing="false" onAction="#handleSaveCurrentFile" text="Save" />
             <Button fx:id="parseButton" mnemonicParsing="false" onAction="#handleParseText" text="Parse" />

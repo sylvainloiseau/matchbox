@@ -7,7 +7,8 @@ date: 2026-10-14
  
 <mami> {pig}
 
-<jaflo> {canoe} #"tocheck/name"
+<jaflo> {canoe}
+#"tocheck/name"
 
 :::
 a mio-jaflo-m-wi-j

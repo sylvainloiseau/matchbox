@@ -22,6 +22,8 @@ public record EditOrigin(Kind kind, Object source, String description) {
         ASSIST,
         /** Search and replace. */
         SEARCH,
+        /** An editor command (duplicate, delete or move lines…): one undo step of its own. */
+        COMMAND,
         UNDO,
         REDO
     }
@@ -48,6 +50,7 @@ public record EditOrigin(Kind kind, Object source, String description) {
             case VIEW -> "Edit";
             case ASSIST -> "Apply suggestion";
             case SEARCH -> "Replace";
+            case COMMAND -> "Edit lines";
             case UNDO -> "Undo";
             case REDO -> "Redo";
         };

@@ -1,0 +1,9 @@
+# Special characters of the editor's palette: "Group name: characters separated by spaces".
+# Names are the Unicode names of the characters. Combining marks are shown on a dotted circle.
+IPA consonants: ɓ ɗ ʄ ɠ ʛ ʘ ǀ ǃ ǂ ǁ ʈ ɖ ɟ ɢ ʔ ʡ ʕ ʢ ɱ ɳ ɲ ŋ ɴ ʙ ʀ ⱱ ɾ ɽ ɸ β θ ð ʃ ʒ ʂ ʐ ç ʝ ɣ χ ʁ ħ ɦ ɬ ɮ ʋ ɹ ɻ ɰ ɭ ʎ ʟ ʍ ɥ ʜ ʑ ɕ ɧ ɺ
+IPA vowels: ɨ ʉ ɯ ʏ ɪ ʊ ø ɘ ɵ ɤ ə ɛ œ ɜ ɞ ʌ ɔ æ ɐ ɶ ɑ ɒ ɚ ɝ
+Diacritics: ̥ ̊ ̬ ʰ ̹ ̜ ̟ ̠ ̈ ̽ ̩ ̯ ˞ ̤ ̰ ̼ ʷ ʲ ˠ ˤ ̴ ̝ ̞ ̘ ̙ ̪ ̺ ̻ ̃ ⁿ ˡ ̚ ̆ ̄ ́ ̀ ̂ ̌ ̋ ̏ ̧ ̨ ̣ ̱
+Tones and accents: ˥ ˦ ˧ ˨ ˩ ꜛ ꜜ ↗ ↘ á à â ǎ ā ã é è ê ě ē ẽ í ì î ǐ ī ĩ ó ò ô ǒ ō õ ú ù û ǔ ū ũ
+Suprasegmentals: ˈ ˌ ː ˑ ‿ | ‖ .
+Other letters: ʼ ʻ ʹ ɂ ŧ đ ł ñ ŋ ẁ ẃ ẅ ỳ ý ÿ ç š ž č ğ ı ǝ ɩ ʋ ƴ ƙ ɓ ƭ ɲ
+Punctuation and symbols: — – … « » ‹ › “ ” ‘ ’ ∅ ± × ÷ → ← ↔ ≈ ≠ ≤ ≥ ° § ¶ • ·

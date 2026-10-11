@@ -125,8 +125,8 @@ The CoNLL-U format has three types of lines:
 
 - Word lines containing the annotation of a word/token/node in 10 fields separated by single tab characters; see below.
 - Blank lines marking sentence boundaries. The last line of each sentence is a blank line.
-- Sentence-level comments starting with hash (#). Comment lines occur at the beginning of sentences, before word lines. The comment lines contain, after the # symbol,
-        a field name and a field value, separated by an equal sign: "#<field_name>=<field_value>". Very common comment lines are : "sent_id" for the sentence ID, "text" for the sentence text, and "text_en" for its translation in english
+- Sentence-level comments starting with hash (#). Comment lines occur at the beginning of sentences, before word lines. The comment lines contain, after the # symbol and a whitespace,
+        a field name and a field value, separated by an equal sign: "# <field_name>=<field_value>". Very common comment lines are : "sent_id" for the sentence ID, "text" for the sentence text, and "text_en" for its translation in english
 
 Sentences consist of one or more word lines, and word lines contain the following fields:
 

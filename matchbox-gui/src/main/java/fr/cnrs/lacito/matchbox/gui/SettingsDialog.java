@@ -1,5 +1,6 @@
 package fr.cnrs.lacito.matchbox.gui;
 
+import fr.cnrs.lacito.matchbox.settings.EditorSettingsData;
 import fr.cnrs.lacito.matchbox.settings.SettingsData;
 import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.nio.charset.Charset;
@@ -53,6 +54,30 @@ public class SettingsDialog {
     @FXML
     private CheckBox allowInvalidViewEditsCheckBox;
 
+    @FXML
+    private CheckBox wrapLinesCheckBox;
+
+    @FXML
+    private CheckBox lineNumbersCheckBox;
+
+    @FXML
+    private CheckBox highlightCurrentLineCheckBox;
+
+    @FXML
+    private CheckBox showInvisiblesCheckBox;
+
+    @FXML
+    private CheckBox autoIndentCheckBox;
+
+    @FXML
+    private TextField fontSizeField;
+
+    @FXML
+    private ComboBox<String> fontFamilyComboBox;
+
+    /** The default font of the editor in the font family list. */
+    private static final String DEFAULT_FONT = "(default monospaced)";
+
     public SettingsDialog(
         UserSettings settings,
         Stage parentStage
@@ -67,7 +92,7 @@ public class SettingsDialog {
         stage.initOwner(parentStage);
         stage.setTitle("Settings");
         stage.setWidth(460);
-        stage.setHeight(380);
+        stage.setHeight(460);
 
         try {
             FXMLLoader loader = new FXMLLoader();
@@ -104,6 +129,16 @@ public class SettingsDialog {
         recentProjectsLimitField.setText(String.valueOf(current.maxRecentProjects()));
         openLastProjectCheckBox.setSelected(current.openLastProject());
         allowInvalidViewEditsCheckBox.setSelected(current.allowInvalidViewEdits());
+        EditorSettingsData editor = current.editor();
+        wrapLinesCheckBox.setSelected(editor.wrapLines());
+        lineNumbersCheckBox.setSelected(editor.lineNumbers());
+        highlightCurrentLineCheckBox.setSelected(editor.highlightCurrentLine());
+        showInvisiblesCheckBox.setSelected(editor.showInvisibles());
+        autoIndentCheckBox.setSelected(editor.autoIndent());
+        fontSizeField.setText(String.valueOf(editor.fontSize()));
+        fontFamilyComboBox.getItems().setAll(DEFAULT_FONT);
+        fontFamilyComboBox.getItems().addAll(javafx.scene.text.Font.getFamilies());
+        fontFamilyComboBox.setValue(editor.fontFamily() == null ? DEFAULT_FONT : editor.fontFamily());
 
         okButton.setOnAction(e -> {
             try {
@@ -135,8 +170,28 @@ public class SettingsDialog {
             current.logFile(),
             current.assist(),
             allowInvalidViewEditsCheckBox.isSelected(),
-            current.tagBrowser()
+            current.tagBrowser(),
+            editedEditor(current.editor())
         );
+    }
+
+    /** The values of the Editor tab; throws IllegalArgumentException with a message for the user. */
+    private EditorSettingsData editedEditor(EditorSettingsData current) {
+        int size;
+        try {
+            size = Integer.parseInt(fontSizeField.getText().strip());
+        } catch (NumberFormatException e) {
+            size = -1;
+        }
+        if (size < EditorSettingsData.MIN_FONT_SIZE || size > EditorSettingsData.MAX_FONT_SIZE) {
+            throw new IllegalArgumentException("The font size must be an integer from "
+                + EditorSettingsData.MIN_FONT_SIZE + " to " + EditorSettingsData.MAX_FONT_SIZE);
+        }
+        String family = fontFamilyComboBox.getValue();
+        return new EditorSettingsData(wrapLinesCheckBox.isSelected(), lineNumbersCheckBox.isSelected(), size,
+            family == null || family.equals(DEFAULT_FONT) ? null : family,
+            highlightCurrentLineCheckBox.isSelected(), showInvisiblesCheckBox.isSelected(), autoIndentCheckBox.isSelected(),
+            current.recentCharacters());
     }
 
     private static List<String> splitItems(String text, String separator) {

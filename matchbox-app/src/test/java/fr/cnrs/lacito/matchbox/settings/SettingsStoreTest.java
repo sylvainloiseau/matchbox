@@ -39,7 +39,8 @@ class SettingsStoreTest {
             "qwen3:8b", false, AssistSettingsData.AUTO, 600, 3000, 500, true, false, "French", List.of("anthropic"));
         SettingsData data = new SettingsData(SettingsData.CURRENT_VERSION, "ISO-8859-1", "-",
             List.of("txt"), List.of("notes-*"), 5, 7, true, "/tmp/m.log", assist, true,
-            new TagBrowserSettingsData(2, 8, TagBrowserSettingsData.SORT_COUNT, true));
+            new TagBrowserSettingsData(2, 8, TagBrowserSettingsData.SORT_COUNT, true),
+            new EditorSettingsData(true, false, 16, "Menlo", false, true, false, List.of("ʔ", "ŋ")));
         store.saveSettings(data);
         store.saveRecent(new RecentData(1, List.of("/a.txt", "/b"), List.of("/p.mbx")));
 
@@ -105,7 +106,7 @@ class SettingsStoreTest {
 
     @Test
     void blankLogFileBecomesNull() {
-        SettingsData d = new SettingsData(null, null, null, null, null, null, null, null, "  ", null, null, null).validated();
+        SettingsData d = new SettingsData(null, null, null, null, null, null, null, null, "  ", null, null, null, null).validated();
         assertNull(d.logFile());
         assertEquals(SettingsData.defaults(), d);
     }

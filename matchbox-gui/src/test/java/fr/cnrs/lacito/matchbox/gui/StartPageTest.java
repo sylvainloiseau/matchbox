@@ -172,6 +172,6 @@ class StartPageTest extends MainWindowFixture {
         loader.setController(new SettingsDialog(settings, stage));
         loader.load();
         TabPane tabs = (TabPane) loader.getNamespace().get("tabs");
-        assertEquals(List.of("Grammar", "Files", "Application"), tabs.getTabs().stream().map(Tab::getText).toList());
+        assertEquals(List.of("Grammar", "Files", "Editor", "Application"), tabs.getTabs().stream().map(Tab::getText).toList());
     }
 }

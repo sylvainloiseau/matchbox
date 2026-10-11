@@ -54,6 +54,28 @@
             </VBox>
           </content>
         </Tab>
+        <Tab text="Editor" closable="false">
+          <content>
+            <VBox spacing="10.0" style="-fx-padding: 15;">
+              <children>
+                <CheckBox fx:id="wrapLinesCheckBox" text="Wrap lines" />
+                <CheckBox fx:id="lineNumbersCheckBox" text="Show line numbers" />
+                <CheckBox fx:id="highlightCurrentLineCheckBox" text="Highlight the current line" />
+                <CheckBox fx:id="showInvisiblesCheckBox" text="Show invisible characters (tabs, trailing spaces)" />
+                <CheckBox fx:id="autoIndentCheckBox" text="Enter keeps the indentation of the line" />
+                <Label text="Font size (8–40):" style="-fx-font-weight: bold;" />
+                <TextField fx:id="fontSizeField" promptText="13" />
+                <Label text="Font family:" style="-fx-font-weight: bold;" />
+                <ComboBox fx:id="fontFamilyComboBox" />
+                <Label
+                                    text="A proportional font breaks the alignment of interlinear glosses."
+                                    wrapText="true"
+                                    style="-fx-font-size: 0.9em; -fx-text-fill: #666666;"
+                                />
+              </children>
+            </VBox>
+          </content>
+        </Tab>
         <Tab text="Application" closable="false">
           <content>
             <VBox spacing="10.0" style="-fx-padding: 15;">

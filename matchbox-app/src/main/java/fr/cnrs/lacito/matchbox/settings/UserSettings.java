@@ -55,6 +55,7 @@ public final class UserSettings implements AutoCloseable {
     private final BooleanProperty openLastProject = new SimpleBooleanProperty();
     private final BooleanProperty allowInvalidViewEdits = new SimpleBooleanProperty();
     private final ObjectProperty<TagBrowserSettingsData> tagBrowser = new SimpleObjectProperty<>();
+    private final ObjectProperty<EditorSettingsData> editor = new SimpleObjectProperty<>();
     private String logFile;
     private final ObjectProperty<AssistSettingsData> assist = new SimpleObjectProperty<>();
     private final RecentItems recentFiles = new RecentItems(maxRecentFiles);
@@ -87,7 +88,7 @@ public final class UserSettings implements AutoCloseable {
 
         for (Observable o : List.<Observable>of(charset, morphemeSeparators,
                 fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, assist,
-                allowInvalidViewEdits, tagBrowser)) {
+                allowInvalidViewEdits, tagBrowser, editor)) {
             o.addListener(obs -> settingsChanged());
         }
         recentFiles.items().addListener((Observable obs) -> recentChanged());
@@ -165,6 +166,7 @@ public final class UserSettings implements AutoCloseable {
     public ObjectProperty<Charset> charsetProperty() { return charset; }
     /** Settings of the Tag Browser mode (replace the whole value to change them). */
     public ObjectProperty<TagBrowserSettingsData> tagBrowserProperty() { return tagBrowser; }
+    public ObjectProperty<EditorSettingsData> editorProperty() { return editor; }
     public StringProperty morphemeSeparatorsProperty() { return morphemeSeparators; }
     /** Normalised extensions (lower case, without dot); empty means all files. */
     public ObservableList<String> fileExtensions() { return fileExtensions; }
@@ -216,7 +218,8 @@ public final class UserSettings implements AutoCloseable {
             logFile,
             assist.get(),
             allowInvalidViewEdits.get(),
-            tagBrowser.get()
+            tagBrowser.get(),
+            editor.get()
         );
     }
 
@@ -243,6 +246,7 @@ public final class UserSettings implements AutoCloseable {
         assist.set(d.assist());
         allowInvalidViewEdits.set(d.allowInvalidViewEdits());
         tagBrowser.set(d.tagBrowser());
+        editor.set(d.editor());
     }
 
     // ------------------------------------------------------------------

@@ -14,6 +14,7 @@ import fr.cnrs.lacito.matchbox.grammarfx.TextActionProvider;
 import fr.cnrs.lacito.matchbox.corpus.capability.MediaSegment;
 import fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle;
 import fr.cnrs.lacito.matchbox.gui.view.DisplayStyleCss;
+import fr.cnrs.lacito.matchbox.settings.EditorSettingsData;
 import fr.cnrs.lacito.matchbox.gui.view.HighlightStyles;
 import fr.cnrs.lacito.matchbox.gui.view.StyleLayers;
 import fr.cnrs.lacito.matchbox.gui.workbench.SelectionTracker;
@@ -29,6 +30,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.text.Font;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.logging.Level;
@@ -50,6 +55,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.input.KeyCombination;
 import org.fxmisc.richtext.InlineCssTextArea;
+import org.fxmisc.richtext.NavigationActions.SelectionPolicy;
 import org.fxmisc.richtext.MultiChangeBuilder;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.fxmisc.richtext.model.TwoDimensional;
@@ -105,6 +111,24 @@ public class EditorController {
     /** Object selected in the editor, a table or a view (may be a nested object, of any file). */
     private final SelectionTracker selection;
 
+    /** Options of the editor (wrap, line numbers, font…), from the user settings. */
+    private EditorSettingsData options = EditorSettingsData.defaults();
+    /** Where the user was in each file of the project. */
+    private final CaretMemory caretMemory = new CaretMemory();
+    /** Markers of the margin by line (▶, ✚, ●), also shown by the error ruler. */
+    private final ObjectProperty<Map<Integer, GutterLayout.Markers>> markers = new SimpleObjectProperty<>(Map.of());
+    /** Digits of the line numbers of the margin as installed (the margin is rebuilt when they change). */
+    private int gutterDigits;
+    /** Matches of the find bar, highlighted; the current one stronger (-1: none). */
+    private List<FindModel.Match> findMatches = List.of();
+    private int findCurrent = -1;
+    /** Paragraph with the current-line background, -1 if none. */
+    private int highlightedParagraph = -1;
+    private static final String CURRENT_LINE_STYLE = "-fx-background-color: #f2f6fc;";
+    private static final DisplayStyle INVISIBLE_STYLE = DisplayStyle.background("#e4e4ec");
+    private static final DisplayStyle MATCH_STYLE = DisplayStyle.background("#fff59d");
+    private static final DisplayStyle CURRENT_MATCH_STYLE = DisplayStyle.background("#ffb74d");
+
     /** Actions plugins offer on the displayed text, shown in the margin of their line. */
     private List<TextActionProvider> actionProviders = List.of();
     private final Set<TextActionProvider> failedProviders = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -123,6 +147,24 @@ public class EditorController {
             InputMap.consume(EventPattern.keyPressed(KeyCode.SPACE, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN),
                 e -> playSegmentAtCaret())
         ));
+        // caret movements and deletions of the system's conventions; Enter keeps the indentation
+        List<InputMap<KeyEvent>> keys = new ArrayList<>();
+        for (EditorKeymap.Binding b : EditorKeymap.forPlatform(EditorKeymap.Platform.current())) {
+            keys.add(InputMap.consume(EventPattern.keyPressed(b.key()), e -> perform(b.action(), b.select())));
+        }
+        keys.add(InputMap.consumeWhen(EventPattern.keyPressed(KeyCode.ENTER),
+            () -> options.autoIndent() && document != null, e -> newline()));
+        Nodes.addInputMap(textArea, InputMap.sequence(keys.toArray(InputMap[]::new)));
+        // the options follow the settings
+        var editorSettings = workbench.settings().editorProperty();
+        editorSettings.addListener((obs, o, n) -> applyOptions(n));
+        textArea.currentParagraphProperty().addListener((obs, o, n) -> updateCurrentLine());
+        textArea.multiPlainChanges().subscribe(c -> {
+            // a new digit in the line count widens the margin
+            if (document != null && GutterLayout.digits(textArea.getParagraphs().size()) != gutterDigits) {
+                refreshTextActions(displayedText());
+            }
+        });
         // typing → document
         this.textArea.multiPlainChanges()
             .filter(changes -> !ghostOperation && !mirroring && document != null)
@@ -140,10 +182,166 @@ public class EditorController {
         });
 
         this.textArea.setOnMouseClicked(e -> handleCodeAreaClick());
+        applyOptions(editorSettings.get());
+    }
+
+    // ------------------------------------------------------------------
+    // Options
+    // ------------------------------------------------------------------
+
+    /** Wrapping, font, margin, current line, invisible characters. */
+    private void applyOptions(EditorSettingsData newOptions) {
+        this.options = newOptions == null ? EditorSettingsData.defaults() : newOptions;
+        textArea.setWrapText(options.wrapLines());
+        String family = options.fontFamily() == null ? "monospace"
+            : "\"" + options.fontFamily().replaceAll("[\"';{}]", "") + "\"";
+        textArea.setStyle("-fx-font-family: " + family + "; -fx-font-size: " + options.fontSize() + "px;");
+        refreshTextActions(displayedText());
+        highlightText();
+        highlightedParagraph = clearCurrentLine();
+        updateCurrentLine();
+    }
+
+    public EditorSettingsData options() {
+        return options;
+    }
+
+    /** The font of the text (for the margin's numbers). */
+    private Font editorFont() {
+        return Font.font(options.fontFamily() == null ? "Monospaced" : options.fontFamily(), options.fontSize());
+    }
+
+    /** The caret's line gets a light background (when the option is on). */
+    private void updateCurrentLine() {
+        int paragraph = document == null || !options.highlightCurrentLine() ? -1 : textArea.getCurrentParagraph();
+        if (paragraph == highlightedParagraph) return;
+        clearCurrentLine();
+        if (paragraph >= 0 && paragraph < textArea.getParagraphs().size()) {
+            textArea.setParagraphStyle(paragraph, CURRENT_LINE_STYLE);
+        }
+        highlightedParagraph = paragraph;
+    }
+
+    private int clearCurrentLine() {
+        if (highlightedParagraph >= 0 && highlightedParagraph < textArea.getParagraphs().size()) {
+            textArea.setParagraphStyle(highlightedParagraph, "");
+        }
+        return -1;
+    }
+
+    // ------------------------------------------------------------------
+    // Keyboard: movements, deletions, Enter, line commands
+    // ------------------------------------------------------------------
+
+    /** A movement or deletion of the keymap; {@code select}: the movement extends the selection. */
+    void perform(EditorAction action, boolean select) {
+        dismissGhost();
+        SelectionPolicy policy = select ? SelectionPolicy.ADJUST : SelectionPolicy.CLEAR;
+        int paragraph = textArea.getCurrentParagraph();
+        switch (action) {
+            case LINE_START -> textArea.moveTo(paragraph,
+                Indentation.smartHome(textArea.getParagraph(paragraph).getText(), textArea.getCaretColumn()), policy);
+            case LINE_END -> textArea.moveTo(paragraph, textArea.getParagraphLength(paragraph), policy);
+            case FILE_START -> textArea.start(policy);
+            case FILE_END -> textArea.end(policy);
+            case WORD_LEFT -> textArea.wordBreaksBackwards(2, policy);
+            case WORD_RIGHT -> textArea.wordBreaksForwards(2, policy);
+            case DELETE_TO_LINE_START, DELETE_WORD_LEFT, DELETE_WORD_RIGHT -> {
+                if (!textArea.isEditable()) return;
+                if (textArea.getSelection().getLength() == 0) {
+                    switch (action) {
+                        case DELETE_TO_LINE_START -> textArea.moveTo(paragraph, 0, SelectionPolicy.ADJUST);
+                        case DELETE_WORD_LEFT -> textArea.wordBreaksBackwards(2, SelectionPolicy.ADJUST);
+                        default -> textArea.wordBreaksForwards(2, SelectionPolicy.ADJUST);
+                    }
+                }
+                textArea.replaceSelection("");
+            }
+        }
+        textArea.requestFollowCaret();
+    }
+
+    /** Enter: a newline and the indentation of the line. */
+    private void newline() {
+        dismissGhost();
+        int paragraph = textArea.getCurrentParagraph();
+        int column = textArea.getSelection().getLength() == 0 ? textArea.getCaretColumn()
+            : textArea.offsetToPosition(textArea.getSelection().getStart(), TwoDimensional.Bias.Forward).getMinor();
+        textArea.replaceSelection(Indentation.newline(textArea.getParagraph(paragraph).getText(), column));
+        textArea.requestFollowCaret();
+    }
+
+    public void duplicateLines() {
+        lineCommand("Duplicate line", t -> Optional.of(LineCommands.duplicate(t, selectionStart(), selectionEnd())));
+    }
+
+    public void deleteLines() {
+        lineCommand("Delete line", t -> Optional.of(LineCommands.delete(t, selectionStart(), selectionEnd())));
+    }
+
+    public void moveLinesUp() {
+        lineCommand("Move line up", t -> LineCommands.moveUp(t, selectionStart(), selectionEnd()));
+    }
+
+    public void moveLinesDown() {
+        lineCommand("Move line down", t -> LineCommands.moveDown(t, selectionStart(), selectionEnd()));
+    }
+
+    private int selectionStart() {
+        return textArea.getSelection().getStart();
+    }
+
+    private int selectionEnd() {
+        return textArea.getSelection().getEnd();
+    }
+
+    /** A command on lines: one change of the document, one undo entry, then the new selection. */
+    private void lineCommand(String description, java.util.function.Function<String, Optional<LineCommands.Result>> command) {
+        if (document == null) return;
+        dismissGhost();
+        command.apply(document.getCurrentText()).ifPresent(r -> {
+            if (document.applyEdits(List.of(r.edit()), EditOrigin.of(EditOrigin.Kind.COMMAND, "editor", description))) {
+                int length = textArea.getLength();
+                textArea.selectRange(Math.min(r.selectionStart(), length), Math.min(r.selectionEnd(), length));
+                textArea.requestFollowCaret();
+            }
+        });
+    }
+
+    /** Inserts text at the caret, replacing the selection (as typing). */
+    public void insertText(String text) {
+        if (document == null || !textArea.isEditable()) return;
+        dismissGhost();
+        textArea.replaceSelection(text);
+        textArea.requestFollowCaret();
+        textArea.requestFocus();
+    }
+
+    /** Offset of the start of a line (1-based, clamped). */
+    public int offsetOfLine(int line) {
+        int paragraph = Math.max(0, Math.min(textArea.getParagraphs().size() - 1, line - 1));
+        return textArea.getAbsolutePosition(paragraph, 0);
+    }
+
+    public int lineCount() {
+        return textArea.getParagraphs().size();
+    }
+
+    /** Markers of the margin by line (▶, ✚, ●). */
+    public ReadOnlyObjectProperty<Map<Integer, GutterLayout.Markers>> markersProperty() {
+        return markers;
+    }
+
+    /** Matches of the find bar to highlight; {@code current}: index of the current one, -1 if none. */
+    public void setFindHighlights(List<FindModel.Match> matches, int current) {
+        this.findMatches = List.copyOf(matches);
+        this.findCurrent = current;
+        highlightText();
     }
 
     public void setProject(Project project) {
         clearEditor();
+        caretMemory.clear();
         this.project = project;
         this.corpus = project == null ? null : project.getCorpus();
     }
@@ -288,63 +486,45 @@ public class EditorController {
         workbench.playback().toggle(segment.get());
     }
 
-    /** Shows the actions of the parsed text as buttons in the margin of their line (never in the text). */
+    /**
+     * Builds the margin: line numbers and the markers of each line — media segments (▶), actions
+     * of plugins (✚, never in the text), parse errors (●) — all with the same width.
+     */
     private void refreshTextActions(Optional<Text> text) {
-        Map<Integer, List<TextAction>> byParagraph = new TreeMap<>();
-        Map<Integer, List<MediaSegment>> segmentsByParagraph = new TreeMap<>();
+        List<MediaSegment> segments = new ArrayList<>();
+        List<TextAction> actions = new ArrayList<>();
         var actionContext = workbench.viewContext();
         if (text.isPresent()) {
-            for (MediaSegment segment : text.get().objectsOf(MediaSegment.class)) {
-                int offset = Math.max(0, Math.min(segment.getTextCoordinate().startIndex(), textArea.getLength()));
-                int paragraph = textArea.offsetToPosition(offset, TwoDimensional.Bias.Forward).getMajor();
-                segmentsByParagraph.computeIfAbsent(paragraph, k -> new ArrayList<>()).add(segment);
-            }
+            segments.addAll(text.get().objectsOf(MediaSegment.class));
             for (TextActionProvider provider : actionProviders) {
-                List<TextAction> actions;
                 try {
-                    actions = provider.actionsFor(text.get(), actionContext);
+                    List<TextAction> offered = provider.actionsFor(text.get(), actionContext);
+                    if (offered != null) actions.addAll(offered);
                 } catch (RuntimeException | LinkageError e) {
                     if (failedProviders.add(provider)) {
                         logger.log(Level.WARNING, "Text action provider " + provider.getClass().getName() + " failed", e);
                     }
-                    continue;
-                }
-                for (TextAction action : actions == null ? List.<TextAction>of() : actions) {
-                    int offset = Math.max(0, Math.min(action.offset(), textArea.getLength()));
-                    int paragraph = textArea.offsetToPosition(offset, TwoDimensional.Bias.Forward).getMajor();
-                    byParagraph.computeIfAbsent(paragraph, k -> new ArrayList<>()).add(action);
                 }
             }
         }
-        if (byParagraph.isEmpty() && segmentsByParagraph.isEmpty()) {
+        LineIndex index = new LineIndex(textArea.getText());
+        Map<Integer, GutterLayout.Markers> byLine = GutterLayout.markers(index, segments, actions,
+            text.map(Text::diagnostics).orElse(List.of()));
+        markers.set(byLine);
+        gutterDigits = GutterLayout.digits(textArea.getParagraphs().size());
+        if (document == null || (!options.lineNumbers() && byLine.isEmpty())) {
             textArea.setParagraphGraphicFactory(null);
             return;
         }
-        textArea.setParagraphGraphicFactory(paragraph -> {
-            List<TextAction> actions = byParagraph.getOrDefault(paragraph, List.of());
-            List<MediaSegment> segments = segmentsByParagraph.getOrDefault(paragraph, List.of());
-            if (actions.isEmpty() && segments.isEmpty()) return null;
-            HBox box = new HBox(2);
-            for (MediaSegment segment : segments) {
-                box.getChildren().add(playButton(segment));
-            }
-            for (TextAction action : actions) {
-                Button button = new Button(action.label());
-                button.setStyle("-fx-font-size: 0.8em; -fx-padding: 0 4 0 4;");
-                if (!action.description().isBlank()) button.setTooltip(new Tooltip(action.description()));
-                button.setFocusTraversable(false);
-                button.setOnAction(e -> {
-                    EditOutcome outcome = actionContext.runTextAction(text.get().id(), action);
-                    if (outcome.isApplied()) {
-                        workbench.status().clear();
-                    } else {
-                        workbench.status().warn(outcome.message());
-                    }
-                });
-                box.getChildren().add(button);
-            }
-            return box;
-        });
+        textArea.setParagraphGraphicFactory(EditorGutter.factory(options.lineNumbers(), gutterDigits, editorFont(), byLine,
+            this::playButton, action -> {
+                EditOutcome outcome = actionContext.runTextAction(text.get().id(), action);
+                if (outcome.isApplied()) {
+                    workbench.status().clear();
+                } else {
+                    workbench.status().warn(outcome.message());
+                }
+            }));
     }
 
     private void handleCodeAreaClick() {
@@ -374,6 +554,16 @@ public class EditorController {
                 layers.add(span.startIndex(), span.stopIndex() + 1, highlightStyles.styleFor(text, o));
             }
         }));
+        // invisible characters, then the matches of the find bar
+        if (options.showInvisibles()) {
+            for (Invisibles.Span span : Invisibles.spans(textArea.getText())) {
+                layers.add(span.start(), span.end(), INVISIBLE_STYLE);
+            }
+        }
+        for (int i = 0; i < findMatches.size(); i++) {
+            FindModel.Match m = findMatches.get(i);
+            if (m.end() <= length) layers.add(m.start(), m.end(), i == findCurrent ? CURRENT_MATCH_STYLE : MATCH_STYLE);
+        }
         // the media segments being played
         displayedText().ifPresent(text -> text.objectsOf(MediaSegment.class).stream()
             .filter(workbench.playback()::isPlaying)
@@ -444,10 +634,17 @@ public class EditorController {
         TextDocument selected = project.getParsedText(filePath);
         this.document = selected;
         resync();
-        textArea.moveTo(0);
         textArea.setEditable(true);
         selected.addChangeListener(mirror);
         refreshFromCorpus();
+        // back where the user was in this file
+        Optional<CaretMemory.Place> place = caretMemory.recall(selected.getId(), textArea.getLength());
+        textArea.selectRange(place.map(CaretMemory.Place::anchor).orElse(0), place.map(CaretMemory.Place::caret).orElse(0));
+        int firstLine = place.map(CaretMemory.Place::firstVisibleLine).orElse(0);
+        Platform.runLater(() -> {
+            if (document == selected && firstLine < textArea.getParagraphs().size()) textArea.showParagraphAtTop(firstLine);
+        });
+        updateCurrentLine();
 
         currentTextCouldBeWrittenDownProperty.bind(selected.getCouldBeWrittenBooleanProperty());
         currentTextCouldBeReparsedProperty.bind(selected.getCouldBeReparsedBooleanProperty());
@@ -467,7 +664,11 @@ public class EditorController {
         dismissGhost();
         if (document != null) {
             document.removeChangeListener(mirror);
+            rememberPlace();
         }
+        highlightedParagraph = clearCurrentLine();
+        findMatches = List.of();
+        findCurrent = -1;
         this.document = null;
         textArea.setParagraphGraphicFactory(null);
         currentTextCouldBeWrittenDownProperty.unbind();
@@ -485,6 +686,19 @@ public class EditorController {
         this.selection.set(null);
         this.currentFileObjects.clear();
         this.currentFileErrors.clear();
+        markers.set(Map.of());
+    }
+
+    /** Remembers the caret, selection and scroll position of the displayed file. */
+    private void rememberPlace() {
+        int firstVisible = 0;
+        try {
+            firstVisible = textArea.firstVisibleParToAllParIndex();
+        } catch (RuntimeException e) {
+            // not laid out yet: no visible paragraph
+        }
+        caretMemory.remember(document.getId(),
+            new CaretMemory.Place(textArea.getCaretPosition(), textArea.getAnchor(), firstVisible));
     }
 
     public BooleanExpression getCurrentTextCouldBeWrittenDownProperty() {
@@ -652,8 +866,17 @@ public class EditorController {
         return line;
     }
 
-    /** Selects a range given by offsets ({@code end} exclusive). */
+    /** Selects a range given by offsets ({@code end} exclusive); an empty range only places the caret. */
     public void selectRange(int start, int end) {
-        selectRangeInEditor(start, Math.max(start, end - 1));
+        if (end <= start) {
+            Platform.runLater(() -> {
+                dismissGhost();
+                textArea.moveTo(Math.min(start, textArea.getLength()));
+                textArea.requestFollowCaret();
+                textArea.requestFocus();
+            });
+            return;
+        }
+        selectRangeInEditor(start, end - 1);
     }
 }
