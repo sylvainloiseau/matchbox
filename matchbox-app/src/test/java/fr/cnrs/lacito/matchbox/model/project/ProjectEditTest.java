@@ -10,6 +10,7 @@ import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -148,5 +149,36 @@ class ProjectEditTest {
 
     private static List<String> ids(List<GrammarPlugin> grammars) {
         return grammars.stream().map(GrammarPlugin::getId).toList();
+    }
+
+    @Test
+    void theInheritedContextIsAppliedAndSaved() throws Exception {
+        Path lift = dir.resolve("dictionary.lift");
+        Path corpus = dir.resolve("corpus.mbx");
+        assertTrue(project.getContextDictionary().isEmpty());
+        ProjectEdit edit = ProjectEdit.of(project);
+        edit.setContextDictionary(lift);
+        edit.setContextCorpus(corpus);
+        assertTrue(project.getContextDictionary().isEmpty(), "nothing changes until applied");
+        edit.applyTo(project);
+        assertEquals(Optional.of(lift), project.getContextDictionary());
+        assertEquals(Optional.of(corpus), project.getContextCorpus());
+
+        // no file type: loading does not need the grammars
+        project.setFileTypes(List.of());
+        project.setFile(dir.resolve("project.mbx").toFile());
+        ProjectXMLSerializer.save(project);
+        assertFalse(project.definitionChangedProperty().get());
+        project.setContextCorpus(corpus);
+        assertFalse(project.definitionChangedProperty().get(), "same value: no change");
+        Project loaded = ProjectXMLSerializer.load(dir.resolve("project.mbx").toFile(), List.of());
+        assertEquals(Optional.of(lift), loaded.getContextDictionary());
+        assertEquals(Optional.of(corpus), loaded.getContextCorpus());
+
+        ProjectEdit none = ProjectEdit.of(loaded);
+        none.setContextDictionary(null);
+        none.applyTo(loaded);
+        assertTrue(loaded.getContextDictionary().isEmpty());
+        assertTrue(loaded.definitionChangedProperty().get());
     }
 }

@@ -11,8 +11,12 @@ import fr.cnrs.lacito.matchbox.model.project.FileType;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import fr.cnrs.lacito.matchbox.model.project.ProjectEdit;
 import fr.cnrs.lacito.matchbox.model.project.ProjectEdit.FileTypeDraft;
+import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -32,13 +36,15 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 /**
  * Edits the definition of a project: name, description, file types (a regular expression on file
  * names and the grammars applied, in rank order), plugin parameters (display styles, shared by all
- * the file types), AI assistant. Files and directories are added with the Current project menu and
+ * the file types), inherited context (a LIFT dictionary and a Matchbox corpus the project's data is
+ * added to), AI assistant. Files and directories are added with the Current project menu and
  * listed in File Mode.
  *
  * <p>The dialog edits a {@link ProjectEdit} working copy: the project is changed only by Save
@@ -93,7 +99,8 @@ public class ProjectPropertiesDialog {
         stage.setHeight(750);
 
         VBox root = new VBox(10,
-            nameSection(), descriptionSection(), fileTypesSection(), pluginParametersSection(), assistantSection(),
+            nameSection(), descriptionSection(), fileTypesSection(), pluginParametersSection(), inheritedContextSection(),
+            assistantSection(),
             buttons());
         root.setPadding(new Insets(15));
         ScrollPane scroll = new ScrollPane(root);
@@ -345,6 +352,76 @@ public class ProjectPropertiesDialog {
         }
         edit.setDisplayStyles(styles);
         refreshPluginRows();
+    }
+
+    // ------------------------------------------------------------------
+    // Inherited context
+    // ------------------------------------------------------------------
+
+    private VBox inheritedContextSection() {
+        VBox dictionary = contextFileRow("contextDictionary", "Context dictionary",
+            "Provide a dictionary if you want the lexical information provided in your project to be added to it."
+                + " The dictionary should be in LIFT format.",
+            edit.getContextDictionary(), edit::setContextDictionary,
+            new FileChooser.ExtensionFilter("LIFT dictionaries", "*.lift"));
+        VBox corpus = contextFileRow("contextCorpus", "Context corpus",
+            "Provide a corpus if you want the data provided in your project to be added to it."
+                + " The corpus should be a Matchbox corpus.",
+            edit.getContextCorpus(), edit::setContextCorpus,
+            new FileChooser.ExtensionFilter("Matchbox projects", "*.mbx"));
+        return section("Inherited context", dictionary, corpus);
+    }
+
+    /**
+     * A file of the inherited context: label, read-only path, "Choose…" (file chooser) and "×"
+     * (none), with an explanation below.
+     *
+     * @param id prefix of the controls' ids ({@code <id>Field}, {@code <id>Choose}, {@code <id>Clear})
+     */
+    private VBox contextFileRow(String id, String title, String explanation, Optional<Path> value,
+                                Consumer<Path> setter, FileChooser.ExtensionFilter filter) {
+        Label label = new Label(title);
+        label.setMinWidth(130);
+        TextField field = new TextField(value.map(Path::toString).orElse(""));
+        field.setId(id + "Field");
+        field.setEditable(false);
+        field.setPromptText("None");
+        HBox.setHgrow(field, Priority.ALWAYS);
+        Button choose = new Button("Choose…");
+        choose.setId(id + "Choose");
+        choose.setTooltip(new Tooltip("Select the file of the " + title.toLowerCase()));
+        Button clear = new Button("×");
+        clear.setId(id + "Clear");
+        clear.setTooltip(new Tooltip("No " + title.toLowerCase()));
+        clear.disableProperty().bind(field.textProperty().isEmpty());
+        choose.setOnAction(e -> {
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle(title);
+            chooser.getExtensionFilters().addAll(filter, new FileChooser.ExtensionFilter("All files", "*.*"));
+            initialDirectory(field.getText()).ifPresent(chooser::setInitialDirectory);
+            File selected = chooser.showOpenDialog(stage);
+            if (selected != null) {
+                setter.accept(selected.toPath());
+                field.setText(selected.toPath().toString());
+            }
+        });
+        clear.setOnAction(e -> {
+            setter.accept(null);
+            field.setText("");
+        });
+        HBox row = new HBox(5, label, field, choose, clear);
+        row.setAlignment(Pos.CENTER_LEFT);
+        Label help = new Label(explanation);
+        help.setWrapText(true);
+        help.setStyle("-fx-text-fill: #666666;");
+        return new VBox(3, row, help);
+    }
+
+    /** Where a file chooser opens: the directory of the current file, else of the project file. */
+    private Optional<File> initialDirectory(String current) {
+        File base = !current.isEmpty() ? new File(current).getParentFile()
+            : project.fileProperty().get() == null ? null : project.fileProperty().get().getParentFile();
+        return Optional.ofNullable(base).filter(File::isDirectory);
     }
 
     private VBox assistantSection() {

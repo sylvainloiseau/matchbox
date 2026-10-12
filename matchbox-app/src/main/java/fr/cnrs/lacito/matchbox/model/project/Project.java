@@ -64,7 +64,7 @@ public class Project {
 
     /**
      * True when the definition (name, description, files and directories, file types, display
-     * styles, assistant setting) differs from the project file: false after loading, creating and
+     * styles, inherited context, assistant setting) differs from the project file: false after loading, creating and
      * saving, true after a change.
      */
     private final SimpleBooleanProperty definitionChanged = new SimpleBooleanProperty(false);
@@ -75,6 +75,11 @@ public class Project {
 
     /** Whether the AI assistant may send text of this project to providers outside this computer. */
     private boolean cloudAssistAllowed = true;
+
+    /** A LIFT dictionary the lexical information of the project is added to (null: none). */
+    private Path contextDictionary;
+    /** A Matchbox corpus the data of the project is added to (null: none). */
+    private Path contextCorpus;
 
     /**
      * The list of files and directories in the project
@@ -365,6 +370,32 @@ public class Project {
     public void setCloudAssistAllowed(boolean allowed) {
         if (allowed != cloudAssistAllowed) {
             this.cloudAssistAllowed = allowed;
+            markDefinitionChanged();
+        }
+    }
+
+    /** The LIFT dictionary the lexical information of the project is added to, if any. */
+    public Optional<Path> getContextDictionary() {
+        return Optional.ofNullable(contextDictionary);
+    }
+
+    /** @param dictionary a LIFT file, or null for none */
+    public void setContextDictionary(Path dictionary) {
+        if (!Objects.equals(dictionary, contextDictionary)) {
+            this.contextDictionary = dictionary;
+            markDefinitionChanged();
+        }
+    }
+
+    /** The Matchbox corpus the data of the project is added to, if any. */
+    public Optional<Path> getContextCorpus() {
+        return Optional.ofNullable(contextCorpus);
+    }
+
+    /** @param corpus a Matchbox corpus, or null for none */
+    public void setContextCorpus(Path corpus) {
+        if (!Objects.equals(corpus, contextCorpus)) {
+            this.contextCorpus = corpus;
             markDefinitionChanged();
         }
     }

@@ -6,7 +6,9 @@ import fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.model.project.DisplayStyles;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -14,6 +16,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ScrollBar;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
@@ -101,6 +104,29 @@ class ProjectPropertiesDialogTest extends MainWindowFixture {
             waitUntil(() -> robot.lookup("#pluginParameters .list-cell").queryAllAs(ListCell.class).stream()
                 .noneMatch(c -> c.getItem() != null && c.getItem().toString().contains("old-grammar")));
             assertFalse(project().getDisplayStyles().isEmpty(), "applied only by Save");
+        } finally {
+            robot.interact(dialog::close);
+        }
+    }
+
+    @Test
+    void theInheritedContextShowsTheFilesAndCanBeCleared(FxRobot robot) {
+        Path lift = Path.of("context", "dictionary.lift").toAbsolutePath();
+        robot.interact(() -> project().setContextDictionary(lift));
+        open(robot);
+        try {
+            TextField dictionary = robot.lookup("#contextDictionaryField").queryAs(TextField.class);
+            TextField corpus = robot.lookup("#contextCorpusField").queryAs(TextField.class);
+            assertEquals(lift.toString(), dictionary.getText());
+            assertFalse(dictionary.isEditable(), "chosen with the file chooser only");
+            assertEquals("", corpus.getText());
+            assertTrue(robot.lookup("#contextCorpusClear").queryButton().isDisable(), "nothing to clear");
+            assertTrue(robot.lookup(".label").queryAllAs(Label.class).stream()
+                .anyMatch(l -> "Inherited context".equals(l.getText())));
+
+            robot.interact(robot.lookup("#contextDictionaryClear").queryButton()::fire);
+            assertEquals("", dictionary.getText());
+            assertEquals(Optional.of(lift), project().getContextDictionary(), "applied only by Save");
         } finally {
             robot.interact(dialog::close);
         }

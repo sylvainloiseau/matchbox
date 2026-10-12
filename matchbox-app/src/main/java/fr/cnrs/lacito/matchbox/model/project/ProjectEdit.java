@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -98,6 +99,8 @@ public final class ProjectEdit {
     private String name;
     private String description;
     private boolean cloudAssistAllowed;
+    private Path contextDictionary;
+    private Path contextCorpus;
     private DisplayStyles displayStyles;
     private final List<Path> paths;
     private final List<FileTypeDraft> fileTypes;
@@ -118,8 +121,11 @@ public final class ProjectEdit {
         for (FileType t : project.getFileTypes()) {
             types.add(new FileTypeDraft(t, t.getName(), t.getRegex(), t.getGrammars()));
         }
-        return new ProjectEdit(project.getName(), project.getDescription(), project.isCloudAssistAllowed(),
+        ProjectEdit edit = new ProjectEdit(project.getName(), project.getDescription(), project.isCloudAssistAllowed(),
             project.getDisplayStyles(), project.getDefinitionPaths(), types);
+        edit.contextDictionary = project.getContextDictionary().orElse(null);
+        edit.contextCorpus = project.getContextCorpus().orElse(null);
+        return edit;
     }
 
     public String getName() {
@@ -144,6 +150,26 @@ public final class ProjectEdit {
 
     public void setCloudAssistAllowed(boolean allowed) {
         this.cloudAssistAllowed = allowed;
+    }
+
+    /** The LIFT dictionary the lexical information is added to, if any. */
+    public Optional<Path> getContextDictionary() {
+        return Optional.ofNullable(contextDictionary);
+    }
+
+    /** @param dictionary a LIFT file, or null for none */
+    public void setContextDictionary(Path dictionary) {
+        this.contextDictionary = dictionary;
+    }
+
+    /** The Matchbox corpus the data is added to, if any. */
+    public Optional<Path> getContextCorpus() {
+        return Optional.ofNullable(contextCorpus);
+    }
+
+    /** @param corpus a Matchbox corpus, or null for none */
+    public void setContextCorpus(Path corpus) {
+        this.contextCorpus = corpus;
     }
 
     /** Display styles by grammar and kind. */
@@ -225,6 +251,8 @@ public final class ProjectEdit {
         if (!Objects.equals(name, project.getName())) project.setName(name);
         if (!Objects.equals(description, project.getDescription())) project.setDescription(description);
         project.setCloudAssistAllowed(cloudAssistAllowed);
+        project.setContextDictionary(contextDictionary);
+        project.setContextCorpus(contextCorpus);
         project.setDisplayStyles(displayStyles);
 
         // file types first, so that added files are parsed with the new grammars

@@ -104,6 +104,22 @@ public class ProjectXMLSerializer {
             }
         }
 
+        // Inherited context (absent: none)
+        if (project.getContextDictionary().isPresent() || project.getContextCorpus().isPresent()) {
+            Element contextElement = doc.createElement("inheritedContext");
+            project.getContextDictionary().ifPresent(p -> {
+                Element e = doc.createElement("dictionary");
+                e.setAttribute("path", p.toString());
+                contextElement.appendChild(e);
+            });
+            project.getContextCorpus().ifPresent(p -> {
+                Element e = doc.createElement("corpus");
+                e.setAttribute("path", p.toString());
+                contextElement.appendChild(e);
+            });
+            rootElement.appendChild(contextElement);
+        }
+
         // Restrictions of the AI assistant (absent: no restriction)
         if (!project.isCloudAssistAllowed()) {
             Element assistantElement = doc.createElement("assistant");
@@ -133,6 +149,14 @@ public class ProjectXMLSerializer {
         StreamResult result = new StreamResult(file);
         transformer.transform(source, result);
         project.definitionChangedProperty().set(false);
+    }
+
+    /** The path of a child of {@code <inheritedContext>}, null if absent or empty. */
+    private static java.nio.file.Path contextPath(Element context, String tag) {
+        NodeList list = context.getElementsByTagName(tag);
+        if (list.getLength() == 0) return null;
+        String path = ((Element) list.item(0)).getAttribute("path");
+        return path.isBlank() ? null : java.nio.file.Path.of(path);
     }
 
     /** The settings of a {@code <directory>}, null if it has none (older project files). */
@@ -323,6 +347,13 @@ public class ProjectXMLSerializer {
                     }
                 }
             }
+        }
+
+        NodeList contextList = rootElement.getElementsByTagName("inheritedContext");
+        if (contextList.getLength() > 0) {
+            Element contextElement = (Element) contextList.item(0);
+            project.setContextDictionary(contextPath(contextElement, "dictionary"));
+            project.setContextCorpus(contextPath(contextElement, "corpus"));
         }
 
         NodeList assistantList = rootElement.getElementsByTagName("assistant");
