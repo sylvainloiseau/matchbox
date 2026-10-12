@@ -2,15 +2,28 @@
 <project>
   <fileset>
     <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/tuwari.md"/>
-    <file path="/Users/sloiseau/workspace/igtcorpus/conll/0.conll"/>
+    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/0.conll"/>
     <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/notebook.md"/>
-    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/notebook2.md"/>
   </fileset>
   <pattern>
     <name>all</name>
     <regex>.*\..*</regex>
-    <grammar id="conll-grammar" rank="0"/>
-    <grammar id="notebook-grammar" rank="1"/>
+    <grammar id="notebook-grammar" rank="0"/>
+    <grammar id="mediaref-grammar" rank="1"/>
     <grammar id="markdown-heading-grammar" rank="2"/>
+    <grammar id="tag-grammar" rank="3"/>
   </pattern>
+  <pattern>
+    <name>conll</name>
+    <regex>.+\.conll</regex>
+    <grammar id="conll-grammar" rank="0"/>
+  </pattern>
+  <inheritedContext>
+    <dictionary path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/lift/lift20250717.lift"/>
+  </inheritedContext>
+  <displayStyles>
+    <display bold="true" fontFamily="American Typewriter" grammar="markdown-heading-grammar" kind="markdown-heading-grammar:header"/>
+    <display bold="true" grammar="markdown-heading-grammar"/>
+    <display background="#6680e6" grammar="mediaref-grammar"/>
+  </displayStyles>
 </project>
