@@ -31,6 +31,8 @@ class ProjectEditTest {
         a = Files.writeString(dir.resolve("a.md"), "aaa");
         b = Files.writeString(dir.resolve("b.txt"), "bbb");
         project = Project.createDefaultProject(List.of(notebook, other));
+        // "All files" with the notebook grammar only, the other grammar on .md files
+        project.getFileTypes().get(0).removeGrammar(other);
         project.setName("Tuwari");
         project.setDescription("Field notes");
         FileType md = new FileType("all", ".*\\.md");

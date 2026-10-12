@@ -117,8 +117,7 @@ Parsers exist for the following conventions:
 
 ### Markdown sections and metadata
 
-The `markdown-heading-grammar` plugin reads the structure of Markdown notes (`.md` files of new
-projects): headings make nested sections, and YAML blocks hold metadata.
+The `markdown-heading-grammar` plugin reads the structure of Markdown notes (`.md` files): headings make nested sections, and YAML blocks hold metadata.
 
 ```markdown
 ---
@@ -190,6 +189,7 @@ The `tag-grammar` plugin reads inline tags, anywhere in a line, several per line
 ## Projects
 
 - Without an open project the window shows a start page: **New project**, **Open project…**, and your recent projects (click one to open it, × removes it from the list). Check "Reopen the last project at startup" to skip it. You can also drop a `.mbx` file on the window.
+- A new project has a single file type, "All files" (`.*\..*`: every file with an extension), with every installed plugin checked, in the order of their names; change it in **Current project › Project properties…**.
 - The **File** menu deals with project files (new, open, save, close) and the application (Settings…, Quit); the **Current project** menu with its content: Project properties…, adding files (several at once) and directories, saving files, removing files and directories from the project (the files stay on the disk).
 - **Closing a project** (or opening another one, or quitting) asks what to save: the project definition if it changed, and the modified files, each with a check box.
 - **Files and directories** are listed in File Mode as a tree: a directory added to the project groups its files, with its sub-directories; files added one by one stay apart. When you add a directory, choose which files it gives: glob patterns to include (`*.txt`) and exclude (`drafts/**`, `*-old.txt`), and whether sub-directories are included, with a preview. Right-click the directory later: **Edit directory settings…**, **Rescan directory** (files created since), **Remove this directory from the project**. A file of a directory is not removed alone: right-click it, **Exclude this file** (or a sub-directory: **Exclude this sub-directory**). These settings are saved in the project file. A pattern without "/" matches the file name in any sub-directory; case is ignored.

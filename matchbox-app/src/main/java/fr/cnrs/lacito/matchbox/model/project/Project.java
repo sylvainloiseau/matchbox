@@ -43,12 +43,8 @@ import javafx.collections.ObservableMap;
 public class Project {
 
     public static final String DEFAULT_PLUGIN_ID = "notebook-grammar";
-    /** Grammar of the sections and metadata of Markdown files, applied to .md files of new projects when installed. */
-    public static final String MARKDOWN_HEADING_PLUGIN_ID = "markdown-heading-grammar";
-    /** Grammar of media markers (@media lines), applied to all files of new projects when installed. */
-    public static final String MEDIAREF_PLUGIN_ID = "mediaref-grammar";
-    /** Grammar of inline tags (#"keyword"), applied to all files of new projects when installed. */
-    public static final String TAG_PLUGIN_ID = "tag-grammar";
+    /** Regular expression of the "All files" file type of new projects: every file with an extension. */
+    public static final String ALL_FILES_REGEX = ".*\\..*";
     private String name;
     private String description;
 
@@ -182,7 +178,9 @@ public class Project {
         return ProjectXMLSerializer.load(projectFile, plugins, documentOptions);
     }
 
-    /** Creates a default project with a single file type "All files" and a single grammar "IGT" applied to all files.
+    /**
+     * Creates a default project: a single file type "All files" ({@value #ALL_FILES_REGEX}: every
+     * file with an extension) with every installed plugin, sorted by name.
      */
     public static final Project createDefaultProject(
         List<GrammarPlugin> plugins
@@ -195,35 +193,12 @@ public class Project {
         DocumentOptions documentOptions
     ) {
         Project project = new Project(plugins, documentOptions);
-        FileType fileType = new FileType("All files", ".+");
-        GrammarPlugin defaultPlugin = plugins
-            .stream()
-            .filter(p -> p.getId().equals(DEFAULT_PLUGIN_ID))
-            .findFirst()
-            .orElseThrow(() ->
-                new RuntimeException("Default plugin not found")
-            );
-        fileType.addGrammar(defaultPlugin);
-        // media markers may appear in any note
+        FileType fileType = new FileType("All files", ALL_FILES_REGEX);
         plugins.stream()
-            .filter(p -> p.getId().equals(MEDIAREF_PLUGIN_ID))
-            .findFirst()
-            .ifPresent(fileType::addGrammar);
-        // so may tags
-        plugins.stream()
-            .filter(p -> p.getId().equals(TAG_PLUGIN_ID))
-            .findFirst()
-            .ifPresent(fileType::addGrammar);
+            .sorted(Comparator.comparing(GrammarPlugin::getDisplayName, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(GrammarPlugin::getId))
+            .forEach(fileType::addGrammar);
         project.fileTypes.add(fileType);
-        // sections and metadata of Markdown files, next to the notebook grammar ("All files" matches them too)
-        plugins.stream()
-            .filter(p -> p.getId().equals(MARKDOWN_HEADING_PLUGIN_ID))
-            .findFirst()
-            .ifPresent(markdown -> {
-                FileType markdownFiles = new FileType("Markdown files", ".*\\.md");
-                markdownFiles.addGrammar(markdown);
-                project.fileTypes.add(markdownFiles);
-            });
         project.definitionChanged.set(false);
         return project;
     }

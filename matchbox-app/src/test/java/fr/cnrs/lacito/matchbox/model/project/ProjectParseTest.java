@@ -151,30 +151,35 @@ class ProjectParseTest {
     }
 
     @Test
-    void defaultProjectAppliesTheMarkdownGrammarToMdFilesWhenInstalled() {
-        WholeTextGrammar markdown = new WholeTextGrammar() {
-            public String getId() { return Project.MARKDOWN_HEADING_PLUGIN_ID; }
-        };
-        Project with = Project.createDefaultProject(List.of(new WholeTextGrammar(), markdown));
-        assertEquals(List.of(Project.DEFAULT_PLUGIN_ID, Project.MARKDOWN_HEADING_PLUGIN_ID),
-            with.getGrammarsForFile(Path.of("notes.md")).stream().map(g -> g.getId()).toList());
-        assertEquals(List.of(Project.DEFAULT_PLUGIN_ID),
-            with.getGrammarsForFile(Path.of("notes.txt")).stream().map(g -> g.getId()).toList());
-        Project without = Project.createDefaultProject(List.of(new WholeTextGrammar()));
-        assertEquals(1, without.getFileTypes().size());
+    void defaultProjectHasOneFileTypeWithEveryPluginSortedByName() {
+        WholeTextGrammar tags = named("tag-grammar", "Tags");
+        WholeTextGrammar conll = named("conll-grammar", "Conll Grammar");
+        WholeTextGrammar notebook = named(Project.DEFAULT_PLUGIN_ID, "Notebook Grammar");
+        WholeTextGrammar markdown = named("markdown-heading-grammar", "Markdown headings and metadata");
+        Project project = Project.createDefaultProject(List.of(tags, conll, notebook, markdown));
+        assertEquals(1, project.getFileTypes().size());
+        FileType all = project.getFileTypes().get(0);
+        assertEquals("All files", all.getName());
+        assertEquals(".*\\..*", all.getRegex());
+        assertEquals(List.of("conll-grammar", "markdown-heading-grammar", Project.DEFAULT_PLUGIN_ID, "tag-grammar"),
+            project.getGrammarsForFile(Path.of("notes.md")).stream().map(g -> g.getId()).toList());
+        assertEquals(4, project.getGrammarsForFile(Path.of("notes.txt")).size());
+        assertTrue(project.getGrammarsForFile(Path.of("README")).isEmpty(), "no extension: not matched");
+        assertFalse(project.definitionChangedProperty().get());
     }
 
     @Test
-    void defaultProjectAppliesTheMediaGrammarToAllFilesWhenInstalled() {
-        WholeTextGrammar media = new WholeTextGrammar() {
-            public String getId() { return Project.MEDIAREF_PLUGIN_ID; }
+    void defaultProjectWithoutPluginHasAnEmptyFileType() {
+        Project project = Project.createDefaultProject(List.of());
+        assertEquals(1, project.getFileTypes().size());
+        assertTrue(project.getFileTypes().get(0).getGrammars().isEmpty());
+    }
+
+    private static WholeTextGrammar named(String id, String name) {
+        return new WholeTextGrammar() {
+            public String getId() { return id; }
+            public String getDisplayName() { return name; }
         };
-        WholeTextGrammar tags = new WholeTextGrammar() {
-            public String getId() { return Project.TAG_PLUGIN_ID; }
-        };
-        Project with = Project.createDefaultProject(List.of(new WholeTextGrammar(), media, tags));
-        assertEquals(List.of(Project.DEFAULT_PLUGIN_ID, Project.MEDIAREF_PLUGIN_ID, Project.TAG_PLUGIN_ID),
-            with.getGrammarsForFile(Path.of("notes.txt")).stream().map(g -> g.getId()).toList());
     }
 }
 

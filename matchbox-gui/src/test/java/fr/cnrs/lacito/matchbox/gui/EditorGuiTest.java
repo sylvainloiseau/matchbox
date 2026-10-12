@@ -120,7 +120,10 @@ class EditorGuiTest extends MainWindowFixture {
         assertTrue(((javafx.scene.layout.HBox) first).getChildren().stream()
             .anyMatch(n -> n instanceof Label l && "1".equals(l.getText())));
         toggle(robot, "Show line numbers");
-        assertNull(area(robot).getParagraphGraphicFactory(), "no numbers and no markers: no margin");
+        // the margin stays for the markers (✚ of the text actions), without the numbers
+        var factory = area(robot).getParagraphGraphicFactory();
+        assertTrue(factory == null || ((javafx.scene.layout.HBox) factory.apply(0)).getChildren().stream()
+            .noneMatch(n -> n instanceof Label l && "1".equals(l.getText())), "no line numbers");
         robot.interact(item(robot, "Zoom in")::fire);
         assertEquals(14, settings.editorProperty().get().fontSize());
     }

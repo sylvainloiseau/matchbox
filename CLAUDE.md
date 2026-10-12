@@ -120,9 +120,9 @@ The project is a **Maven multi-module** repository with the following structure:
 - Each submodule (e.g., `matchbox-grammar-notebook`) contains:
   - ANTLR grammar files (`.g4`) in `src/main/antlr4/fr/cnrs/lacito/matchbox/grammar/<name>/`.
   - Java listeners/visitors (e.g., `NotebookListener.java`).
-- `matchbox-grammar-tag` (id `tag-grammar`): inline tags `#"keyword"` or `#“keyword”` anywhere in a line, not in fenced code blocks, as `SimpleTag`; `TagViewFactory` (empty detail pane; columns Tag (editable: renames this occurrence, written with straight quotes), Path, Applies to); added to "All files" by new default projects when installed.
-- `matchbox-grammar-mediaref` (id `mediaref-grammar`, no view, no JavaFX): `@media <file> [<start>-<end>] [<caption>]` or `@media <start>-<end> [<caption>]` lines as `MediaMarker` (`MediaSegment` + `HasFields`, time formats kept by edits); every other line ignored; added to "All files" by new default projects when installed.
-- `matchbox-grammar-markdownheading` (id `markdown-heading-grammar`): sections from ATX and Setext headings (`MarkdownSection`, with level and style) and YAML `key: value` metadata (file header on line 1 → `SimpleTextHeader`; block after a heading → section metadata); every other line ignored, so it runs next to the notebook grammar on `.md` files (the default project applies it to `.*\.md` when installed). Whole-line lexer tokens; context decisions (Setext underline vs metadata block vs separator, fences) in lexer actions. Ships `TextHeaderViewFactory` and the "Add header" text action; `ObjectEditor` with `addField`/`removeField`.
+- `matchbox-grammar-tag` (id `tag-grammar`): inline tags `#"keyword"` or `#“keyword”` anywhere in a line, not in fenced code blocks, as `SimpleTag`; `TagViewFactory` (empty detail pane; columns Tag (editable: renames this occurrence, written with straight quotes), Path, Applies to).
+- `matchbox-grammar-mediaref` (id `mediaref-grammar`, no view, no JavaFX): `@media <file> [<start>-<end>] [<caption>]` or `@media <start>-<end> [<caption>]` lines as `MediaMarker` (`MediaSegment` + `HasFields`, time formats kept by edits); every other line ignored.
+- `matchbox-grammar-markdownheading` (id `markdown-heading-grammar`): sections from ATX and Setext headings (`MarkdownSection`, with level and style) and YAML `key: value` metadata (file header on line 1 → `SimpleTextHeader`; block after a heading → section metadata); every other line ignored, so it runs next to the notebook grammar on `.md` files. Whole-line lexer tokens; context decisions (Setext underline vs metadata block vs separator, fences) in lexer actions. Ships `TextHeaderViewFactory` and the "Add header" text action; `ObjectEditor` with `addField`/`removeField`.
 
 ---
 
@@ -251,7 +251,8 @@ Managed by `fr.cnrs.lacito.matchbox.settings` (matchbox-app):
 
 - **`.mbx` files**: XML-based project files with:
   - Fileset (files and directories in definition order; a directory with its settings: `recursive`, `<include>`, `<exclude>` globs; a `<directory>` without settings loads as before: non-recursive, global extensions).
-  - File type patterns (regex + associated grammars).
+  - File type patterns (regex on the file name, not the path, + associated grammars in rank order). **A file belongs to every file type it matches**, not only the first: it is parsed with the union of their grammars (`Project.getGrammarsForFile`), in the order of the file types then of the grammars, each grammar once (at its first place). A catch-all type never hides a more specific one; the order of the file types only sets the order of a file's grammars.
+  - New project (`Project.createDefaultProject`): a single file type "All files", regex `.*\..*` (`Project.ALL_FILES_REGEX`: every file with an extension), with every installed plugin, sorted by display name.
   - Display styles by grammar and kind (attributes absent = not set; unknown grammars kept).
   - Loading reads the file types before the fileset, so each file is parsed once, with its grammars, when it is added: a loaded project needs no `parseProject()`.
   - Example structure:
