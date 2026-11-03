@@ -1,5 +1,16 @@
-# Create native installers (jpackage runs jlink) on push of semantic tags (e.g., v1.0.0).
-# Each OS builds in parallel and attaches its binaries to the GitHub release of the tag.
+# Native installers (jpackage runs jlink) on push of a version tag (e.g. v1.2.0).
+# Each system and architecture builds in parallel and attaches its installers, with their SHA-256
+# checksums, to the GitHub release named after the tag. The installers take their version from the
+# tag (v1.2.0 -> 1.2.0).
+#
+#   ubuntu-latest      x86_64         DEB + AppImage
+#   ubuntu-24.04-arm   aarch64        DEB + AppImage
+#   windows-latest     x86_64         EXE
+#   macos-latest       Apple Silicon  DMG (-apple-silicon)
+#   macos-26-intel     Intel          DMG (-intel)
+#
+# Run by hand (Actions > Release > Run workflow), it builds the same installers with the version of
+# the pom and keeps them as workflow artifacts, without creating a release.
 
 name: Release
 
@@ -7,6 +18,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,21 +29,37 @@ concurrency:
 
 jobs:
   package:
-    name: ${{ matrix.runner }} (${{ matrix.javafx }})
+    name: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: ubuntu-latest
-            javafx: linux
+            appimage_arch: x86_64
+            appimagetool_sha256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+          - runner: ubuntu-24.04-arm
+            appimage_arch: aarch64
+            appimagetool_sha256: f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
           - runner: windows-latest
-            javafx: win
           - runner: macos-latest
-            javafx: mac-aarch64
+            mac_label: apple-silicon
+          - runner: macos-26-intel
+            mac_label: intel
 
     runs-on: ${{ matrix.runner }}
 
     steps:
+      # jpackage needs a numeric version (and a first number of at least 1 on macOS):
+      # refuse other tags before building anything.
+      - name: Check the tag
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[1-9][0-9]*(\.[0-9]+){0,2}$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' is not a version jpackage accepts: use v1, v1.2 or v1.2.3 (first number at least 1, no suffix such as -beta)."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v5
 
@@ -54,14 +82,34 @@ jobs:
           curl -fsSL "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz" | tar xz -C /tmp
           echo "/tmp/apache-maven-3.9.9/bin" >> "$GITHUB_PATH"
 
-      # one build of all the modules, distribution included (jpackage writes build/target/installer).
-      # Do not rebuild the distribution with clean afterwards: on Windows the new .exe is still
-      # locked (antivirus scan) and cannot be deleted.
+      # the version of the installers: the tag without its "v", else (run by hand) the pom's
+      - name: Version
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            APP_VERSION="${GITHUB_REF_NAME#v}"
+          else
+            APP_VERSION="$(mvn -q -ntp -N help:evaluate -Dexpression=app.version -DforceStdout)"
+          fi
+          echo "Installer version: $APP_VERSION"
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+
+      - name: Install packaging tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot
+
+      # one build of all the modules, distribution included (jpackage writes build/target/installer:
+      # DEB, EXE or DMG). Do not rebuild the distribution with clean afterwards: on Windows the new
+      # .exe is still locked (antivirus scan) and cannot be deleted.
       - name: Build, test and package
         shell: bash
-        run: mvn install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mvn -B -ntp install "-Dapp.version=$APP_VERSION"
 
-      # the detailed test results, to debug a build that fails on one OS only
+      # the detailed test results, to debug a build that fails on one system only
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
@@ -69,10 +117,103 @@ jobs:
           name: surefire-reports-${{ matrix.runner }}
           path: '**/target/surefire-reports/'
 
-      - name: Publish artifacts on the GitHub release
+      # the same application as a plain directory (no installer options), for the AppImage
+      - name: App image (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mvn -B -ntp -pl matchbox-distribution jpackage:jpackage@installer \
+            "-Dapp.version=$APP_VERSION" \
+            -Djpackage.type=APP_IMAGE -Djpackage.destSuffix=-appimage
+
+      - name: AppImage (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          ARCH: ${{ matrix.appimage_arch }}
+          APPIMAGETOOL_VERSION: 1.9.1
+          APPIMAGETOOL_SHA256: ${{ matrix.appimagetool_sha256 }}
+          # The runner has no FUSE: let the tool extract itself instead of mounting.
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          set -euo pipefail
+          APPDIR=build/target/Matchbox.AppDir
+          RESOURCES=matchbox-distribution/src/main
+
+          # out of build/target/installer-appimage: only build/target/installer is published
+          rm -rf "$APPDIR"
+          mv build/target/installer-appimage/Matchbox "$APPDIR"
+
+          cat > "$APPDIR/AppRun" <<'EOF'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/bin/Matchbox" "$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+
+          cat > "$APPDIR/matchbox.desktop" <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Matchbox
+          Comment=Linguistic field notes: parse, browse and edit corpora
+          Exec=Matchbox %f
+          Icon=matchbox
+          Categories=Office;Education;
+          MimeType=application/x-matchbox-project;
+          Terminal=false
+          EOF
+
+          cp "$RESOURCES/resources/icon.png" "$APPDIR/matchbox.png"
+          ln -s matchbox.png "$APPDIR/.DirIcon"
+          # MIME type of .mbx files, registered by AppImage integration tools
+          mkdir -p "$APPDIR/usr/share/mime/packages"
+          cp "$RESOURCES/jpackage/matchbox-mime.xml" "$APPDIR/usr/share/mime/packages/matchbox.xml"
+
+          curl -fsSL -o /tmp/appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-${ARCH}.AppImage"
+          echo "${APPIMAGETOOL_SHA256}  /tmp/appimagetool" | sha256sum -c -
+          chmod +x /tmp/appimagetool
+          /tmp/appimagetool "$APPDIR" \
+            "build/target/installer/Matchbox-${APP_VERSION}-${ARCH}.AppImage"
+
+      - name: Name the DMG after its architecture (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          for f in build/target/installer/*.dmg; do
+            mv "$f" "${f%.dmg}-${{ matrix.mac_label }}.dmg"
+          done
+
+      - name: Checksums
+        shell: bash
+        run: |
+          cd build/target/installer
+          for f in *; do
+            case "$f" in *.sha256) continue ;; esac
+            if command -v sha256sum >/dev/null; then
+              sha256sum "$f" > "$f.sha256"
+            else
+              shasum -a 256 "$f" > "$f.sha256"
+            fi
+          done
+          ls -l
+
+      - name: Keep the installers (run by hand)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.runner }}
+          path: build/target/installer/*
+          retention-days: 7
+
+      - name: Publish the installers on the GitHub release
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
         with:
-          fail_on_unmatched_files: false
+          name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
           generate_release_notes: true
           files: |
             build/target/installer/*

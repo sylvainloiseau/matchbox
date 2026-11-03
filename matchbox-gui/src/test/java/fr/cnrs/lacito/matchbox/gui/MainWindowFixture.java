@@ -90,7 +90,7 @@ abstract class MainWindowFixture {
             System.setProperty("user.home", home);
         }
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fr/cnrs/lacito/matchbox/gui/MainView.fxml"));
-        controller = new MainController(settings, PluginManager.loadPlugins());
+        controller = new MainController(settings, PluginManager.loadPlugins(), launchProject());
         loader.setController(controller);
         Parent root = loader.load();
         controller.setPrimaryStage(stage);
@@ -119,6 +119,11 @@ abstract class MainWindowFixture {
      */
     protected boolean openProjectAtStart() {
         return true;
+    }
+
+    /** The project Matchbox is started with (a double-clicked .mbx file); none by default. */
+    protected Optional<Path> launchProject() throws IOException {
+        return Optional.empty();
     }
 
     /** Call it from the test class's {@code @Stop} method. */

@@ -166,6 +166,14 @@ public class MainController {
     private final InvalidationListener titleUpdater = o -> updateTitle();
 
     public MainController(UserSettings settings, List<GrammarPlugin> plugins) {
+        this(settings, plugins, Optional.empty());
+    }
+
+    /**
+     * @param launchProject the project Matchbox was started with (a double-clicked .mbx file);
+     *        opened instead of the last project
+     */
+    public MainController(UserSettings settings, List<GrammarPlugin> plugins, Optional<Path> launchProject) {
         this.settings = settings;
         this.plugins = plugins;
         this.assist = new AssistController(settings, () -> primaryStage);
@@ -175,18 +183,22 @@ public class MainController {
             (state, action) -> CloseProjectDialog.ask(primaryStage, state, action, projectDirectory()),
             this::saveProject,
             (title, e) -> ErrorReporter.report(primaryStage, title, e));
-        // no project unless the last one is reopened: the start page is shown
+        // the project Matchbox was started with, else the last one if it is to be reopened,
+        // else no project: the start page is shown
         List<Path> recentProjects = settings.recentProjects().existing();
-        if (settings.openLastProjectProperty().get() && !recentProjects.isEmpty()) {
-            Path last = recentProjects.get(0);
+        Optional<Path> atStart = launchProject.isPresent() ? launchProject
+            : settings.openLastProjectProperty().get() && !recentProjects.isEmpty()
+                ? Optional.of(recentProjects.get(0)) : Optional.empty();
+        atStart.ifPresent(path -> {
             try {
-                workbench.session().setProject(Project.loadProject(plugins, last.toFile(), settings.documentOptions()));
+                workbench.session().setProject(Project.loadProject(plugins, path.toFile(), settings.documentOptions()));
+                settings.recentProjects().add(path);
             } catch (Exception e) {
-                logger.log(Level.WARNING, "Cannot reopen the last project " + last, e);
-                startupFailurePath = last;
+                logger.log(Level.WARNING, "Cannot open the project " + path + " at startup", e);
+                startupFailurePath = path;
                 startupFailure = e;
             }
-        }
+        });
     }
 
     private Project project() {
@@ -490,6 +502,19 @@ public class MainController {
         Project p = project();
         if (p == null || p.fileProperty().get() == null) return Optional.empty();
         return Optional.ofNullable(p.fileProperty().get().toPath().toAbsolutePath().getParent());
+    }
+
+    /**
+     * Opens a project file Matchbox was asked to open from outside (a .mbx file double-clicked
+     * while it runs), after asking what to save of the open project. JavaFX thread.
+     */
+    public void openProjectFile(File f) {
+        if (primaryStage != null) {
+            primaryStage.setIconified(false);
+            primaryStage.toFront();
+        }
+        if (modes == null) return;
+        openProject(f);
     }
 
     /** Opens a project file, after asking what to save of the open project. */

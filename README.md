@@ -52,11 +52,23 @@ you can further use matchbox to extract the lexical information and add them to 
 
 # Installation
 
-Download the latest release from the [GitHub releases page](https://github.com/sylvainloiseau/matchbox/releases) for your OS.
+Download the latest release from the [GitHub releases page](https://github.com/sylvainloiseau/matchbox/releases) for your system. The installers include their Java runtime: nothing else is needed.
 
-### Prerequisite
+| System | File |
+|---|---|
+| macOS, Apple Silicon (M1 and later) | `Matchbox-<version>-apple-silicon.dmg` |
+| macOS, Intel | `Matchbox-<version>-intel.dmg` |
+| Windows | `Matchbox-<version>.exe` |
+| Linux x86_64, Debian / Ubuntu | `matchbox_<version>_amd64.deb` |
+| Linux ARM 64-bit, Debian / Ubuntu | `matchbox_<version>_arm64.deb` |
+| Linux x86_64, any distribution | `Matchbox-<version>-x86_64.AppImage` |
+| Linux ARM 64-bit, any distribution | `Matchbox-<version>-aarch64.AppImage` |
 
-A Java runtime environment (JRE or JDK), version 17 or later, available on your `PATH`.
+Each file comes with a `.sha256` checksum (`sha256sum -c Matchbox-<version>-x86_64.AppImage.sha256`).
+
+An AppImage needs no installation: make it executable (`chmod +x Matchbox-*.AppImage`) and run it.
+
+Once Matchbox is installed (DMG, EXE, DEB), a double-click on a project file (`.mbx`) opens it in Matchbox. A project file given on the command line (`Matchbox notes.mbx`) is opened at startup instead of the last project.
 
 ### First launch on macOS
 
@@ -306,4 +318,10 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The artifacts are attached to the corresponding **Release** on GitHub (`.deb`, `.msi`, `.exe`, `.dmg` files according to the successful jobs).
+The release is named after the tag, and the installers take its version (`v1.2.0` → `1.2.0`). jpackage needs a numeric version whose first number is at least 1: a tag such as `v0.9` or `v1.2.0-beta` stops the workflow at its first step.
+
+Five jobs run in parallel and attach their files, each with a `.sha256` checksum, to the release: a DEB and an AppImage for Linux x86_64 (`ubuntu-latest`) and aarch64 (`ubuntu-24.04-arm`), an EXE for Windows, a DMG for Apple Silicon (`macos-latest`, `-apple-silicon`) and for Intel (`macos-26-intel`, `-intel`). The tests run in every job.
+
+**Actions › Release › Run workflow** builds the same installers with the version of the pom and keeps them for 7 days as artifacts of the run, without creating a release: a way to try the packaging before tagging.
+
+Locally, `mvn install` builds the installer of the current system in `build/target/installer` (DMG on macOS, EXE on Windows, DEB on Linux); `-Dapp.version=1.2.3` sets its version, `-Djpackage.type=…` its type.

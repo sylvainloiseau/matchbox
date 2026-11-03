@@ -41,6 +41,8 @@
         <junit.version>5.10.2</junit.version>
         <jackson.version>2.20.1</jackson.version>
         <revision>1.0.0</revision>
+        <!-- Version of the installers (jpackage); the release workflow passes the tag (-Dapp.version=1.2.3). -->
+        <app.version>${revision}</app.version>
         <plugins.dir>${project.basedir}/plugins</plugins.dir>
         <build.root>${maven.multiModuleProjectDirectory}/build</build.root>
     </properties>

@@ -7,8 +7,13 @@ import fr.cnrs.lacito.matchbox.settings.AppDirectories;
 import fr.cnrs.lacito.matchbox.settings.LoggingSetup;
 import fr.cnrs.lacito.matchbox.settings.UserSettings;
 
+import java.awt.Desktop;
+import java.awt.GraphicsEnvironment;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Application;
@@ -26,6 +31,9 @@ import javafx.stage.Stage;
 public class MatchboxApplication extends Application {
 
     private static final Logger logger = Logger.getLogger(MatchboxApplication.class.getName());
+
+    /** Project files received from the system (macOS "open file" events). */
+    private static final LaunchFiles OPEN_EVENTS = new LaunchFiles();
 
     private UserSettings settings;
     private MainController mainController;
@@ -50,8 +58,13 @@ public class MatchboxApplication extends Application {
             getClass().getResource("/fr/cnrs/lacito/matchbox/gui/MainView.fxml")
         );
 
+        // a double-clicked .mbx file: an argument (Linux, Windows) or an "open file" event (macOS)
+        List<Path> received = OPEN_EVENTS.drain();
+        Optional<Path> launchProject = LaunchFiles.projectIn(getParameters().getRaw())
+            .or(() -> received.isEmpty() ? Optional.empty() : Optional.of(received.getLast()));
+
         // set the controller and set up dependencies
-        mainController = new MainController(settings, plugins);
+        mainController = new MainController(settings, plugins, launchProject);
         loader.setController(mainController);
         var root = loader.load();
 
@@ -78,6 +91,8 @@ public class MatchboxApplication extends Application {
             }
         });
         primaryStage.show();
+        // .mbx files opened while Matchbox runs (macOS)
+        OPEN_EVENTS.setConsumer(p -> Platform.runLater(() -> mainController.openProjectFile(p.toFile())));
 
         List<String> warnings = settings.getLoadWarnings();
         if (!warnings.isEmpty()) {
@@ -110,6 +125,28 @@ public class MatchboxApplication extends Application {
     }
 
     public static void main(String[] args) {
+        listenToOpenFileEvents();
         launch(args);
+    }
+
+    /**
+     * macOS gives a double-clicked file as an "open file" event, not as an argument. The handler
+     * is installed before JavaFX starts, so that the event that launched the application is not
+     * lost; it is kept by {@link #OPEN_EVENTS} until the window exists.
+     */
+    private static void listenToOpenFileEvents() {
+        if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac")
+            || GraphicsEnvironment.isHeadless() || !Desktop.isDesktopSupported()) {
+            return;
+        }
+        try {
+            Desktop desktop = Desktop.getDesktop();
+            if (desktop.isSupported(Desktop.Action.APP_OPEN_FILE)) {
+                desktop.setOpenFileHandler(e -> OPEN_EVENTS.offer(e.getFiles()));
+            }
+        } catch (RuntimeException e) {
+            // the application works without it: File › Open project
+            logger.log(Level.WARNING, "Cannot listen to open file events", e);
+        }
     }
 }

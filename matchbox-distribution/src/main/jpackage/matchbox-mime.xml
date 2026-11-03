@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MIME type of .mbx project files, shipped in the AppImage (usr/share/mime/packages). -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-matchbox-project">
+    <comment>Matchbox project</comment>
+    <sub-class-of type="application/xml"/>
+    <glob pattern="*.mbx"/>
+  </mime-type>
+</mime-info>

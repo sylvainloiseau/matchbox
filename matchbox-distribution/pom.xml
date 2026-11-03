@@ -81,6 +81,14 @@
         </dependency>
     </dependencies>
 
+    <properties>
+        <!-- Installer type (jpackage); each OS profile sets its default: EXE, DMG, DEB.
+             The release workflow also builds an APP_IMAGE on Linux (-Djpackage.type=APP_IMAGE). -->
+        <jpackage.type>DEB</jpackage.type>
+        <!-- Suffix of the output directory, to build a second type next to the first one. -->
+        <jpackage.destSuffix />
+    </properties>
+
     <profiles>
         <profile>
             <id>win</id>
@@ -89,6 +97,9 @@
                     <family>windows</family>
                 </os>
             </activation>
+            <properties>
+                <jpackage.type>EXE</jpackage.type>
+            </properties>
             <build>
                 <plugins>
                     <plugin>
@@ -109,6 +120,9 @@
                     <family>mac</family>
                 </os>
             </activation>
+            <properties>
+                <jpackage.type>DMG</jpackage.type>
+            </properties>
             <build>
                 <plugins>
                     <plugin>
@@ -135,6 +149,58 @@
                         <artifactId>jpackage-maven-plugin</artifactId>
                         <configuration>
                             <icon>${project.basedir}/src/main/resources/icon.png</icon>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- Menu entry and .mbx association of the Linux installer (DEB). jpackage rejects these
+             options for an app image (-Djpackage.type=APP_IMAGE) and on other systems: both
+             conditions must hold (Maven ANDs them). -->
+        <profile>
+            <id>linux-installer</id>
+            <activation>
+                <os>
+                    <family>linux</family>
+                </os>
+                <property>
+                    <name>jpackage.type</name>
+                    <value>!APP_IMAGE</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.panteleyev</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <configuration>
+                            <linuxShortcut>true</linuxShortcut>
+                            <linuxMenuGroup>Matchbox</linuxMenuGroup>
+                            <linuxAppCategory>Office</linuxAppCategory>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- .mbx files open with Matchbox (DMG, EXE, DEB; not the app image used for the AppImage,
+             whose desktop file declares the MIME type itself). -->
+        <profile>
+            <id>file-association</id>
+            <activation>
+                <property>
+                    <name>jpackage.type</name>
+                    <value>!APP_IMAGE</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.panteleyev</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <configuration>
+                            <fileAssociations>
+                                <fileAssociation>${project.basedir}/src/main/jpackage/mbx.properties</fileAssociation>
+                            </fileAssociations>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -254,7 +320,10 @@
             <version>1.6.0</version>
 
             <executions>
+                <!-- named, so that the release workflow can run it again with another type:
+                     mvn -pl matchbox-distribution jpackage:jpackage@installer -Djpackage.type=APP_IMAGE … -->
                 <execution>
+                    <id>installer</id>
                     <phase>package</phase>
                     <goals>
                         <goal>jpackage</goal>
@@ -263,7 +332,7 @@
 
                         <!-- App identity -->
                         <name>Matchbox</name>
-                        <appVersion>${project.version}</appVersion>
+                        <appVersion>${app.version}</appVersion>
                         <vendor>CNRS-LACITO</vendor>
 
                         <!-- Main class -->
@@ -276,7 +345,8 @@
 
 
                         <!-- Output installer -->
-                        <destination>${build.root}/target/installer</destination>
+                        <destination>${build.root}/target/installer${jpackage.destSuffix}</destination>
+                        <type>${jpackage.type}</type>
 
                         <!-- Java runtime of the installer: jpackage runs jlink with these JDK
                              modules only (JavaFX and the other libraries stay as jars in the
@@ -297,9 +367,6 @@
                             <addModule>jdk.charsets</addModule>      <!-- all charsets offered in the settings -->
                             <addModule>jdk.localedata</addModule>    <!-- locales other than English -->
                         </addModules>
-                        <!-- Type will depend on OS -->
-                        <!-- Will be decided automatically according to the OS-->
-                        <!--<type>ALL</type>-->
 
                         <!-- Java options -->
                         <javaOptions>

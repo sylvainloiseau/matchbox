@@ -171,6 +171,8 @@ The project is a **Maven multi-module** repository with the following structure:
      ```bash
      bash build/assembly/matchbox-distribution-1.0.0-distribution/bin/matchbox
      ```
+3. **Installers** (jpackage, `matchbox-distribution`, execution `installer`): `mvn install` writes the installer of the current system in `build/target/installer${jpackage.destSuffix}`; type `jpackage.type` (default per OS profile: DMG, EXE, DEB), version `app.version` (root pom, default `${revision}`; `-Dapp.version=1.2.3`). Profiles active unless `-Djpackage.type=APP_IMAGE`: `file-association` (`.mbx`, `src/main/jpackage/mbx.properties`) and, on Linux, `linux-installer` (menu entry).
+4. **Release** (`.github/workflows/release.yml`, plan `.claude/plans/RELEASE_PLAN.md`): on a tag `v<n>[.<n>[.<n>]]` (first number ≥ 1, else the first step fails), five runners build DEB + AppImage (Linux x86_64 and aarch64; AppImage from `jpackage:jpackage@installer -Djpackage.type=APP_IMAGE`, appimagetool pinned with its SHA-256), EXE (Windows), DMG `-apple-silicon` / `-intel` (macOS), each with a `.sha256`, published on the release named after the tag; `workflow_dispatch` keeps them as run artifacts instead.
 
 ---
 
@@ -206,6 +208,7 @@ The project is a **Maven multi-module** repository with the following structure:
 ### Application
 
 - **Main class**: `fr.cnrs.lacito.matchbox.MatchboxApplication` (JavaFX entry point).
+- **Project given at launch**: a `.mbx` argument (Linux, Windows) or a macOS "open file" event (`java.awt.Desktop` handler installed in `main` before JavaFX starts) is opened instead of the last project (`MainController(settings, plugins, launchProject)`); later events open it with `MainController.openProjectFile` (asks before closing). Pure helper `LaunchFiles` (argument choice, events queued until the window exists). Tests: `LaunchFilesTest`, `LaunchProjectTest` (fixture hook `launchProject()`).
 - **GUI**: Launched via `mvn -pl matchbox-gui javafx:run`.
 
 ### Grammars
