@@ -76,7 +76,8 @@ The project is a **Maven multi-module** repository with the following structure:
 #### `matchbox-corpus`
 
 - `fr.cnrs.lacito.matchbox.corpus`: `CorpusObject` (interface: `getTextCoordinate()`, `getKind()`, `getLabel()`, `getChildren()`) and `TextCoordinate(TextId text, …)` (stop index inclusive; empty span `stopIndex = startIndex - 1`, used only for fields).
-  - `TextId`: identity of a text (`TextId.of(path)` normalises the path), known before parsing and given to the grammar.
+  - `TextId`: identity of a text (`TextId.of(path)` normalises the path), known before parsing and given to the grammar; ordered with `FileOrder`.
+  - `FileOrder`: the one order of files of the application, the same on every system (`NAMES`: NFC, case ignored, then case; `PATHS`: element by element). See §6 "Same behaviour on Windows, macOS and Linux".
   - `Text`: immutable snapshot of one parse of a text (content, objects and `Diagnostic`s per grammar in rank order); lookups `objectAt`, `flatten`, `objectsOf`, `grammarIdOf`, `parentOf`, `owns`, header `properties()`, `sections()`, `enclosingSections(o)` (sections of any grammar enclosing an object), `metadataOf(o)` (text properties overridden by enclosing sections). Built with `Text.builder(id, content).add(grammarId, objects, diagnostics)`, which drops objects with invalid spans (fields included) and reports them.
   - `Corpus` (implements the read-only `CorpusView`): one `Text` per `TextId`, replaced copy-on-write (consistent reads from any thread), `CorpusListener(id, before, after)`; `textOf(object)` finds the text of an object (empty for an object of an outdated parse).
   - `Field`, `HasFields`: named values of an object with the span of their raw text, which makes the object editable; `TextEdit` (replacement of a range, `replace(content, span, value)`, `inverse()`).
@@ -200,6 +201,18 @@ The project is a **Maven multi-module** repository with the following structure:
 - **Threading**: parsing runs on a background thread (`Project.parseInBackground`); results are applied to `Corpus` on the JavaFX thread (`Project.setApplyExecutor(Platform::runLater)`).
 - **Plugin dependencies** on matchbox modules and JavaFX use the `provided` scope.
 - **User settings**: `fr.cnrs.lacito.matchbox.settings.UserSettings` (observable properties, saved automatically); never read or write settings files directly (see §9).
+
+### Same behaviour on Windows, macOS and Linux
+
+Matchbox must behave identically on every system; the release builds and tests on Windows, macOS (Apple Silicon, Intel) and Linux (x86_64, aarch64). **Never rely on a default of the JDK or of the system when the result is visible or stored: give an explicit criterion.** In particular:
+
+- **Order of files: always `FileOrder`** (`matchbox-corpus`). A total, predictable order of the files is a strong requirement of the application (order of the texts of a corpus, of a directory's files, of plugin loading, of the file tree; later, chronological projects). `Path.compareTo`, `Stream.sorted()` on paths, `TreeMap<Path, …>` / `TreeSet<Path>` and `Comparable` records wrapping a path differ by system: Windows ignores case (`a.txt` < `B.TXT`), macOS and Linux do not (`B.TXT` < `a.txt`). Use `FileOrder.PATHS` for paths and `FileOrder.NAMES` for file and directory names (`TextId.compareTo` uses it). `String.CASE_INSENSITIVE_ORDER` alone is not total either (`A.txt` and `a.txt` both exist on Linux; a `TreeMap` with it merges them).
+- **Case of file names**: macOS and Windows file systems ignore case by default, Linux does not; `Path.equals` ignores case on Windows only. Do not decide that two files are the same by comparing strings, and do not create test files differing only by case (they collide on macOS/Windows).
+- **Unicode form**: macOS may give file names in NFD (`e` + combining accent), Linux and Windows in NFC; normalise (`java.text.Normalizer`, NFC) before comparing names (as `FileOrder` does).
+- **Separators and roots**: use the `Path` API, never `"/"` or `"\\"` in strings, except in the project-relative forms that are defined with `/` (`DirectorySettings.relativePath`, globs). Absolute paths start with `C:\` on Windows; temporary directories may be 8.3 short names (`C:\Users\RUNNER~1\…`): compare with `toRealPath()` or build the expected path the same way as the code.
+- **Text**: read and write with an explicit `Charset` (the `charset` setting for documents, UTF-8 elsewhere), never the platform default; lowercase / uppercase with `Locale.ROOT`; do not assume `\n` line endings in files written by others (Windows writes `\r\n`), and use `System.lineSeparator()` only for output meant for the system.
+- **Files in use**: Windows cannot delete or replace a file that is open (or being scanned by the antivirus): close streams (`try`-with-resources) and do not rebuild artifacts that were just written (see the release workflow).
+- **Tests** must state the expected result explicitly (e.g. the expected order of `a.txt` and `B.TXT`), not reproduce what the current system happens to do; a test that passes on macOS only is a bug of the code or of the test.
 
 ---
 

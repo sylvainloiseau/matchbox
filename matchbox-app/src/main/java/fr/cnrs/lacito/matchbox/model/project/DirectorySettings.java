@@ -1,5 +1,6 @@
 package fr.cnrs.lacito.matchbox.model.project;
 
+import fr.cnrs.lacito.matchbox.corpus.FileOrder;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -61,7 +62,8 @@ public record DirectorySettings(List<String> includes, List<String> excludes, bo
     }
 
     /**
-     * The files of {@code directory} that belong to the project, sorted.
+     * The files of {@code directory} that belong to the project, in {@link FileOrder#PATHS} order
+     * (the same on every system).
      *
      * @throws IllegalArgumentException if a pattern is invalid
      */
@@ -71,7 +73,8 @@ public record DirectorySettings(List<String> includes, List<String> excludes, bo
         try (Stream<Path> files = Files.walk(directory, recursive ? Integer.MAX_VALUE : 1)) {
             return files.filter(Files::isRegularFile)
                 .filter(f -> accepts(relativePath(directory, f), in, out))
-                .sorted()
+                // explicit order: Path.compareTo ignores case on Windows only
+                .sorted(FileOrder.PATHS)
                 .toList();
         }
     }

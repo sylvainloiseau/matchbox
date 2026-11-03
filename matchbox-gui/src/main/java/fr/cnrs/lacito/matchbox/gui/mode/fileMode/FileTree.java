@@ -1,5 +1,6 @@
 package fr.cnrs.lacito.matchbox.gui.mode.fileMode;
 
+import fr.cnrs.lacito.matchbox.corpus.FileOrder;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import java.nio.file.Path;
@@ -18,7 +19,7 @@ import java.util.stream.Stream;
 /**
  * The files of a project as File Mode's tree shows them: one top node per entry of the project
  * definition, in order; a directory groups the files it gives, with its sub-directories as nodes
- * (directories first, then files, each sorted by name); files added alone are top nodes, never
+ * (directories first, then files, each sorted by name with {@link FileOrder#NAMES}); files added alone are top nodes, never
  * grouped. Sub-directories without file are not shown. Pure: no JavaFX control.
  */
 public final class FileTree {
@@ -124,7 +125,7 @@ public final class FileTree {
     /** A directory being built: its sub-directories by name and its files. */
     private static final class Folder {
         private final Path path;
-        private final Map<String, Folder> subdirectories = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        private final Map<String, Folder> subdirectories = new TreeMap<>(FileOrder.NAMES);
         private final List<TextDocument> files = new ArrayList<>();
 
         Folder(Path path) {
@@ -152,7 +153,7 @@ public final class FileTree {
             }
             files.stream()
                 .sorted(Comparator.comparing((TextDocument d) -> d.getFilePath().getFileName().toString(),
-                    String.CASE_INSENSITIVE_ORDER))
+                    FileOrder.NAMES))
                 .forEach(d -> children.add(new Entry(new FileNode(d, Optional.of(top)), List.of())));
             return new Entry(node, children);
         }

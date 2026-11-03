@@ -29,9 +29,10 @@ public record TextId(Path path) implements Comparable<TextId> {
         return name == null ? path.toString() : name.toString();
     }
 
+    /** {@link FileOrder#PATHS}: the same order on every system (not {@code Path.compareTo}). */
     @Override
     public int compareTo(TextId other) {
-        return path.compareTo(other.path);
+        return FileOrder.PATHS.compare(path, other.path);
     }
 
     @Override

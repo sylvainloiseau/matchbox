@@ -67,12 +67,12 @@ class DirectorySettingsTest {
 
     @Test
     void scanAppliesIncludesExcludesAndRecursion() throws Exception {
-        assertEquals(List.of("2024/day1.txt", "B.TXT", "a.txt", "drafts/old/x.txt"),
+        assertEquals(List.of("2024/day1.txt", "a.txt", "B.TXT", "drafts/old/x.txt"),
             scan(new DirectorySettings(List.of("*.txt"), List.of(), true)));
-        assertEquals(List.of("2024/day1.txt", "B.TXT", "a.txt"),
+        assertEquals(List.of("2024/day1.txt", "a.txt", "B.TXT"),
             scan(new DirectorySettings(List.of("*.txt"), List.of("drafts/**"), true)), "exclude wins");
-        assertEquals(List.of("B.TXT", "a.txt"), scan(new DirectorySettings(List.of("*.txt"), List.of(), false)));
-        assertEquals(List.of("B.TXT", "a.txt", "c.md", "image.png"),
+        assertEquals(List.of("a.txt", "B.TXT"), scan(new DirectorySettings(List.of("*.txt"), List.of(), false)));
+        assertEquals(List.of("a.txt", "B.TXT", "c.md", "image.png"),
             scan(new DirectorySettings(List.of(), List.of(), false)), "no include: every file");
         assertEquals(List.of("*.txt", "*.md"), DirectorySettings.of(List.of("txt", "md"), true).includes());
     }
@@ -93,7 +93,7 @@ class DirectorySettingsTest {
     void newSettingsAddAndRemoveFiles() throws Exception {
         Project p = project();
         p.addDirectory(notes, new DirectorySettings(List.of("*.txt"), List.of(), false));
-        assertEquals(List.of(notes.resolve("B.TXT"), notes.resolve("a.txt")), p.filesOf(notes));
+        assertEquals(List.of(notes.resolve("a.txt"), notes.resolve("B.TXT")), p.filesOf(notes));
         assertEquals(notes, p.directoryOf(notes.resolve("a.txt")).orElseThrow());
 
         DirectorySettings next = new DirectorySettings(List.of("*.txt", "*.md"), List.of("B.TXT"), true);
@@ -146,6 +146,6 @@ class DirectorySettingsTest {
         Files.writeString(mbx, "<project><fileset><directory path=\"" + notes + "\"/></fileset></project>");
         Project loaded = ProjectXMLSerializer.load(mbx.toFile(), List.of());
         assertEquals(DirectorySettings.of(List.of("txt", "md"), false), loaded.directorySettings(notes).orElseThrow());
-        assertEquals(List.of(notes.resolve("B.TXT"), notes.resolve("a.txt"), notes.resolve("c.md")), loaded.filesOf(notes));
+        assertEquals(List.of(notes.resolve("a.txt"), notes.resolve("B.TXT"), notes.resolve("c.md")), loaded.filesOf(notes));
     }
 }

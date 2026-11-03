@@ -1,5 +1,6 @@
 package fr.cnrs.lacito.matchbox;
 
+import fr.cnrs.lacito.matchbox.corpus.FileOrder;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import java.io.IOException;
 import java.net.URL;
@@ -62,7 +63,8 @@ public class PluginManager {
         try (var jars = Files.list(pluginsDir)) {
             jars
                 .filter(path -> path.toString().endsWith(".jar"))
-                .sorted()
+                // loading order the same on every system
+                .sorted(FileOrder.PATHS)
                 .forEach(PluginManager::loadJar);
         }
 
