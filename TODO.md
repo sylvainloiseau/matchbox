@@ -2,6 +2,11 @@
 - parcoursup : dépôt
 - parcoursup : fiche
 
+## Chronological project / non chronological
+
+If a project is chronological, only one file at a time is editable, the one that is the last according to the key producing a total ordering of files. Either name, or header value: date, or number. File rejected while no date or number. Corpus blocked if a file has no date or number anymore.
+
+If the project is non-chronological, then no patch logic: lift-patchbox cannot be used.
 
 ## Project settings
 
