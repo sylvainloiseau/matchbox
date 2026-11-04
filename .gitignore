@@ -5,3 +5,6 @@ build
 .project
 .settings
 bin
+.claude
+CLAUDE.md
+TODO.md
