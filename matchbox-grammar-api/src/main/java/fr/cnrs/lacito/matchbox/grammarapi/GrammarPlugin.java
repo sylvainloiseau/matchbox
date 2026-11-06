@@ -58,6 +58,17 @@ public interface GrammarPlugin {
     ParseResult getResult(TextId text, String content);
 
     /**
+     * Parses one text knowing what the grammars ranked before this one for the file already read
+     * (see {@link ParseContext}). The application calls this method; the default ignores the
+     * context and calls {@link #getResult(TextId, String)}. Override it to skip text claimed by
+     * another grammar, or not to report errors there. Same contract as
+     * {@link #getResult(TextId, String)}.
+     */
+    default ParseResult getResult(TextId text, String content, ParseContext context) {
+        return getResult(text, content);
+    }
+
+    /**
      * Writes changes of values into the text, in the notation of this grammar (used by editable
      * views). The default replaces the raw text of a field verbatim; override it when the
      * notation needs escaping.

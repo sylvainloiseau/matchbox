@@ -212,7 +212,9 @@ public class ProjectPropertiesDialog {
 
         HBox main = new HBox(10, left, right);
         Label union = new Label("A file belongs to every file type it matches: it is parsed with all the grammars"
-            + " of these file types (each grammar once, in the order of the list).");
+            + " of these file types (each grammar once, in the order of the list). When two grammars read the"
+            + " same text, the first one listed wins; the reading of the other is not kept and gets a warning"
+            + " (sections and tags may contain the readings of other grammars).");
         union.setWrapText(true);
         union.setStyle("-fx-text-fill: #666666;");
         VBox box = section("File types: patterns matching file names and the grammars applied to them", union, main);

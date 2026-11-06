@@ -4,6 +4,7 @@ import fr.cnrs.lacito.matchbox.assist.prompt.PromptBuilder;
 import fr.cnrs.lacito.matchbox.corpus.CorpusView;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.MatchRole;
 import fr.cnrs.lacito.matchbox.corpus.Text;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
@@ -128,6 +129,12 @@ public class EditorController {
     private static final DisplayStyle INVISIBLE_STYLE = DisplayStyle.background("#e4e4ec");
     private static final DisplayStyle MATCH_STYLE = DisplayStyle.background("#fff59d");
     private static final DisplayStyle CURRENT_MATCH_STYLE = DisplayStyle.background("#ffb74d");
+    /** Outline of a reading that was not kept (hover of ◆, Show both of the Overlaps tab). */
+    private static final DisplayStyle DROPPED_STYLE = DisplayStyle.background("#ffe0a3").withUnderline(true);
+    /** The range outlined with {@link #DROPPED_STYLE} ({@code [start, end)}), null if none. */
+    private int[] outlined;
+    /** Lines of the section containing the caret, shown as a band in the margin. */
+    private final ObjectProperty<Optional<SectionBand.Lines>> sectionBand = new SimpleObjectProperty<>(Optional.empty());
 
     /** Actions plugins offer on the displayed text, shown in the margin of their line. */
     private List<TextActionProvider> actionProviders = List.of();
@@ -159,6 +166,7 @@ public class EditorController {
         var editorSettings = workbench.settings().editorProperty();
         editorSettings.addListener((obs, o, n) -> applyOptions(n));
         textArea.currentParagraphProperty().addListener((obs, o, n) -> updateCurrentLine());
+        textArea.caretPositionProperty().addListener((obs, o, n) -> updateSectionBand());
         textArea.multiPlainChanges().subscribe(c -> {
             // a new digit in the line count widens the margin
             if (document != null && GutterLayout.digits(textArea.getParagraphs().size()) != gutterDigits) {
@@ -220,6 +228,19 @@ public class EditorController {
             textArea.setParagraphStyle(paragraph, CURRENT_LINE_STYLE);
         }
         highlightedParagraph = paragraph;
+    }
+
+    /** The band of the margin follows the section containing the caret. */
+    private void updateSectionBand() {
+        Optional<SectionBand.Lines> lines = displayedText().flatMap(t -> SectionBand.linesOf(t, textArea.getCaretPosition()));
+        if (!lines.equals(sectionBand.get())) {
+            sectionBand.set(lines);
+        }
+    }
+
+    /** Lines of the section containing the caret (the band of the margin), for tests. */
+    public Optional<SectionBand.Lines> sectionBand() {
+        return sectionBand.get();
     }
 
     private int clearCurrentLine() {
@@ -433,7 +454,9 @@ public class EditorController {
         Optional<Text> text = displayedText();
         currentFileObjects.setAll(text.map(Text::objects).orElse(List.of()));
         currentFileErrors.setAll(text.map(Text::diagnostics).orElse(List.of()));
+        outlined = null;
         highlightText();
+        updateSectionBand();
         if (document != null) {
             selection.textChanged(document.getId(), corpus, true);
         }
@@ -512,7 +535,8 @@ public class EditorController {
             text.map(Text::diagnostics).orElse(List.of()));
         markers.set(byLine);
         gutterDigits = GutterLayout.digits(textArea.getParagraphs().size());
-        if (document == null || (!options.lineNumbers() && byLine.isEmpty())) {
+        boolean sections = text.map(t -> !t.sections().isEmpty()).orElse(false);
+        if (document == null || (!options.lineNumbers() && byLine.isEmpty() && !sections)) {
             textArea.setParagraphGraphicFactory(null);
             return;
         }
@@ -524,7 +548,24 @@ public class EditorController {
                 } else {
                     workbench.status().warn(outcome.message());
                 }
-            }));
+            }, sectionBand, warning -> outline(warning == null ? null
+                : new int[] {warning.startIndex(), warning.stopIndex() + 1})));
+    }
+
+    /**
+     * Outlines a range of the displayed text ({@code [start, end)}), e.g. a reading that was not
+     * kept; null removes the outline. It also goes away at the next parse.
+     */
+    public void outline(int[] range) {
+        if (range != null && (range[0] < 0 || range[1] <= range[0])) range = null;
+        if (java.util.Arrays.equals(range, outlined)) return;
+        outlined = range;
+        highlightText();
+    }
+
+    /** The outlined range ({@code [start, end)}), if any (for tests). */
+    public Optional<int[]> outlinedRange() {
+        return Optional.ofNullable(outlined);
     }
 
     private void handleCodeAreaClick() {
@@ -533,7 +574,11 @@ public class EditorController {
         displayedText().flatMap(t -> t.objectAt(caretPosition)).ifPresent(selection::set);
     }
 
-    /** Highlights every corpus object of the file: grammars in rank order, parents before children. */
+    /**
+     * Highlights every corpus object of the file in drawing order ({@link Text#layered()}): scopes
+     * (on their first line only), then exclusive objects, then annotations such as tags; within a
+     * role, grammars in rank order and parents before children.
+     */
     public void highlightText() {
         if (textArea == null || document == null || corpus == null) {
             return;
@@ -541,17 +586,21 @@ public class EditorController {
         // spans refer to the real text: remove provisional text first
         dismissGhost();
         int length = textArea.getLength();
-        // parents before children, tags last (a tag inside an IGT or an entry stays visible); each
-        // layer overrides only the properties it sets
+        // scopes underneath, then exclusive objects, annotations (tags) on top; each layer
+        // overrides only the properties it sets
         StyleLayers layers = new StyleLayers();
-        displayedText().ifPresent(text -> java.util.stream.Stream.concat(
-            text.flatten().filter(o -> !(o instanceof fr.cnrs.lacito.matchbox.corpus.capability.Tag)),
-            text.flatten().filter(o -> o instanceof fr.cnrs.lacito.matchbox.corpus.capability.Tag)
-        ).forEach(o -> {
+        String content = textArea.getText();
+        displayedText().ifPresent(text -> text.layered().forEach(o -> {
             TextCoordinate span = o.getTextCoordinate();
             // spans refer to the parsed text; the editor text may have changed since
             if (span.stopIndex() < length) {
-                layers.add(span.startIndex(), span.stopIndex() + 1, highlightStyles.styleFor(text, o));
+                int end = span.stopIndex() + 1;
+                if (o.getMatchRole() == MatchRole.SCOPE) {
+                    // a section is painted on its heading line only: its extent is the margin's band
+                    int newline = content.indexOf('\n', span.startIndex());
+                    if (newline >= 0 && newline < end) end = newline;
+                }
+                layers.add(span.startIndex(), end, highlightStyles.styleFor(text, o));
             }
         }));
         // invisible characters, then the matches of the find bar
@@ -569,6 +618,10 @@ public class EditorController {
             .filter(workbench.playback()::isPlaying)
             .forEach(s -> layers.add(s.getTextCoordinate().startIndex(),
                 Math.min(length, s.getTextCoordinate().stopIndex() + 1), PLAYING_STYLE)));
+        // the reading not kept, while its warning is hovered
+        if (outlined != null && outlined[1] <= length) {
+            layers.add(outlined[0], outlined[1], DROPPED_STYLE);
+        }
         if (length > 0) {
             StyleSpansBuilder<String> spans = new StyleSpansBuilder<>();
             for (StyleLayers.Run run : layers.runs(length)) {
@@ -849,11 +902,12 @@ public class EditorController {
         highlightText();
     }
 
-    /** The parse error at an offset (its span contains it, or it is on the same line). */
+    /** The parse error at an offset (its span contains it, or it is on the same line); warnings ignored. */
     public Optional<Diagnostic> errorAt(int offset) {
         String text = textArea.getText();
         int line = lineOf(text, offset);
         return currentFileErrors.stream()
+            .filter(Diagnostic::isError)
             .filter(e -> e.span().map(sp -> sp.contains(offset)).orElse(false) || e.line() == line)
             .min(Comparator.comparingInt(e -> Math.abs(PromptBuilder.errorOffset(text, e) - offset)));
     }

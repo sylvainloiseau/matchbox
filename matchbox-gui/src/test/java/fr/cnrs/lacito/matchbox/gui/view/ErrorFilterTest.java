@@ -59,4 +59,16 @@ class ErrorFilterTest {
         assertEquals("Parsing errors (12)", ErrorFilter.tabTitle(12, 12, false));
         assertEquals("Parsing errors (3/12)", ErrorFilter.tabTitle(3, 12, true));
     }
+
+    @Test
+    void tabTitlesCountWarningsApart() {
+        Diagnostic warning = Diagnostic.warning(T, "g", 1, 0, "Not kept", 0, 3);
+        Diagnostic error = error("g");
+        assertEquals("Parsing errors (2)", ErrorFilter.tabTitle(2, List.of(error, error), false));
+        assertEquals("Parsing errors (1 warning)", ErrorFilter.tabTitle(1, List.of(warning), false));
+        assertEquals("Parsing errors (2 errors, 1 warning)", ErrorFilter.tabTitle(3, List.of(error, warning, error), false));
+        assertEquals("Parsing errors (1/2)", ErrorFilter.tabTitle(1, List.of(error, warning), true));
+        assertEquals("Warning", ErrorFilter.severityLabel(warning));
+        assertEquals("Error", ErrorFilter.severityLabel(error));
+    }
 }

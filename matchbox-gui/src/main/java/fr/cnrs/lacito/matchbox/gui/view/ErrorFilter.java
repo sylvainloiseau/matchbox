@@ -57,4 +57,25 @@ public final class ErrorFilter {
         if (total == 0) return "Parsing errors";
         return filtered ? "Parsing errors (" + shown + "/" + total + ")" : "Parsing errors (" + total + ")";
     }
+
+    /**
+     * As {@link #tabTitle(int, int, boolean)} when there are only errors; with warnings, both are
+     * counted: "Parsing errors (2 errors, 1 warning)", "Parsing errors (1 warning)", "Parsing errors
+     * (1/3)" when filtered.
+     */
+    public static String tabTitle(int shown, List<Diagnostic> all, boolean filtered) {
+        long warnings = all.stream().filter(Diagnostic::isWarning).count();
+        long errors = all.size() - warnings;
+        if (warnings == 0 || filtered) return tabTitle(shown, all.size(), filtered);
+        return "Parsing errors (" + (errors == 0 ? "" : plural(errors, "error") + ", ") + plural(warnings, "warning") + ")";
+    }
+
+    private static String plural(long n, String word) {
+        return n + " " + word + (n == 1 ? "" : "s");
+    }
+
+    /** "Error" or "Warning", the text of the severity column. */
+    public static String severityLabel(Diagnostic d) {
+        return d.isWarning() ? "Warning" : "Error";
+    }
 }

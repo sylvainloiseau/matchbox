@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox.corpus.capability;
 
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
+import fr.cnrs.lacito.matchbox.corpus.MatchRole;
 import java.util.Arrays;
 import java.util.List;
 
@@ -30,5 +31,11 @@ public interface Tag extends CorpusObject {
     @Override
     default String getLabel() {
         return getName();
+    }
+
+    /** A tag may be written inside objects of other grammars: it is an annotation. */
+    @Override
+    default MatchRole getMatchRole() {
+        return MatchRole.ANNOTATION;
     }
 }

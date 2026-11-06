@@ -1,11 +1,10 @@
 package fr.cnrs.lacito.matchbox.model.project;
 
 import fr.cnrs.lacito.matchbox.corpus.Corpus;
-import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.corpus.Text;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
+import fr.cnrs.lacito.matchbox.grammarapi.TextParser;
 import fr.cnrs.lacito.matchbox.model.DocumentChange;
 import fr.cnrs.lacito.matchbox.model.DocumentListener;
 import fr.cnrs.lacito.matchbox.model.DocumentOptions;
@@ -318,23 +317,7 @@ public class Project {
      * state.
      */
     private static ParseRun computeParse(TextId id, String text, long version, List<GrammarPlugin> grammars) {
-        Text.Builder builder = Text.builder(id, text);
-        for (GrammarPlugin plugin : grammars) {
-            ParseResult result;
-            try {
-                result = plugin.getResult(id, text);
-                if (result == null) {
-                    throw new IllegalStateException("getResult returned null");
-                }
-            } catch (RuntimeException | LinkageError e) {
-                logger.log(Level.WARNING, "Grammar " + plugin.getId() + " failed on " + id, e);
-                result = new ParseResult(List.of(), List.of(
-                    Diagnostic.at(id, plugin.getId(), 0, 0, "Internal error of the grammar: " + e)
-                ));
-            }
-            builder.add(plugin.getId(), result.objects(), result.diagnostics());
-        }
-        return new ParseRun(builder.build(), version);
+        return new ParseRun(TextParser.parse(id, text, grammars), version);
     }
 
     private void applyParse(TextDocument document, ParseRun run) {

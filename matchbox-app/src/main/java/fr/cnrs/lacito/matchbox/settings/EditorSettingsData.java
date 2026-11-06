@@ -16,10 +16,20 @@ import java.util.function.Consumer;
  * @param showInvisibles       show tabs and trailing spaces
  * @param autoIndent           Enter keeps the indentation of the current line
  * @param recentCharacters     special characters inserted recently, most recent first
+ * @param showWarnings         the Parsing errors table also lists warnings (e.g. readings not kept
+ *                             because another grammar reads the same text)
  */
 public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer fontSize, String fontFamily,
                                  Boolean highlightCurrentLine, Boolean showInvisibles, Boolean autoIndent,
-                                 List<String> recentCharacters) {
+                                 List<String> recentCharacters, Boolean showWarnings) {
+
+    /** Settings without {@code showWarnings} (written before it existed): shown. */
+    public EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer fontSize, String fontFamily,
+                              Boolean highlightCurrentLine, Boolean showInvisibles, Boolean autoIndent,
+                              List<String> recentCharacters) {
+        this(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent,
+            recentCharacters, null);
+    }
 
     public static final int MIN_FONT_SIZE = 8;
     public static final int MAX_FONT_SIZE = 40;
@@ -27,7 +37,7 @@ public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer
     public static final int MAX_RECENT_CHARACTERS = 24;
 
     public static EditorSettingsData defaults() {
-        return new EditorSettingsData(false, true, DEFAULT_FONT_SIZE, null, true, false, true, List.of());
+        return new EditorSettingsData(false, true, DEFAULT_FONT_SIZE, null, true, false, true, List.of(), true);
     }
 
     /** Copy where missing or invalid values are replaced by the defaults. */
@@ -52,7 +62,8 @@ public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer
             autoIndent == null ? d.autoIndent : autoIndent,
             recentCharacters == null ? List.of()
                 : recentCharacters.stream().filter(c -> c != null && !c.isEmpty()).distinct()
-                    .limit(MAX_RECENT_CHARACTERS).toList());
+                    .limit(MAX_RECENT_CHARACTERS).toList(),
+            showWarnings == null ? d.showWarnings : showWarnings);
     }
 
     public static int clamp(int size) {
@@ -60,32 +71,37 @@ public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer
     }
 
     public EditorSettingsData withWrapLines(boolean value) {
-        return new EditorSettingsData(value, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters);
+        return new EditorSettingsData(value, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings);
     }
 
     public EditorSettingsData withLineNumbers(boolean value) {
-        return new EditorSettingsData(wrapLines, value, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters);
+        return new EditorSettingsData(wrapLines, value, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings);
     }
 
     public EditorSettingsData withFontSize(int value) {
-        return new EditorSettingsData(wrapLines, lineNumbers, clamp(value), fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters);
+        return new EditorSettingsData(wrapLines, lineNumbers, clamp(value), fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings);
     }
 
     public EditorSettingsData withFontFamily(String value) {
         return new EditorSettingsData(wrapLines, lineNumbers, fontSize, value == null || value.isBlank() ? null : value,
-            highlightCurrentLine, showInvisibles, autoIndent, recentCharacters);
+            highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings);
     }
 
     public EditorSettingsData withHighlightCurrentLine(boolean value) {
-        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, value, showInvisibles, autoIndent, recentCharacters);
+        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, value, showInvisibles, autoIndent, recentCharacters, showWarnings);
     }
 
     public EditorSettingsData withShowInvisibles(boolean value) {
-        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, value, autoIndent, recentCharacters);
+        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, value, autoIndent, recentCharacters, showWarnings);
     }
 
     public EditorSettingsData withAutoIndent(boolean value) {
-        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, value, recentCharacters);
+        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, value, recentCharacters, showWarnings);
+    }
+
+    public EditorSettingsData withShowWarnings(boolean value) {
+        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles,
+            autoIndent, recentCharacters, value);
     }
 
     /** A copy where {@code character} is the most recent special character. */
@@ -94,6 +110,6 @@ public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer
         recent.add(character);
         if (recentCharacters != null) recentCharacters.stream().filter(c -> !c.equals(character)).forEach(recent::add);
         return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles,
-            autoIndent, recent.stream().limit(MAX_RECENT_CHARACTERS).toList());
+            autoIndent, recent.stream().limit(MAX_RECENT_CHARACTERS).toList(), showWarnings);
     }
 }

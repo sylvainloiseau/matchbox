@@ -196,7 +196,9 @@ public final class SuggestionPanelController {
         }
         String text = editor.getFileContentArea().getText();
         List<GrammarPlugin> grammars = assist.grammarsFor(current);
-        List<Diagnostic> errors = editor.getCurrentFileErrors().stream().limit(MAX_ERRORS).toList();
+        // warnings (readings not kept) are about the grammars of the file, not a text to fix
+        List<Diagnostic> errors = editor.getCurrentFileErrors().stream().filter(Diagnostic::isError)
+            .limit(MAX_ERRORS).toList();
         List<Suggestion> added = new ArrayList<>();
         for (Diagnostic error : errors) {
             String key = errorKey(error, text);

@@ -22,6 +22,11 @@ public interface CorpusView {
         return texts().stream().flatMap(t -> t.objectsOf(type).stream());
     }
 
+    /** Overlapping readings of all texts, texts in order (see {@link Text#conflicts()}). */
+    default Stream<MatchConflict> conflicts() {
+        return texts().stream().flatMap(t -> t.conflicts().stream());
+    }
+
     /** Diagnostics of all texts. */
     default Stream<Diagnostic> diagnostics() {
         return texts().stream().flatMap(t -> t.diagnostics().stream());

@@ -89,7 +89,7 @@ class UserSettingsTest {
                 s.tagBrowserProperty().get());
             // font size clamped, blank family = default, recent characters cleaned
             assertEquals(new EditorSettingsData(false, false, EditorSettingsData.MAX_FONT_SIZE, null, true, false, true,
-                List.of("a")), s.editorProperty().get());
+                List.of("a"), true), s.editorProperty().get());
         }
     }
 

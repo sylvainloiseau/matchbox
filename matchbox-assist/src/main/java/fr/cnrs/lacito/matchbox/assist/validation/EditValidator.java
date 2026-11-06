@@ -4,16 +4,18 @@ import fr.cnrs.lacito.matchbox.assist.suggestion.Paragraphs;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
-import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
+import fr.cnrs.lacito.matchbox.grammarapi.TextParser;
+import fr.cnrs.lacito.matchbox.corpus.MatchConflict;
+import fr.cnrs.lacito.matchbox.corpus.Text;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Checks proposed edits with the grammars of the file: the edits are applied to a copy of the
@@ -27,8 +29,6 @@ import java.util.logging.Logger;
  * blank lines and assumed independent).
  */
 public final class EditValidator implements AutoCloseable {
-
-    private static final Logger logger = Logger.getLogger(EditValidator.class.getName());
 
     /** Above this length, only the paragraphs around the edits are parsed. */
     static final int LARGE_TEXT = 200_000;
@@ -127,6 +127,10 @@ public final class EditValidator implements AutoCloseable {
 
     /** Kind of error, from the start of the ANTLR message ("missing", "extraneous input"…). */
     static String kind(Diagnostic e) {
+        if (e.isWarning()) {
+            // the message names lines, which move with the edits
+            return "not kept";
+        }
         String m = e.message() == null ? "" : e.message();
         for (String k : List.of("missing", "extraneous input", "mismatched input", "no viable alternative",
                 "token recognition error")) {
@@ -140,18 +144,26 @@ public final class EditValidator implements AutoCloseable {
         return e.startIndex() >= start && e.startIndex() <= end;
     }
 
+    /**
+     * Problems of a text that an edit must not add: the errors of the grammars, and the warnings
+     * of the objects not kept because an earlier grammar reads the same characters (an edit making
+     * an IGT disappear is a loss). The other overlap warnings are not counted.
+     */
     static List<Diagnostic> parse(TextId file, String text, List<GrammarPlugin> grammars) {
-        List<Diagnostic> errors = new ArrayList<>();
-        for (GrammarPlugin g : grammars) {
-            try {
-                ParseResult r = g.getResult(file, text);
-                errors.addAll(r.diagnostics());
-            } catch (RuntimeException | LinkageError e) {
-                logger.log(Level.WARNING, "Grammar " + g.getId() + " failed during validation", e);
-                errors.add(Diagnostic.at(file, g.getId(), 0, 0, "Internal error of the grammar: " + e));
+        Text parsed = TextParser.parse(file, text, grammars);
+        Set<String> dropped = new HashSet<>();
+        for (MatchConflict c : parsed.conflicts()) {
+            if (c.isDropped()) {
+                dropped.add(c.grammarId() + "@" + c.object().getTextCoordinate().startIndex());
             }
         }
-        return errors;
+        List<Diagnostic> problems = new ArrayList<>();
+        for (Diagnostic d : parsed.diagnostics()) {
+            if (d.isError() || dropped.contains(d.grammarId() + "@" + d.startIndex())) {
+                problems.add(d);
+            }
+        }
+        return problems;
     }
 
     static int paragraphStart(String text, int offset) {

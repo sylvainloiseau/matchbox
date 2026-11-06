@@ -7,12 +7,14 @@ import javafx.scene.layout.Pane;
 import javafx.scene.shape.Rectangle;
 
 /**
- * A narrow strip beside the editor's scroll bar marking where the parse errors are in the whole
- * file; a click on a mark goes to its line.
+ * A narrow strip beside the editor's scroll bar marking where the parse errors (red) and the
+ * warnings (amber) are in the whole file; a click on a mark goes to its line.
  */
 public final class ErrorRuler extends Pane {
 
     static final double WIDTH = 8;
+    static final String ERROR_COLOR = "#d32f2f";
+    static final String WARNING_COLOR = "#f0a000";
     private Map<Integer, GutterLayout.Markers> markers = Map.of();
     private int lineCount = 1;
     private final IntConsumer goToLine;
@@ -42,10 +44,10 @@ public final class ErrorRuler extends Pane {
         getChildren().clear();
         double h = getHeight();
         markers.forEach((line, m) -> {
-            if (m.errors().isEmpty()) return;
+            if (m.errors().isEmpty() && m.warnings().isEmpty()) return;
             Rectangle mark = new Rectangle(1, Math.max(0, GutterLayout.rulerPosition(line, lineCount) * h - 2), WIDTH - 2, 4);
-            mark.setFill(javafx.scene.paint.Color.web("#d32f2f"));
-            Tooltip.install(mark, new Tooltip("Line " + (line + 1) + ": " + String.join("\n", m.errors())));
+            mark.setFill(javafx.scene.paint.Color.web(m.warningOnly() ? WARNING_COLOR : ERROR_COLOR));
+            Tooltip.install(mark, new Tooltip("Line " + (line + 1) + ": " + String.join("\n", m.messages())));
             mark.setOnMouseClicked(e -> goToLine.accept(line));
             mark.setCursor(javafx.scene.Cursor.HAND);
             getChildren().add(mark);

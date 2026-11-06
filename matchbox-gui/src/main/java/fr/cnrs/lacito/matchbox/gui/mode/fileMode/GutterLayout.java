@@ -10,15 +10,38 @@ import java.util.TreeMap;
 
 /**
  * What the margin of the editor shows on each line (counted from 0): the media segments starting
- * there (▶), the text actions of plugins (✚) and the parse errors (●); the width of the line
- * numbers. Pure: computed from the parsed text, without controls.
+ * there (▶), the text actions of plugins (✚), the parse errors (●) and the warnings (◆, e.g. a
+ * reading not kept because another grammar reads the same text); the width of the line numbers. Pure: computed from the parsed text, without controls.
  */
 public final class GutterLayout {
 
-    /** The markers of a line. */
-    public record Markers(List<MediaSegment> segments, List<TextAction> actions, List<String> errors) {
+    /**
+     * The markers of a line.
+     *
+     * @param errors   messages of the errors
+     * @param warnings the warnings (their spans are outlined while the marker is hovered)
+     */
+    public record Markers(List<MediaSegment> segments, List<TextAction> actions, List<String> errors,
+                          List<Diagnostic> warnings) {
+
+        public Markers(List<MediaSegment> segments, List<TextAction> actions, List<String> errors) {
+            this(segments, actions, errors, List.of());
+        }
+
         public boolean isEmpty() {
-            return segments.isEmpty() && actions.isEmpty() && errors.isEmpty();
+            return segments.isEmpty() && actions.isEmpty() && errors.isEmpty() && warnings.isEmpty();
+        }
+
+        /** True if the line has warnings but no error (◆; an error wins: ●). */
+        public boolean warningOnly() {
+            return errors.isEmpty() && !warnings.isEmpty();
+        }
+
+        /** Messages of the errors, then of the warnings (tooltips). */
+        public List<String> messages() {
+            List<String> all = new ArrayList<>(errors);
+            warnings.forEach(w -> all.add(w.message()));
+            return all;
         }
     }
 
@@ -36,6 +59,7 @@ public final class GutterLayout {
         Map<Integer, List<MediaSegment>> s = new TreeMap<>();
         Map<Integer, List<TextAction>> a = new TreeMap<>();
         Map<Integer, List<String>> e = new TreeMap<>();
+        Map<Integer, List<Diagnostic>> w = new TreeMap<>();
         for (MediaSegment segment : segments) {
             s.computeIfAbsent(index.lineOf(segment.getTextCoordinate().startIndex()), k -> new ArrayList<>()).add(segment);
         }
@@ -43,12 +67,16 @@ public final class GutterLayout {
             a.computeIfAbsent(index.lineOf(action.offset()), k -> new ArrayList<>()).add(action);
         }
         for (Diagnostic d : diagnostics) {
-            e.computeIfAbsent(lineOf(index, d), k -> new ArrayList<>()).add(d.message());
+            if (d.isWarning()) {
+                w.computeIfAbsent(lineOf(index, d), k -> new ArrayList<>()).add(d);
+            } else {
+                e.computeIfAbsent(lineOf(index, d), k -> new ArrayList<>()).add(d.message());
+            }
         }
         Map<Integer, Markers> markers = new TreeMap<>();
-        for (Integer line : union(s, a, e)) {
+        for (Integer line : union(s, a, e, w)) {
             markers.put(line, new Markers(s.getOrDefault(line, List.of()), a.getOrDefault(line, List.of()),
-                e.getOrDefault(line, List.of())));
+                e.getOrDefault(line, List.of()), w.getOrDefault(line, List.of())));
         }
         return markers;
     }

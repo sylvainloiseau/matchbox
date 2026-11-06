@@ -42,12 +42,16 @@ public final class Text {
     private final Map<CorpusObject, CorpusObject> parentOf = new IdentityHashMap<>();
     private final List<Section> sections;
     private final Map<String, String> properties;
+    private final List<MatchConflict> conflicts;
+    /** Objects in drawing order, computed on first use. */
+    private volatile List<CorpusObject> layered;
     /** Targets of the tags, computed on first use. */
     private volatile TagAttachment tagAttachment;
 
     private Text(TextId id, String content, Map<String, List<CorpusObject>> objectsByGrammar,
-                 Map<String, List<Diagnostic>> diagnosticsByGrammar) {
+                 Map<String, List<Diagnostic>> diagnosticsByGrammar, List<MatchConflict> conflicts) {
         this.id = id;
+        this.conflicts = List.copyOf(conflicts);
         this.content = content;
         this.objectsByGrammar = Collections.unmodifiableMap(objectsByGrammar);
         this.diagnosticsByGrammar = Collections.unmodifiableMap(diagnosticsByGrammar);
@@ -125,18 +129,43 @@ public final class Text {
         return flatten().filter(type::isInstance).map(type::cast).toList();
     }
 
-    /** Deepest object whose span contains {@code offset}. */
+    /**
+     * The object drawn on top at {@code offset}: the last object of {@link #layered()} containing
+     * it, i.e. the innermost annotation, else the deepest exclusive object, else the deepest scope.
+     */
     public Optional<CorpusObject> objectAt(int offset) {
-        return deepestAt(objects, offset);
-    }
-
-    private static Optional<CorpusObject> deepestAt(List<? extends CorpusObject> objects, int offset) {
-        for (CorpusObject o : objects) {
-            if (o.getTextCoordinate().contains(offset)) {
-                return deepestAt(o.getChildren(), offset).or(() -> Optional.of(o));
+        List<CorpusObject> all = layered();
+        for (int i = all.size() - 1; i >= 0; i--) {
+            if (all.get(i).getTextCoordinate().contains(offset)) {
+                return Optional.of(all.get(i));
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Objects and their descendants in drawing order: by {@link MatchRole} (scopes, then exclusive
+     * objects, then annotations), then grammar rank, then depth-first (parents before children).
+     * What is drawn last is on top, and is what {@link #objectAt} returns.
+     */
+    public List<CorpusObject> layered() {
+        List<CorpusObject> l = layered;
+        if (l == null) {
+            List<CorpusObject> all = new ArrayList<>(flatten().toList());
+            // stable: keeps rank and depth-first order within a role
+            all.sort(Comparator.comparingInt(o -> o.getMatchRole().ordinal()));
+            l = List.copyOf(all);
+            layered = l;
+        }
+        return l;
+    }
+
+    /**
+     * Readings of the same characters by several grammars found when the text was built, in grammar
+     * order; those of kind {@link MatchConflict.Kind#DROPPED} are not among the objects.
+     */
+    public List<MatchConflict> conflicts() {
+        return conflicts;
     }
 
     /** Id of the grammar that produced an object (top-level or nested) of this snapshot. */
@@ -259,17 +288,29 @@ public final class Text {
         private final String content;
         private final Map<String, List<CorpusObject>> objects = new LinkedHashMap<>();
         private final Map<String, List<Diagnostic>> diagnostics = new LinkedHashMap<>();
+        private final OverlapResolver resolver;
 
         private Builder(TextId id, String content) {
             this.id = Objects.requireNonNull(id, "id");
             this.content = Objects.requireNonNull(content, "content");
+            this.resolver = new OverlapResolver(id);
+        }
+
+        /** Same as {@link #add(String, String, List, List)} with the id as the grammar's name. */
+        public Builder add(String grammarId, List<? extends CorpusObject> objects, List<Diagnostic> diagnostics) {
+            return add(grammarId, grammarId, objects, diagnostics);
         }
 
         /**
-         * Adds what one grammar produced (call in rank order). Objects whose span, a descendant's
-         * span or a field span is invalid are dropped and reported as diagnostics.
+         * Adds what one grammar produced (call in rank order: earlier grammars win, see
+         * {@link MatchRole}). Objects whose span, a descendant's span or a field span is invalid
+         * are dropped and reported as errors; exclusive objects meeting those of an earlier grammar
+         * are dropped and reported as warnings.
+         *
+         * @param grammarName name of the grammar in the warnings (its display name)
          */
-        public Builder add(String grammarId, List<? extends CorpusObject> objects, List<Diagnostic> diagnostics) {
+        public Builder add(String grammarId, String grammarName, List<? extends CorpusObject> objects,
+                           List<Diagnostic> diagnostics) {
             List<CorpusObject> valid = new ArrayList<>();
             List<Diagnostic> diags = new ArrayList<>(diagnostics);
             for (CorpusObject o : objects) {
@@ -285,9 +326,19 @@ public final class Text {
                         "Object ignored, the grammar returned an invalid span: " + problem));
                 }
             }
-            this.objects.put(grammarId, List.copyOf(valid));
+            OverlapResolver.Outcome outcome = resolver.add(grammarId, grammarName, valid);
+            diags.addAll(outcome.warnings());
+            this.objects.put(grammarId, outcome.kept());
             this.diagnostics.put(grammarId, List.copyOf(diags));
             return this;
+        }
+
+        /**
+         * Characters owned by the exclusive objects of the grammars added so far, sorted by
+         * position (given to the next grammar, see {@code ParseContext}).
+         */
+        public List<Claim> claims() {
+            return resolver.claims();
         }
 
         private String findProblem(CorpusObject o, CorpusObject parent) {
@@ -315,7 +366,8 @@ public final class Text {
         }
 
         public Text build() {
-            return new Text(id, content, new LinkedHashMap<>(objects), new LinkedHashMap<>(diagnostics));
+            return new Text(id, content, new LinkedHashMap<>(objects), new LinkedHashMap<>(diagnostics),
+                resolver.conflicts());
         }
     }
 }

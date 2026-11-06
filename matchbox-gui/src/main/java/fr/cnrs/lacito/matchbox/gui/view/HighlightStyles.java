@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox.gui.view;
 
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
+import fr.cnrs.lacito.matchbox.corpus.MatchRole;
 import fr.cnrs.lacito.matchbox.corpus.Text;
 import fr.cnrs.lacito.matchbox.corpus.capability.Sense;
 import fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle;
@@ -16,7 +17,8 @@ import javafx.beans.value.ChangeListener;
 /**
  * Display styles of corpus objects in the editor and the views. The style of an object is, property
  * by property: the project's style of its kind, the project's style of its grammar, the grammar's
- * default for the kind, the grammar's default, then a palette background by kind.
+ * default for the kind, the grammar's default, then a palette background by kind (none for a
+ * {@code Sense} or a {@linkplain MatchRole#SCOPE scope}).
  */
 public class HighlightStyles {
 
@@ -75,8 +77,10 @@ public class HighlightStyles {
 
     private DisplayStyle resolve(String grammarId, CorpusObject object) {
         String kind = object.getKind();
-        // a sense shows the colour of its entry
-        DisplayStyle fallback = object instanceof Sense ? DisplayStyle.EMPTY : DisplayStyle.background(paletteColor(kind));
+        // a sense shows the colour of its entry; a scope (section) gets no colour of its own: it
+        // would tint pages of prose and the objects it contains
+        DisplayStyle fallback = object instanceof Sense || object.getMatchRole() == MatchRole.SCOPE
+            ? DisplayStyle.EMPTY : DisplayStyle.background(paletteColor(kind));
         if (grammarId == null) return fallback;
         Project project = session.project();
         DisplayStyle style = project == null ? DisplayStyle.EMPTY : project.getDisplayStyles().resolve(grammarId, kind);

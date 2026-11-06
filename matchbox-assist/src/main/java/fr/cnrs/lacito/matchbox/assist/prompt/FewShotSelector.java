@@ -56,6 +56,7 @@ public final class FewShotSelector {
 
     private static boolean hasError(TextCoordinate span, List<Diagnostic> errors) {
         for (Diagnostic e : errors) {
+            if (e.isWarning()) continue;
             if (e.startIndex() >= 0 ? span.contains(e.startIndex())
                     : e.line() >= span.startLine() && e.line() <= span.endLine()) {
                 return true;

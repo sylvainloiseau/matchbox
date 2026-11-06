@@ -37,4 +37,13 @@ public interface CorpusObject {
     default List<? extends CorpusObject> getChildren() {
         return List.of();
     }
+
+    /**
+     * What the object does to its characters when other grammars read the same text: exclusive by
+     * default; {@link fr.cnrs.lacito.matchbox.corpus.capability.Section} is a scope and
+     * {@link fr.cnrs.lacito.matchbox.corpus.capability.Tag} an annotation. See {@link MatchRole}.
+     */
+    default MatchRole getMatchRole() {
+        return MatchRole.EXCLUSIVE;
+    }
 }

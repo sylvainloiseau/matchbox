@@ -191,7 +191,7 @@ public class SettingsDialog {
         return new EditorSettingsData(wrapLinesCheckBox.isSelected(), lineNumbersCheckBox.isSelected(), size,
             family == null || family.equals(DEFAULT_FONT) ? null : family,
             highlightCurrentLineCheckBox.isSelected(), showInvisiblesCheckBox.isSelected(), autoIndentCheckBox.isSelected(),
-            current.recentCharacters());
+            current.recentCharacters(), current.showWarnings());
     }
 
     private static List<String> splitItems(String text, String separator) {

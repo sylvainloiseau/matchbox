@@ -5,7 +5,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A problem reported while parsing a text: syntax error, invalid object, internal grammar error.
+ * A problem reported while parsing a text: syntax error, invalid object, internal grammar error
+ * ({@link Severity#ERROR}), or an object not kept because another grammar already reads the same
+ * characters ({@link Severity#WARNING}, see {@link MatchRole}).
  *
  * @param text       the text
  * @param grammarId  id of the grammar reporting it
@@ -19,18 +21,48 @@ import java.util.Optional;
  * @param expected   tokens expected at this position, as displayed by ANTLR: the literal between
  *                   quotes when the token has one (e.g. {@code "'<'"}), its symbolic name
  *                   otherwise (e.g. {@code "IMB_LINE"}), {@code "<EOF>"}
+ * @param severity   error (syntax, invalid object, grammar failure) or warning (overlapping readings)
  */
 public record Diagnostic(TextId text, String grammarId, int line, int column, String message,
-                         int startIndex, int stopIndex, List<String> expected) {
+                         int startIndex, int stopIndex, List<String> expected, Severity severity) {
+
+    /** How serious a diagnostic is. */
+    public enum Severity {
+        /** The text does not follow the grammar, or the grammar failed. */
+        ERROR,
+        /** The text parses, but something was not kept (e.g. an overlapping reading). */
+        WARNING
+    }
 
     public Diagnostic {
         Objects.requireNonNull(text, "text");
         expected = List.copyOf(expected);
+        severity = severity == null ? Severity.ERROR : severity;
     }
 
-    /** A diagnostic without offsets. */
+    /** An error (the constructor used by grammars). */
+    public Diagnostic(TextId text, String grammarId, int line, int column, String message,
+                      int startIndex, int stopIndex, List<String> expected) {
+        this(text, grammarId, line, column, message, startIndex, stopIndex, expected, Severity.ERROR);
+    }
+
+    /** An error without offsets. */
     public static Diagnostic at(TextId text, String grammarId, int line, int column, String message) {
         return new Diagnostic(text, grammarId, line, column, message, -1, -1, List.of());
+    }
+
+    /** A warning on a range of the text ({@code stopIndex} inclusive). */
+    public static Diagnostic warning(TextId text, String grammarId, int line, int column, String message,
+                                     int startIndex, int stopIndex) {
+        return new Diagnostic(text, grammarId, line, column, message, startIndex, stopIndex, List.of(), Severity.WARNING);
+    }
+
+    public boolean isError() {
+        return severity == Severity.ERROR;
+    }
+
+    public boolean isWarning() {
+        return severity == Severity.WARNING;
     }
 
     /**

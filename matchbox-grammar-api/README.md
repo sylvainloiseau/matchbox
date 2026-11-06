@@ -1,6 +1,6 @@
 # matchbox-grammar-api
 
-The contract between Matchbox and its grammar plugins (`GrammarPlugin`, `ParseResult`, `ObjectEditor`, `Spans`, `TimeCodes`, `CollectingErrorListener`). No JavaFX.
+The contract between Matchbox and its grammar plugins (`GrammarPlugin`, `ParseResult`, `ParseContext`, `TextParser`, `ObjectEditor`, `Spans`, `TimeCodes`, `CollectingErrorListener`). No JavaFX.
 
 ## What a plugin is
 
@@ -37,5 +37,24 @@ Consequences for plugin authors:
 - if the data is a concept the application knows, implement its capability interface (the `Simple*` classes of `matchbox-corpus` can be reused);
 - otherwise, define a grammar-specific type in the plugin module; a capability is added to `matchbox-corpus` only when an application feature needs it;
 - give the kinds the plugin's id as prefix, and never change the id (it is stored in project files).
+
+## When several plugins read the same text
+
+A file is parsed by the grammars of every file type it matches, **in order** (`Project.getGrammarsForFile`; `TextParser` runs them). The same characters may then be read by several plugins. Each object says what it does to its characters with `CorpusObject.getMatchRole()` (`matchbox-corpus` `MatchRole`):
+
+| Role | Default for | Overlaps |
+|---|---|---|
+| `EXCLUSIVE` | every object (IGT, lexical entry, header, media reference…) | owns its characters |
+| `SCOPE` | `Section` | may contain anything (gives context to what it contains) |
+| `ANNOTATION` | `Tag` | may be written inside anything |
+
+**The rule** (applied by `Text.Builder`, nothing to do in a plugin): an exclusive object of a grammar may not overlap, include or cross an exclusive object of a grammar listed **earlier** for the file. It is then **not kept**, and a *warning* (`Diagnostic.Severity.WARNING`) of the later grammar names the reading that won; the user sees it in the margin (◆), the Parsing errors tab and the Overlaps tab (`Text.conflicts()`, `MatchConflict`). Also reported, but kept: an exclusive child of a scope meeting an earlier claim, a scope crossing an exclusive object of another grammar (a heading inside an IGT block), overlapping objects of one grammar.
+
+The role also sets how objects are drawn and clicked (`Text.layered()`, `Text.objectAt`): scopes underneath (a section is coloured on its heading line only; the margin shows its extent), exclusive objects above, annotations on top; a click selects what is drawn on top.
+
+For plugin authors:
+
+- an object meant to be written inside the objects of other notations (a mark, a reference) must override `getMatchRole()` to return `ANNOTATION`; a region grouping other objects, `SCOPE`;
+- `getResult(TextId, String, ParseContext)` (default: calls `getResult(TextId, String)`) gives the characters already owned by the earlier grammars (`ParseContext.claims()`, `isClaimed(start, stop)`): override it to skip that text, or not to report errors there (a grammar flagging every line it does not understand). The objects meeting a claim are dropped anyway.
 
 How to write a plugin: see the `write-grammar` skill (`.claude/skills/write-grammar/SKILL.md`) and the reference plugins `grammars/matchbox-grammar-notebook` and `grammars/matchbox-grammar-conll`.

@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox.corpus.capability;
 
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
+import fr.cnrs.lacito.matchbox.corpus.MatchRole;
 import java.util.List;
 import java.util.Map;
 
@@ -50,5 +51,11 @@ public interface Section extends CorpusObject {
     @Override
     default List<? extends CorpusObject> getChildren() {
         return getContent();
+    }
+
+    /** A section contains objects of other grammars: it is a scope. */
+    @Override
+    default MatchRole getMatchRole() {
+        return MatchRole.SCOPE;
     }
 }

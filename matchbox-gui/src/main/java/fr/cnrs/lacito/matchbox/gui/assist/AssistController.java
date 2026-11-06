@@ -221,7 +221,8 @@ public final class AssistController {
         PromptPrefix prefix = prefixes.get(grammars, examples(), data().includeGrammarSource());
         TextId id = TextId.of(file);
         List<Diagnostic> errors = project == null ? List.of()
-            : project.getCorpus().text(id).map(Text::diagnostics).orElse(List.of());
+            : project.getCorpus().text(id).map(Text::diagnostics).orElse(List.of())
+                .stream().filter(Diagnostic::isError).toList();
         return new AssistContext(id, text, caret, grammars, errors, prefix);
     }
 

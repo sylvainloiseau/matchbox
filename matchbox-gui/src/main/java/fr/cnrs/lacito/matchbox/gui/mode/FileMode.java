@@ -18,7 +18,10 @@ import fr.cnrs.lacito.matchbox.gui.mode.fileMode.FindBar;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.ShortcutsWindow;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.SpecialCharacterPopup;
 import fr.cnrs.lacito.matchbox.gui.view.ErrorFilter;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.OverlapRows;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.OverlapsPane;
 import fr.cnrs.lacito.matchbox.gui.view.GrammarNames;
+import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.view.Kinds;
 import fr.cnrs.lacito.matchbox.gui.view.ObjectViewRegistry;
 import fr.cnrs.lacito.matchbox.gui.workbench.Focus;
@@ -128,6 +131,9 @@ public class FileMode implements Mode {
     private TableView<Diagnostic> errorTableView;
 
     @FXML
+    private TableColumn<Diagnostic, String> severityColumn;
+
+    @FXML
     private TableColumn<Diagnostic, Number> lineColumn;
 
     @FXML
@@ -142,6 +148,19 @@ public class FileMode implements Mode {
     /** Filters the error table by plugin. */
     @FXML
     private ChoiceBox<ErrorFilter.Choice> errorPluginChoice;
+
+    /** The table also lists warnings (remembered in the editor settings). */
+    @FXML
+    private javafx.scene.control.CheckBox showWarningsCheck;
+
+    @FXML
+    private TabPane bottomTabPane;
+
+    /** Overlapping readings of the whole project. */
+    private OverlapsPane overlapsPane;
+    private Tab overlapsTab;
+    /** True when the corpus changed while the Overlaps tab was not shown. */
+    private boolean overlapsStale = true;
 
     private FilteredList<Diagnostic> filteredErrors;
     /** True while the choices are rebuilt (their selection must not filter yet). */
@@ -226,6 +245,7 @@ public class FileMode implements Mode {
         setupFileListView();
         setupObjectsTab();
         setupErrorTab();
+        setupOverlapsTab();
         setupAssistant();
         setupFocus();
         this.menu = buildMenu();
@@ -474,6 +494,7 @@ public class FileMode implements Mode {
             new SeparatorMenuItem(), zoomIn, zoomOut, actualSize);
         MenuItem shortcuts = item("Keyboard shortcuts", this::showShortcuts);
         MenuItem parse = item("Parse file", this::handleParseText);
+        MenuItem showOverlaps = item("Show overlaps", this::showOverlaps);
         MenuItem suggest = item("Suggest completion (Ctrl+Space)", this::requestCompletion);
         CheckMenuItem inline = new CheckMenuItem("Inline suggestions");
         inline.setSelected(assist.data().inlineEnabled());
@@ -498,7 +519,7 @@ public class FileMode implements Mode {
         removeDirectory.disableProperty().bind(directorySelected.not());
 
         Menu result = new Menu("File Mode", null,
-            search, findNext, findPrevious, replace, goToLine, specialCharacter, parse,
+            search, findNext, findPrevious, replace, goToLine, specialCharacter, parse, showOverlaps,
             new SeparatorMenuItem(),
             lines, editorOptions,
             new SeparatorMenuItem(),
@@ -832,6 +853,37 @@ public class FileMode implements Mode {
     // ------------------------------------------------------------------
 
     private void setupErrorTab() {
+        severityColumn.setCellValueFactory(cellData -> new SimpleStringProperty(ErrorFilter.severityLabel(cellData.getValue())));
+        severityColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String label, boolean empty) {
+                super.updateItem(label, empty);
+                if (empty || label == null) {
+                    setText(null);
+                    setStyle("");
+                    setAccessibleText(null);
+                    return;
+                }
+                boolean warning = "Warning".equals(label);
+                setText((warning ? "◆ " : "● ") + label);
+                setStyle("-fx-text-fill: " + (warning ? "#b07000" : "#d32f2f") + ";");
+                setAccessibleText(label);
+            }
+        });
+        showWarningsCheck.setSelected(!Boolean.FALSE.equals(settings.editorProperty().get().showWarnings()));
+        showWarningsCheck.setTooltip(new Tooltip(
+            "Also list the warnings, e.g. a reading not kept because a grammar listed earlier reads the same text"));
+        showWarningsCheck.selectedProperty().addListener((obs, o, n) -> {
+            if (!n.equals(settings.editorProperty().get().showWarnings())) {
+                settings.editorProperty().set(settings.editorProperty().get().withShowWarnings(n));
+            }
+            applyErrorFilter();
+        });
+        settings.editorProperty().addListener((obs, o, n) -> {
+            if (n != null && n.showWarnings() != null && n.showWarnings() != showWarningsCheck.isSelected()) {
+                showWarningsCheck.setSelected(n.showWarnings());
+            }
+        });
         lineColumn.setCellValueFactory(cellData -> new SimpleIntegerProperty(cellData.getValue().line()));
         charPositionColumn.setCellValueFactory(cellData -> new SimpleIntegerProperty(cellData.getValue().column()));
         messageColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().message()));
@@ -906,9 +958,79 @@ public class FileMode implements Mode {
 
     private void applyErrorFilter() {
         ErrorFilter.Choice choice = errorPluginChoice.getSelectionModel().getSelectedItem();
-        filteredErrors.setPredicate(choice == null ? d -> true : choice::accepts);
+        boolean warnings = showWarningsCheck.isSelected();
+        filteredErrors.setPredicate(d -> (warnings || d.isError()) && (choice == null || choice.accepts(d)));
+        boolean filtered = (choice != null && choice.grammarId() != null)
+            || (!warnings && editorController.getCurrentFileErrors().stream().anyMatch(Diagnostic::isWarning));
         parsingErrorPane.setText(ErrorFilter.tabTitle(filteredErrors.size(),
-            editorController.getCurrentFileErrors().size(), choice != null && choice.grammarId() != null));
+            editorController.getCurrentFileErrors(), filtered));
+    }
+
+    // ------------------------------------------------------------------
+    // Overlaps tab
+    // ------------------------------------------------------------------
+
+    private void setupOverlapsTab() {
+        overlapsPane = new OverlapsPane(this::grammarLabel, this::showBoth);
+        overlapsTab = new Tab(OverlapRows.tabTitle(0), overlapsPane);
+        overlapsTab.setId("overlapsTab");
+        overlapsTab.setTooltip(new Tooltip("Readings of the same text by several grammars, in the whole project"));
+        int errorsIndex = bottomTabPane.getTabs().indexOf(parsingErrorPane);
+        bottomTabPane.getTabs().add(errorsIndex + 1, overlapsTab);
+        overlapsTab.selectedProperty().addListener((obs, o, n) -> {
+            if (n && overlapsStale) refreshOverlaps();
+        });
+        workbench.session().addCorpusListener((id, before, after) -> {
+            boolean changed = before.map(t -> !t.conflicts().isEmpty()).orElse(false)
+                || after.map(t -> !t.conflicts().isEmpty()).orElse(false);
+            if (changed) overlapsChanged();
+        });
+        workbench.session().projectProperty().addListener((obs, o, n) -> overlapsChanged());
+        overlapsChanged();
+    }
+
+    /** "Display name (id)" of a grammar of the project, or installed; the id if unknown. */
+    private String grammarLabel(String grammarId) {
+        List<GrammarPlugin> known = new ArrayList<>();
+        if (project != null) {
+            project.getFileTypes().forEach(t -> known.addAll(t.getGrammars()));
+        }
+        known.addAll(PluginManager.getAvailableGrammars());
+        return GrammarNames.label(grammarId, known);
+    }
+
+    /** The count of the tab follows the corpus; the rows are rebuilt only while the tab is shown. */
+    private void overlapsChanged() {
+        overlapsTab.setText(OverlapRows.tabTitle(OverlapRows.counts(workbench.session().corpus())[0]));
+        overlapsStale = true;
+        if (overlapsTab.isSelected()) refreshOverlaps();
+    }
+
+    private void refreshOverlaps() {
+        overlapsPane.refresh(workbench.session().corpus());
+        overlapsStale = false;
+    }
+
+    /** Shows the Overlaps tab (File Mode menu). */
+    public void showOverlaps() {
+        bottomTabPane.getSelectionModel().select(overlapsTab);
+        if (overlapsStale) refreshOverlaps();
+        overlapsPane.table().requestFocus();
+        if (overlapsPane.table().getSelectionModel().isEmpty() && !overlapsPane.table().getItems().isEmpty()) {
+            overlapsPane.table().getSelectionModel().select(0);
+        }
+    }
+
+    /** Shows both readings of an overlap: selects the one kept, outlines the other. */
+    void showBoth(OverlapRows.Row row) {
+        workbench.navigator().showInEditor(Focus.of(row.selected()));
+        var outlined = row.outlined();
+        editorController.outline(new int[] {outlined.startIndex(), outlined.stopIndex() + 1});
+    }
+
+    /** The Overlaps view (for tests). */
+    public OverlapsPane overlapsPane() {
+        return overlapsPane;
     }
 
     // ------------------------------------------------------------------

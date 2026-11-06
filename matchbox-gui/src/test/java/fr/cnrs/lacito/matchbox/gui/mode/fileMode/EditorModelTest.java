@@ -136,6 +136,22 @@ class EditorModelTest {
     }
 
     @Test
+    void warningsAreMarkedApartAndErrorsWin() {
+        TextId id = TextId.of(Path.of("a.txt"));
+        LineIndex index = new LineIndex("l0\nl1\nl2");
+        Diagnostic warning = Diagnostic.warning(id, "g", 2, 0, "Not kept", 3, 4);
+        Diagnostic error = new Diagnostic(id, "g", 3, 0, "unexpected", 6, 6, List.of());
+        Diagnostic warningOnErrorLine = Diagnostic.warning(id, "g", 3, 0, "Not kept either", 6, 7);
+        Map<Integer, GutterLayout.Markers> m = GutterLayout.markers(index, List.of(), List.of(),
+            List.of(warning, error, warningOnErrorLine));
+        assertTrue(m.get(1).warningOnly());
+        assertTrue(m.get(1).errors().isEmpty());
+        assertEquals(List.of(warning), m.get(1).warnings());
+        assertFalse(m.get(2).warningOnly());
+        assertEquals(List.of("unexpected", "Not kept either"), m.get(2).messages());
+    }
+
+    @Test
     void caretMemoryIsClampedToTheCurrentLength() {
         CaretMemory memory = new CaretMemory();
         TextId id = TextId.of(Path.of("a.txt"));
