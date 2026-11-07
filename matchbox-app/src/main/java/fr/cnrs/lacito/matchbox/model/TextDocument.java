@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
+import fr.cnrs.lacito.matchbox.corpus.EditRebase;
+import java.util.Optional;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
 
@@ -39,8 +42,15 @@ import javafx.beans.property.ReadOnlyBooleanWrapper;
  */
 public class TextDocument {
 
+    /**
+     * Source of the versions of all the documents: a version names one state of one document,
+     * even across documents and a file removed and added again.
+     */
+    private static final AtomicLong VERSIONS = new AtomicLong();
+
     private volatile String content;
-    private volatile long version;
+    private volatile long version = VERSIONS.incrementAndGet();
+    private final ChangeLog changeLog = new ChangeLog();
     /** The text as last read or written: the document is dirty when it differs. */
     private String savedContent;
     private final Path filePath;
@@ -111,9 +121,95 @@ public class TextDocument {
         return content;
     }
 
-    /** Incremented at each change of the text; used to discard results of outdated parses. */
+    /**
+     * Changed at each change of the text; used to discard results of outdated parses and to move
+     * edits computed against an earlier version ({@link #rebase}). Unique across all documents;
+     * only equality is meaningful.
+     */
     public long getVersion() {
         return version;
+    }
+
+    /**
+     * The changes made since {@code version}, oldest first (an empty list for the current
+     * version); empty if {@code version} is not a version of this document or its changes were
+     * forgotten (at most {@link ChangeLog#CAPACITY} changes are kept).
+     */
+    public Optional<List<DocumentChange>> changesSince(long version) {
+        return changeLog.since(version, this.version);
+    }
+
+    /** Result of {@link #rebase}. */
+    public sealed interface Rebased {
+        /** The edits, relative to the current text, in the order given. */
+        record Moved(List<TextEdit> edits) implements Rebased {}
+
+        /** An edit meets characters changed since the version; {@code line} (1-based, current text) of the change. */
+        record Conflict(int line) implements Rebased {}
+
+        /** The changes since the version are not known. */
+        record Unknown() implements Rebased {}
+    }
+
+    /**
+     * Moves edits computed against version {@code version} of this document, whose text was
+     * {@code textAtVersion}, to the current text: through the net change since then
+     * ({@link EditRebase#compose}), by position only. Typing inside an edit's range and undoing it
+     * is no conflict. Read from the thread that changes the document.
+     */
+    public Rebased rebase(List<TextEdit> edits, long version, String textAtVersion) {
+        Optional<List<DocumentChange>> since = changesSince(version);
+        if (since.isEmpty()) {
+            return new Rebased.Unknown();
+        }
+        if (since.get().isEmpty()) {
+            return new Rebased.Moved(List.copyOf(edits));
+        }
+        List<TextEdit> net;
+        try {
+            net = EditRebase.compose(textAtVersion, since.get().stream().map(DocumentChange::edits).toList());
+            if (!TextEdit.applyAll(textAtVersion, net).equals(content)) {
+                return new Rebased.Unknown();
+            }
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // textAtVersion was not the text of that version
+            return new Rebased.Unknown();
+        }
+        return switch (EditRebase.rebase(edits, List.of(net))) {
+            case EditRebase.Result.Moved m -> new Rebased.Moved(m.edits());
+            case EditRebase.Result.Conflict c -> {
+                String current = content;
+                int at = EditRebase.offset(c.change().start(), EditRebase.Bias.BEFORE, List.of(net));
+                yield new Rebased.Conflict(lineOf(current, Math.min(at, current.length())));
+            }
+        };
+    }
+
+    /**
+     * An offset of version {@code from} moved to version {@code to} (a later version of this
+     * document, or the current one); empty if the changes between them are not known.
+     */
+    public java.util.OptionalInt moveOffset(int offset, EditRebase.Bias bias, long from, long to) {
+        Optional<List<DocumentChange>> since = changesSince(from);
+        if (since.isEmpty()) {
+            return java.util.OptionalInt.empty();
+        }
+        List<List<TextEdit>> changes = new ArrayList<>();
+        boolean reached = from == to;
+        for (DocumentChange c : since.get()) {
+            if (reached) break;
+            changes.add(c.edits());
+            reached = c.versionAfter() == to;
+        }
+        return reached ? java.util.OptionalInt.of(EditRebase.offset(offset, bias, changes)) : java.util.OptionalInt.empty();
+    }
+
+    private static int lineOf(String text, int offset) {
+        int line = 1;
+        for (int i = 0; i < offset; i++) {
+            if (text.charAt(i) == '\n') line++;
+        }
+        return line;
     }
 
     // ------------------------------------------------------------------
@@ -191,10 +287,11 @@ public class TextDocument {
     private void commit(String newContent, List<TextEdit> sortedEdits, EditOrigin origin) {
         long versionBefore = version;
         content = newContent;
-        version = versionBefore + 1;
+        version = VERSIONS.incrementAndGet();
         couldBeWritten.set(!isSaved());
         couldBeReParsed.set(true);
         DocumentChange change = new DocumentChange(this, sortedEdits, origin, versionBefore, version);
+        changeLog.record(change);
         for (DocumentListener l : listeners) {
             l.changed(change);
         }

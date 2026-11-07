@@ -26,7 +26,15 @@ public final class TextParser {
      * result) contributes an internal-error diagnostic and no object.
      */
     public static Text parse(TextId id, String content, List<? extends GrammarPlugin> grammars) {
-        Text.Builder builder = Text.builder(id, content);
+        return parse(id, content, Text.UNKNOWN_VERSION, grammars);
+    }
+
+    /**
+     * Same as {@link #parse(TextId, String, List)}, for {@code content} taken from version
+     * {@code version} of its document ({@link Text#version()}).
+     */
+    public static Text parse(TextId id, String content, long version, List<? extends GrammarPlugin> grammars) {
+        Text.Builder builder = Text.builder(id, content).version(version);
         for (GrammarPlugin plugin : grammars) {
             ParseResult result;
             try {

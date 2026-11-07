@@ -119,6 +119,18 @@ class ProjectParseTest {
     }
 
     @Test
+    void theParsedTextCarriesTheVersionOfItsDocument(@TempDir Path dir) throws Exception {
+        Path file = Files.writeString(dir.resolve("a.txt"), "hello");
+        Project project = Project.createDefaultProject(List.of(new WholeTextGrammar()));
+        project.addFile(file);
+        TextDocument document = project.document(TextId.of(file)).orElseThrow();
+        assertEquals(document.getVersion(), project.getCorpus().text(TextId.of(file)).orElseThrow().version());
+        type(project, file, "changed");
+        project.parsePath(file);
+        assertEquals(document.getVersion(), project.getCorpus().text(TextId.of(file)).orElseThrow().version());
+    }
+
+    @Test
     void nonTypingChangesAreParsedAtOnce(@TempDir Path dir) throws Exception {
         Path file = Files.writeString(dir.resolve("a.txt"), "hello");
         Project project = Project.createDefaultProject(List.of(new WholeTextGrammar()));

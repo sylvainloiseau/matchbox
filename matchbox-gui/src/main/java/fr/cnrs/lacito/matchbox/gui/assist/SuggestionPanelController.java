@@ -19,6 +19,8 @@ import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.view.GrammarNames;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.EditorController;
+import fr.cnrs.lacito.matchbox.model.TextDocument;
+import java.util.logging.Logger;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -99,14 +101,26 @@ public final class SuggestionPanelController {
     /** Errors already explained, by suggestion id. */
     private final Set<String> explained = new HashSet<>();
     private List<ReviewResult.ReviewEdit> lastRejected = List.of();
+    /** The text the rejected review edits were computed against. */
+    private Snapshot lastRejectedAt;
+    /** The text each explanation (by error key) was computed against. */
+    private final Map<String, Snapshot> explanationsAt = new HashMap<>();
+
+    private static final Logger logger = Logger.getLogger(SuggestionPanelController.class.getName());
+
+    /**
+     * A text of the displayed document and its version, taken when a request is made: the edits
+     * received later are moved from it to the current text ({@link TextDocument#rebase}).
+     */
+    private record Snapshot(String text, long version) {}
 
     public SuggestionPanelController(EditorController editor, AssistController assist) {
         this.editor = editor;
         this.assist = assist;
         buildUi();
         editor.getCurrentFileErrors().addListener((ListChangeListener<Diagnostic>) c -> rebuildFromErrors());
-        editor.userChanges().subscribe(change -> relocateAll(change.getPosition(), change.getRemoved().length(),
-            change.getInserted().length()));
+        // every change of the displayed document moves the suggestions (typing, views, undo…)
+        editor.documentChanges().subscribe(change -> relocateAll(change.edits(), change.document().getCurrentText()));
     }
 
     public Node getRoot() {
@@ -185,6 +199,7 @@ public final class SuggestionPanelController {
             items.clear();
             dismissed.clear();
             explanations.clear();
+            explanationsAt.clear();
             explained.clear();
             lastRejected = List.of();
             setStatus("");
@@ -210,7 +225,8 @@ public final class SuggestionPanelController {
                 expectedText(grammars, error), List.of(), Optional.of(error), Status.ACTIVE, "");
             Explanation known = explanations.get(key);
             if (known != null) {
-                s = withExplanation(s, known, text);
+                s = withExplanation(s, known, explanationsAt.getOrDefault(key, new Snapshot(text,
+                    fr.cnrs.lacito.matchbox.corpus.Text.UNKNOWN_VERSION)));
                 explained.add(id);
             }
             added.add(s);
@@ -237,6 +253,7 @@ public final class SuggestionPanelController {
 
     private void computeGrammarFixes(Path current, String text, List<GrammarPlugin> grammars, List<Diagnostic> errors,
                                      long gen) {
+        Snapshot at = snapshot(text);
         int n = 0;
         for (Diagnostic error : errors) {
             if (n++ == MAX_ERRORS_WITH_FIXES) break;
@@ -248,8 +265,7 @@ public final class SuggestionPanelController {
                 if (dismissed.contains(id)) continue;
                 FxAssist.onFx(assist.validator().checkAsync(fr.cnrs.lacito.matchbox.corpus.TextId.of(current), text, List.of(fix.edit()), grammars), result -> {
                     if (gen != generation || !result.accepted() || result.fixedErrors() == 0) return;
-                    String now = editor.getFileContentArea().getText();
-                    Optional<TextEdit> edit = Relocation.find(fix.edit(), now);
+                    Optional<TextEdit> edit = place(fix.edit(), at);
                     if (edit.isEmpty() || items.stream().anyMatch(s -> s.id().equals(id))) return;
                     items.add(new Suggestion(id, Source.GRAMMAR_FIX, edit.get().start(), edit.get().end(), fix.title(),
                         "For: " + error.message(), List.of(edit.get()), Optional.of(error), Status.ACTIVE,
@@ -263,13 +279,51 @@ public final class SuggestionPanelController {
     // Following the text
     // ------------------------------------------------------------------
 
-    private void relocateAll(int position, int removed, int inserted) {
+    private void relocateAll(List<TextEdit> change, String text) {
         if (items.isEmpty()) return;
-        String text = editor.getFileContentArea().getText();
-        List<Suggestion> moved = items.stream().map(s -> s.relocated(position, removed, inserted, text)).toList();
+        List<Suggestion> moved = items.stream().map(s -> s.relocated(change, text)).toList();
         if (!moved.equals(items)) {
             items.setAll(moved);
         }
+    }
+
+    /** The displayed text and its version; the version is unknown if {@code text} is not the document's text. */
+    private Snapshot snapshot(String text) {
+        long version = editor.getSelectedDocument()
+            .filter(d -> d.getCurrentText().equals(text))
+            .map(TextDocument::getVersion)
+            .orElse(fr.cnrs.lacito.matchbox.corpus.Text.UNKNOWN_VERSION);
+        return new Snapshot(text, version);
+    }
+
+    /**
+     * An edit computed against {@code at}, in the current text of the displayed document: moved
+     * through the changes made since; empty if they changed its characters. Only when they are not
+     * known is the text searched (unique copy near its old place).
+     */
+    private Optional<TextEdit> place(TextEdit edit, Snapshot at) {
+        Optional<TextDocument> document = editor.getSelectedDocument();
+        if (document.isEmpty()) return Optional.empty();
+        TextDocument d = document.get();
+        if (at.version() != fr.cnrs.lacito.matchbox.corpus.Text.UNKNOWN_VERSION) {
+            switch (d.rebase(List.of(edit), at.version(), at.text())) {
+                case TextDocument.Rebased.Moved m -> {
+                    return Optional.of(m.edits().get(0)).filter(e -> e.matches(d.getCurrentText()));
+                }
+                case TextDocument.Rebased.Conflict c -> {
+                    return Optional.empty();
+                }
+                case TextDocument.Rebased.Unknown u -> {
+                    // searched below
+                }
+            }
+        }
+        String now = d.getCurrentText();
+        if (at.text().equals(now)) {
+            return Optional.of(edit).filter(e -> e.matches(now));
+        }
+        logger.info(() -> "No history of " + d.getId() + " since the request: suggestion searched in the text");
+        return Relocation.find(edit, now);
     }
 
     private void replace(Suggestion updated) {
@@ -295,16 +349,14 @@ public final class SuggestionPanelController {
 
     void apply(Suggestion s) {
         if (!s.hasEdits() || s.status() == Status.OUTDATED) return;
+        // suggestions follow every change of the document: their edits are up to date
         String text = editor.currentText();
-        List<TextEdit> edits = new ArrayList<>();
-        for (TextEdit e : s.edits()) {
-            Optional<TextEdit> found = Relocation.find(e, text);
-            if (found.isEmpty()) {
-                replace(s.withStatus(Status.OUTDATED));
-                setStatus("The text changed: this suggestion no longer applies.");
-                return;
-            }
-            edits.add(found.get());
+        List<TextEdit> edits = s.edits();
+        if (!edits.stream().allMatch(e -> e.matches(text))) {
+            logger.warning(() -> "A suggestion no longer matches the text: " + s);
+            replace(s.withStatus(Status.OUTDATED));
+            setStatus("The text changed: this suggestion no longer applies.");
+            return;
         }
         items.removeIf(x -> x.id().equals(s.id()));
         if (editor.applyEdits(edits)) {
@@ -333,14 +385,15 @@ public final class SuggestionPanelController {
         String text = editor.currentText();
         AssistContext ctx = assist.context(editor.getSelectedFilePath(), text, editor.getFileContentArea().getCaretPosition());
         String key = errorKey(s.error().get(), text);
+        Snapshot at = snapshot(text);
         explaining.add(s.id());
         list.refresh();
         FxAssist.onFx(service.get().explain(ctx, s.error().get()), explanation -> {
             explaining.remove(s.id());
             explained.add(s.id());
             explanations.put(key, explanation);
-            byId(s.id()).ifPresent(current ->
-                replace(withExplanation(current, explanation, editor.getFileContentArea().getText())));
+            explanationsAt.put(key, at);
+            byId(s.id()).ifPresent(current -> replace(withExplanation(current, explanation, at)));
             list.refresh();
         }, error -> {
             explaining.remove(s.id());
@@ -349,10 +402,10 @@ public final class SuggestionPanelController {
         });
     }
 
-    private static Suggestion withExplanation(Suggestion s, Explanation e, String text) {
+    private Suggestion withExplanation(Suggestion s, Explanation e, Snapshot at) {
         Suggestion updated = s.withDetail(e.text()).withNote(e.note());
         if (e.fix().isPresent()) {
-            Optional<TextEdit> fix = Relocation.find(e.fix().get(), text);
+            Optional<TextEdit> fix = place(e.fix().get(), at);
             if (fix.isPresent()) {
                 updated = updated.withEdits(List.of(fix.get()));
             }
@@ -453,6 +506,7 @@ public final class SuggestionPanelController {
             return;
         }
         Path reviewed = editor.getSelectedFilePath();
+        Snapshot at = snapshot(text);
         AssistContext ctx = assist.context(reviewed, text, editor.getFileContentArea().getCaretPosition());
         List<int[]> chunks = Paragraphs.chunks(text, start, end, REVIEW_CHUNK);
         reviewButton.setDisable(true);
@@ -468,15 +522,14 @@ public final class SuggestionPanelController {
         FxAssist.onFx(all, results -> {
             reviewButton.setDisable(false);
             if (!reviewed.equals(editor.getSelectedFilePath())) return;
-            showReview(results);
+            showReview(results, at);
         }, error -> {
             reviewButton.setDisable(false);
             setStatus("Review failed: " + FxAssist.message(error));
         });
     }
 
-    private void showReview(List<ReviewResult> results) {
-        String now = editor.getFileContentArea().getText();
+    private void showReview(List<ReviewResult> results, Snapshot at) {
         int added = 0;
         int unlocated = 0;
         List<ReviewResult.ReviewEdit> rejected = new ArrayList<>();
@@ -484,13 +537,14 @@ public final class SuggestionPanelController {
             unlocated += r.unlocated();
             rejected.addAll(r.rejected());
             for (ReviewResult.ReviewEdit e : r.accepted()) {
-                if (addReviewEdit(e, now, e.fixedErrors() > 0 ? "Fixes " + e.fixedErrors() + " parse error(s)" : "")) {
+                if (addReviewEdit(e, at, e.fixedErrors() > 0 ? "Fixes " + e.fixedErrors() + " parse error(s)" : "")) {
                     added++;
                 }
             }
         }
         aiChip.setSelected(true);
         lastRejected = rejected;
+        lastRejectedAt = at;
         StringBuilder msg = new StringBuilder(added == 0 ? "No correction proposed for this passage." :
             added + " correction" + (added > 1 ? "s" : "") + " proposed.");
         if (unlocated > 0) {
@@ -503,8 +557,8 @@ public final class SuggestionPanelController {
         showAnyway.setVisible(!rejected.isEmpty());
     }
 
-    private boolean addReviewEdit(ReviewResult.ReviewEdit e, String text, String note) {
-        Optional<TextEdit> edit = Relocation.find(e.edit(), text);
+    private boolean addReviewEdit(ReviewResult.ReviewEdit e, Snapshot at, String note) {
+        Optional<TextEdit> edit = place(e.edit(), at);
         if (edit.isEmpty()) return false;
         String kind = e.kind().isEmpty() ? "Correction" : Character.toUpperCase(e.kind().charAt(0)) + e.kind().substring(1);
         items.add(new Suggestion("ai:" + (nextId++), Source.AI, edit.get().start(), edit.get().end(), kind,
@@ -513,9 +567,8 @@ public final class SuggestionPanelController {
     }
 
     private void showRejected() {
-        String text = editor.getFileContentArea().getText();
         for (ReviewResult.ReviewEdit e : lastRejected) {
-            addReviewEdit(e, text, "⚠ Would introduce parse errors");
+            addReviewEdit(e, lastRejectedAt, "⚠ Would introduce parse errors");
         }
         lastRejected = List.of();
         setStatus("");

@@ -45,11 +45,11 @@ public final class SelectionTracker {
         CorpusObject previous = selected.get();
         Optional<Text> text = corpus.text(id);
         if (previous != null && previous.getTextCoordinate().text().equals(id) && corpus.textOf(previous).isEmpty()) {
-            selected.set(text.flatMap(t -> ObjectSuccessor.find(t, previous, hints.lastEditOffset(id))).orElse(null));
+            selected.set(text.flatMap(t -> ObjectSuccessor.find(t, previous, hints.lastEditOffset(t))).orElse(null));
         }
         if (takePending) {
-            hints.takePendingSelection(id).ifPresent(offset ->
-                text.flatMap(t -> t.objectAt(offset)).ifPresent(selected::set));
+            text.ifPresent(t -> hints.takePendingSelection(t).ifPresent(offset ->
+                t.objectAt(offset).ifPresent(selected::set)));
         }
     }
 }

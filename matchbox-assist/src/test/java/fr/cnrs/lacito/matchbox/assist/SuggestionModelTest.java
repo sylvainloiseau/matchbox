@@ -29,21 +29,20 @@ class SuggestionModelTest {
     }
 
     @Test
-    void relocationShiftsKeepsOrSearches() {
+    void relocationAcceptsOnlyAUniqueNearbyCopy() {
         String text = "one two three";
         TextEdit edit = TextEdit.replace(text, 4, 7, "2");
-        // insertion before
-        String t1 = "xx" + text;
-        assertEquals(Optional.of(edit.shifted(2)), Relocation.relocate(edit, 0, 0, 2, t1));
-        // change after
-        String t2 = text + "!";
-        assertEquals(Optional.of(edit), Relocation.relocate(edit, 13, 0, 1, t2));
-        // overlapping change that keeps the original nearby
-        String t3 = "one  two three";
-        assertEquals(5, Relocation.relocate(edit, 3, 1, 2, t3).orElseThrow().start());
-        // overlapping change that destroys it
-        String t4 = "one tw three";
-        assertTrue(Relocation.relocate(edit, 6, 1, 0, t4).isEmpty());
+        assertEquals(Optional.of(edit), Relocation.find(edit, text));
+        assertEquals(6, Relocation.find(edit, "xx" + text).orElseThrow().start());
+        // two copies: never a guess, even at the old offset
+        assertTrue(Relocation.find(edit, "one two two three").isEmpty());
+        // gone
+        assertTrue(Relocation.find(edit, "one tw three").isEmpty());
+        // too far
+        assertTrue(Relocation.find(edit, "x".repeat(400) + text).isEmpty());
+        // an insertion cannot be searched for
+        TextEdit insertion = TextEdit.insert(3, "!");
+        assertTrue(Relocation.find(insertion, text).isEmpty());
     }
 
     @Test
@@ -51,12 +50,28 @@ class SuggestionModelTest {
         String text = "abc [def";
         Suggestion s = new Suggestion("1", Suggestion.Source.GRAMMAR_FIX, 8, 8, "Insert ']'", "",
             List.of(TextEdit.insert(8, "]")), Optional.empty(), Suggestion.Status.ACTIVE, "");
-        Suggestion moved = s.relocated(0, 0, 1, "Xabc [def");
+        Suggestion moved = s.relocated(List.of(TextEdit.insert(0, "X")), "Xabc [def");
         assertEquals(9, moved.start());
         assertEquals(9, moved.edits().get(0).start());
+        // text typed at the same offset: the insertion goes after it
+        assertEquals(9, s.relocated(List.of(TextEdit.insert(8, "!")), "abc [def!").edits().get(0).start());
+        // a change after the range keeps it
+        Suggestion early = new Suggestion("4", Suggestion.Source.AI, 0, 3, "t", "",
+            List.of(TextEdit.replace(text, 0, 3, "ABC")), Optional.empty(), Suggestion.Status.ACTIVE, "");
+        assertEquals(early, early.relocated(List.of(TextEdit.insert(8, "!")), "abc [def!"));
         Suggestion replaced = new Suggestion("2", Suggestion.Source.AI, 0, 3, "t", "",
             List.of(TextEdit.replace(text, 0, 3, "ABC")), Optional.empty(), Suggestion.Status.ACTIVE, "");
-        assertEquals(Suggestion.Status.OUTDATED, replaced.relocated(1, 1, 0, "ac [def").status());
+        assertEquals(Suggestion.Status.OUTDATED,
+            replaced.relocated(List.of(TextEdit.replace(text, 1, 2, "")), "ac [def").status());
+        // a repeated text far before does not confuse it
+        assertEquals(103, replaced.relocated(List.of(TextEdit.insert(0, "abc".repeat(34) + "!")),
+            "abc".repeat(34) + "!" + text).edits().get(0).start());
+        // a suggestion without edits: its range follows
+        Suggestion error = new Suggestion("3", Suggestion.Source.PARSE_ERROR, 4, 5, "e", "",
+            List.of(), Optional.empty(), Suggestion.Status.ACTIVE, "");
+        Suggestion e2 = error.relocated(List.of(TextEdit.insert(0, "zz")), "zz" + text);
+        assertEquals(6, e2.start());
+        assertEquals(7, e2.end());
     }
 
     @Test

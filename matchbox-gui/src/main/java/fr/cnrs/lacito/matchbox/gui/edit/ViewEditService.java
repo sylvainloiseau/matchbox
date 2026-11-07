@@ -19,7 +19,10 @@ import fr.cnrs.lacito.matchbox.settings.UserSettings;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import fr.cnrs.lacito.matchbox.gui.workbench.Focus;
+import fr.cnrs.lacito.matchbox.gui.workbench.StatusLine;
 import java.util.function.Supplier;
 
 /**
@@ -36,11 +39,52 @@ public final class ViewEditService {
     private final EditHints hints;
     private final UserSettings settings;
     private final EditValidator validator = new EditValidator();
+    private final StatusLine status;
+    private final Consumer<Focus> show;
 
     public ViewEditService(Supplier<Project> project, EditHints hints, UserSettings settings) {
+        this(project, hints, settings, null, f -> {});
+    }
+
+    /**
+     * @param status where an edit refused because the user changed its place is reported, with a
+     *               Show link; null: not reported
+     * @param show   shows a place in the editor (the Show link)
+     */
+    public ViewEditService(Supplier<Project> project, EditHints hints, UserSettings settings, StatusLine status,
+                           Consumer<Focus> show) {
         this.project = project;
         this.hints = hints;
         this.settings = settings;
+        this.status = status;
+        this.show = show;
+    }
+
+    /** The outcome of a failed preparation, the conflict reported on the status line. */
+    private EditOutcome failed(ViewEditPlanner.Failed f) {
+        f.conflict().ifPresent(this::report);
+        return f.outcome();
+    }
+
+    private void report(ViewEditPlanner.Conflict c) {
+        if (status == null) return;
+        Project p = project.get();
+        String name = p == null ? c.text().toString()
+            : p.document(c.text()).map(d -> d.getFilePath().getFileName().toString()).orElse(c.text().toString());
+        status.info("Not applied: line " + c.line() + " of " + name + " changed since it was parsed", "Show",
+            () -> p.document(c.text()).ifPresent(d -> show.accept(Focus.at(c.text(),
+                lineStart(d.getCurrentText(), c.line())))));
+    }
+
+    /** Offset of the start of a 1-based line (the end of the text if there are fewer lines). */
+    static int lineStart(String text, int line) {
+        int offset = 0;
+        for (int l = 1; l < line; l++) {
+            int nl = text.indexOf('\n', offset);
+            if (nl < 0) return text.length();
+            offset = nl + 1;
+        }
+        return offset;
     }
 
     private ViewEditPlanner planner() {
@@ -115,8 +159,8 @@ public final class ViewEditService {
             for (ViewEditPlanner.Ready document : ready.documents()) {
                 if (!ok[0] || document.edits().isEmpty()) continue;
                 int offset = document.edits().stream().mapToInt(TextEdit::start).min().orElse(0);
-                hints.lastEdit(document.document().getId(), offset);
                 ok[0] = document.document().applyEdits(document.edits(), EditOrigin.of(EditOrigin.Kind.VIEW, this, description));
+                hints.lastEdit(document.document().getId(), offset, document.document().getVersion());
             }
         });
         if (!ok[0]) {
@@ -177,7 +221,7 @@ public final class ViewEditService {
         }
         // views building their own edits need no fields, only a document that can be written
         return switch (planner().prepare(object, edits)) {
-            case ViewEditPlanner.Failed f -> f.outcome();
+            case ViewEditPlanner.Failed f -> failed(f);
             case ViewEditPlanner.Ready r -> apply(r, description);
         };
     }
@@ -191,10 +235,10 @@ public final class ViewEditService {
             return new EditOutcome.NotEditable("The file " + document.getFilePath() + " cannot be written");
         }
         int offset = ready.edits().stream().mapToInt(TextEdit::start).min().orElse(0);
-        hints.lastEdit(document.getId(), offset);
         if (!document.applyEdits(ready.edits(), EditOrigin.of(EditOrigin.Kind.VIEW, this, description))) {
             return new EditOutcome.Stale("The text changed: parse it again and retry");
         }
+        hints.lastEdit(document.getId(), offset, document.getVersion());
         // the project parses the document again (non-typing change)
         return new EditOutcome.Applied();
     }
@@ -208,11 +252,12 @@ public final class ViewEditService {
             return new EditOutcome.NotEditable("No project");
         }
         return switch (planner().prepare(text, action.edits())) {
-            case ViewEditPlanner.Failed f -> f.outcome();
+            case ViewEditPlanner.Failed f -> failed(f);
             case ViewEditPlanner.Ready r -> {
+                int select = action.selectOffset() >= 0 ? r.moveResultOffset(action.selectOffset()) : -1;
                 EditOutcome outcome = apply(r, action.label());
-                if (outcome.isApplied() && action.selectOffset() >= 0) {
-                    hints.selectAfterParse(text, action.selectOffset());
+                if (outcome.isApplied() && select >= 0) {
+                    hints.selectAfterParse(text, select, r.document().getVersion());
                 }
                 yield outcome;
             }

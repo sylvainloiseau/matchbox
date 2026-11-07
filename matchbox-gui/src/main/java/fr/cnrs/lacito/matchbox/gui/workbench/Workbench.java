@@ -31,7 +31,7 @@ public final class Workbench implements AutoCloseable {
     private final AssistController assist;
     private final Supplier<Window> window;
     private final ProjectSession session;
-    private final EditHints editHints = new EditHints();
+    private final EditHints editHints;
     private final EditJournalView journal;
     private final ViewEditService edits;
     private final SharedMediaPlayers mediaPlayers = new SharedMediaPlayers();
@@ -58,9 +58,16 @@ public final class Workbench implements AutoCloseable {
         this.assist = assist;
         this.window = window;
         this.session = new ProjectSession(applyExecutor);
+        this.editHints = new EditHints((text, offset, from, to) -> {
+            var project = session.project();
+            return project == null ? java.util.OptionalInt.empty()
+                : project.document(text).map(d -> d.moveOffset(offset,
+                    fr.cnrs.lacito.matchbox.corpus.EditRebase.Bias.BEFORE, from, to))
+                    .orElse(java.util.OptionalInt.empty());
+        });
         this.journal = new EditJournalView(session);
-        this.edits = new ViewEditService(session::project, editHints, settings);
         this.navigator = new Navigator(session);
+        this.edits = new ViewEditService(session::project, editHints, settings, status, navigator::showInEditor);
         this.viewRegistry = viewRegistry;
         this.highlightStyles = new HighlightStyles(session, PluginManager::getPluginById);
         this.viewContext = new WorkbenchViewContext(this);

@@ -1,5 +1,6 @@
 package fr.cnrs.lacito.matchbox.assist.suggestion;
 
+import fr.cnrs.lacito.matchbox.corpus.EditRebase;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import java.util.List;
@@ -82,31 +83,29 @@ public record Suggestion(String id, Source source, int start, int end, String ti
     }
 
     /**
-     * This suggestion after a change of the text: its range and edits are relocated, or it is
-     * marked {@link Status#OUTDATED} if an edit cannot be found any more.
+     * This suggestion after a change of the text (edits relative to the text before it, sorted,
+     * non-overlapping): its range and edits are moved by position
+     * ({@link fr.cnrs.lacito.matchbox.corpus.EditRebase}), or it is marked {@link Status#OUTDATED}
+     * if the change touches the characters an edit replaces.
      */
-    public Suggestion relocated(int position, int removed, int inserted, String newText) {
-        if (status == Status.OUTDATED) {
+    public Suggestion relocated(List<TextEdit> change, String newText) {
+        if (status == Status.OUTDATED || change.isEmpty()) {
             return this;
         }
-        int delta = inserted - removed;
-        int newStart = start;
-        int newEnd = end;
-        if (position + removed <= start) {
-            newStart += delta;
-            newEnd += delta;
-        } else if (position < end) {
-            newEnd = Math.max(newStart, newEnd + delta);
-        }
-        List<TextEdit> moved = new java.util.ArrayList<>();
-        for (TextEdit e : edits) {
-            Optional<TextEdit> r = Relocation.relocate(e, position, removed, inserted, newText);
-            if (r.isEmpty()) {
+        List<List<TextEdit>> changes = List.of(change);
+        int newStart = EditRebase.offset(start, EditRebase.Bias.BEFORE, changes);
+        int newEnd = EditRebase.offset(end, EditRebase.Bias.AFTER, changes);
+        List<TextEdit> moved = edits;
+        if (!edits.isEmpty()) {
+            switch (EditRebase.rebase(edits, changes)) {
+                case EditRebase.Result.Conflict c -> {
+                    return withStatus(Status.OUTDATED);
+                }
+                case EditRebase.Result.Moved m -> moved = m.edits();
+            }
+            if (!moved.stream().allMatch(e -> e.matches(newText))) {
                 return withStatus(Status.OUTDATED);
             }
-            moved.add(r.get());
-        }
-        if (!moved.isEmpty()) {
             newStart = moved.stream().mapToInt(TextEdit::start).min().orElse(newStart);
             newEnd = moved.stream().mapToInt(TextEdit::end).max().orElse(newEnd);
         }

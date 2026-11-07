@@ -4,59 +4,38 @@ import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import java.util.Optional;
 
 /**
- * Keeps ranges of a text valid while the text is edited: a range is shifted when the change is
- * before it, kept when the change is after it, and searched for again (by its original text, near
- * its old position) when the change overlaps it.
+ * Last resort to place an edit in a text that changed when the changes made since the edit was
+ * computed are not known (otherwise edits are moved by position with
+ * {@link fr.cnrs.lacito.matchbox.corpus.EditRebase}): the original text of the edit is searched
+ * near its old position, and accepted only if it occurs exactly once there.
  */
 public final class Relocation {
 
-    /** Distance around the old position where an overlapped range is searched for. */
+    /** Distance around the old position where the original text is searched for. */
     static final int SEARCH_RADIUS = 200;
 
     private Relocation() {}
 
     /**
-     * The edit after a change of the text, or empty if it cannot be found any more.
-     *
-     * @param position offset of the change
-     * @param removed  number of characters removed at {@code position}
-     * @param inserted number of characters inserted at {@code position}
-     * @param newText  the text after the change
+     * The edit in a text that may have changed: the only occurrence of its original text within
+     * {@link #SEARCH_RADIUS} characters of its old range; empty if there is none or several, or if
+     * the edit is an insertion (nothing to search for).
      */
-    public static Optional<TextEdit> relocate(TextEdit edit, int position, int removed, int inserted, String newText) {
-        int delta = inserted - removed;
-        if (position + removed <= edit.start()) {
-            // change before the range (an insertion at its start moves it)
-            TextEdit shifted = edit.shifted(delta);
-            return shifted.matches(newText) ? Optional.of(shifted) : search(edit, newText);
-        }
-        if (position >= edit.end()) {
-            // change after the range
-            return edit.matches(newText) ? Optional.of(edit) : search(edit, newText);
-        }
-        return search(edit, newText);
-    }
-
-    /** The edit in a text that may have changed: as is if it still applies, else searched for nearby. */
     public static Optional<TextEdit> find(TextEdit edit, String text) {
-        return edit.matches(text) ? Optional.of(edit) : search(edit, text);
-    }
-
-    /** The occurrence of the original text nearest to the old position, within the search radius. */
-    static Optional<TextEdit> search(TextEdit edit, String text) {
         String original = edit.expectedOriginal();
         if (original.isEmpty()) {
             return Optional.empty();
         }
         int from = Math.max(0, edit.start() - SEARCH_RADIUS);
         int to = Math.min(text.length(), edit.end() + SEARCH_RADIUS);
-        int best = -1;
+        int found = -1;
         for (int i = text.indexOf(original, from); i >= 0 && i + original.length() <= to; i = text.indexOf(original, i + 1)) {
-            if (best < 0 || Math.abs(i - edit.start()) < Math.abs(best - edit.start())) {
-                best = i;
+            if (found >= 0) {
+                return Optional.empty();
             }
+            found = i;
         }
-        return best < 0 ? Optional.empty()
-            : Optional.of(new TextEdit(best, best + original.length(), original, edit.replacement()));
+        return found < 0 ? Optional.empty()
+            : Optional.of(new TextEdit(found, found + original.length(), original, edit.replacement()));
     }
 }

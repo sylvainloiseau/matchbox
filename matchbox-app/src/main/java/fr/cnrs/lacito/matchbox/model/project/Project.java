@@ -317,7 +317,7 @@ public class Project {
      * state.
      */
     private static ParseRun computeParse(TextId id, String text, long version, List<GrammarPlugin> grammars) {
-        return new ParseRun(TextParser.parse(id, text, grammars), version);
+        return new ParseRun(TextParser.parse(id, text, version, grammars), version);
     }
 
     private void applyParse(TextDocument document, ParseRun run) {

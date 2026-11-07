@@ -27,8 +27,12 @@ public final class Text {
 
     private static final Logger logger = Logger.getLogger(Text.class.getName());
 
+    /** {@link #version()} of a text whose document version is not known. */
+    public static final long UNKNOWN_VERSION = -1;
+
     private final TextId id;
     private final String content;
+    private final long version;
     /** grammar id → top-level objects, in rank order. */
     private final Map<String, List<CorpusObject>> objectsByGrammar;
     /** grammar id → diagnostics, in rank order. */
@@ -48,9 +52,10 @@ public final class Text {
     /** Targets of the tags, computed on first use. */
     private volatile TagAttachment tagAttachment;
 
-    private Text(TextId id, String content, Map<String, List<CorpusObject>> objectsByGrammar,
+    private Text(TextId id, String content, long version, Map<String, List<CorpusObject>> objectsByGrammar,
                  Map<String, List<Diagnostic>> diagnosticsByGrammar, List<MatchConflict> conflicts) {
         this.id = id;
+        this.version = version;
         this.conflicts = List.copyOf(conflicts);
         this.content = content;
         this.objectsByGrammar = Collections.unmodifiableMap(objectsByGrammar);
@@ -102,6 +107,15 @@ public final class Text {
     /** The text the spans refer to. */
     public String content() {
         return content;
+    }
+
+    /**
+     * Version of the document the content was taken from, {@link #UNKNOWN_VERSION} if not given.
+     * An opaque number for this module: the application uses it to move edits computed against
+     * this content to the current text of the document.
+     */
+    public long version() {
+        return version;
     }
 
     /** Grammars that produced this snapshot, in rank order. */
@@ -289,6 +303,7 @@ public final class Text {
         private final Map<String, List<CorpusObject>> objects = new LinkedHashMap<>();
         private final Map<String, List<Diagnostic>> diagnostics = new LinkedHashMap<>();
         private final OverlapResolver resolver;
+        private long version = UNKNOWN_VERSION;
 
         private Builder(TextId id, String content) {
             this.id = Objects.requireNonNull(id, "id");
@@ -365,8 +380,14 @@ public final class Text {
             return null;
         }
 
+        /** Version of the document {@code content} was taken from (see {@link Text#version()}). */
+        public Builder version(long version) {
+            this.version = version;
+            return this;
+        }
+
         public Text build() {
-            return new Text(id, content, new LinkedHashMap<>(objects), new LinkedHashMap<>(diagnostics),
+            return new Text(id, content, version, new LinkedHashMap<>(objects), new LinkedHashMap<>(diagnostics),
                 resolver.conflicts());
         }
     }

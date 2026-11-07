@@ -2,6 +2,7 @@ package fr.cnrs.lacito.matchbox.gui.edit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import fr.cnrs.lacito.matchbox.assist.validation.EditValidator;
 import fr.cnrs.lacito.matchbox.corpus.Corpus;
@@ -129,5 +130,94 @@ class ViewEditPlannerTest {
         var unknown = new ViewEditPlanner(new Corpus(), id -> Optional.of(document), d -> List.of(), null)
             .prepare(document.getId(), actions.get(0).edits());
         assertInstanceOf(ViewEditPlanner.Failed.class, unknown);
+    }
+
+    // ------------------------------------------------------------------
+    // Edits moved by history (the parse knows the version of its text)
+    // ------------------------------------------------------------------
+
+    private static final EditOrigin TYPING = EditOrigin.of(EditOrigin.Kind.TYPING, null);
+
+    /** Parses the current text of the document, with its version. */
+    private void parse() {
+        String text = document.getCurrentText();
+        ParseResult r = grammar.getResult(document.getId(), text);
+        corpus.put(Text.builder(document.getId(), text).version(document.getVersion())
+            .add(grammar.getId(), r.objects(), r.diagnostics()).build());
+        igt = corpus.text(document.getId()).orElseThrow().objectsOf(SimpleIGT.class).get(0);
+    }
+
+    private List<TextEdit> setTranslationOfParse(String value) {
+        String content = corpus.text(document.getId()).orElseThrow().content();
+        EditProposal p = grammar.getObjectEditor().setField(igt, InterlinearSentence.FREE_TRANSLATION, value, content);
+        return assertInstanceOf(EditProposal.Edits.class, p).edits();
+    }
+
+    private void type(int offset, String s) {
+        assertTrue(document.applyEdits(List.of(TextEdit.insert(offset, s)), TYPING));
+    }
+
+    @Test
+    void farAwayTypingDoesNotLoseTheEdit() {
+        parse();
+        List<TextEdit> edits = setTranslationOfParse("I went by canoe");
+        type(0, "% " + "long note ".repeat(50) + "\n");
+        var ready = assertInstanceOf(ViewEditPlanner.Ready.class, planner(true).prepare(igt, edits));
+        assertTrue(document.applyEdits(ready.edits(), TYPING));
+        assertTrue(document.getCurrentText().contains("'I went by canoe'"));
+    }
+
+    @Test
+    void aCopyOfTheValueTypedNearbyIsNotPicked() {
+        parse();
+        List<TextEdit> edits = setTranslationOfParse("I went by canoe");
+        int afterIgt = document.getCurrentText().length();
+        // the user types the same translation just before the IGT, and something more after
+        type(TEXT.indexOf(":::"), "'I went down in canoe'\n");
+        type(document.getCurrentText().length(), "end\n");
+        var ready = assertInstanceOf(ViewEditPlanner.Ready.class, planner(true).prepare(igt, edits));
+        assertTrue(document.applyEdits(ready.edits(), TYPING));
+        String now = document.getCurrentText();
+        assertTrue(now.indexOf("'I went down in canoe'") < now.indexOf(":::"), now);
+        assertTrue(now.indexOf("'I went by canoe'") > now.indexOf(":::"), now);
+        assertTrue(afterIgt > 0);
+    }
+
+    @Test
+    void withoutHistoryTwoCopiesAreRefused() {
+        // the parse has no version: the text is searched, and two copies are ambiguous
+        List<TextEdit> edits = setTranslation("I went by canoe");
+        type(TEXT.indexOf(":::"), "'I went down in canoe'\n");
+        var failed = assertInstanceOf(ViewEditPlanner.Failed.class, planner(true).prepare(igt, edits));
+        assertInstanceOf(EditOutcome.Stale.class, failed.outcome());
+    }
+
+    @Test
+    void typingInTheFieldIsAConflictUnlessUndone() {
+        parse();
+        List<TextEdit> edits = setTranslationOfParse("I went by canoe");
+        int at = TEXT.indexOf("went");
+        type(at, "x");
+        var failed = assertInstanceOf(ViewEditPlanner.Failed.class, planner(true).prepare(igt, edits));
+        assertInstanceOf(EditOutcome.Stale.class, failed.outcome());
+        assertTrue(failed.outcome().message().startsWith("You changed line 6"), failed.outcome().message());
+        assertEquals(Optional.of(new ViewEditPlanner.Conflict(document.getId(), 6)), failed.conflict());
+        // deleting the typed character: no net change there
+        assertTrue(document.applyEdits(List.of(TextEdit.replace(document.getCurrentText(), at, at + 1, "")), TYPING));
+        assertInstanceOf(ViewEditPlanner.Ready.class, planner(true).prepare(igt, edits));
+    }
+
+    @Test
+    void anInsertionIsMovedAndItsResultOffsetToo() {
+        parse();
+        int end = TEXT.length();
+        List<TextEdit> insertion = List.of(TextEdit.insert(end, "\n<jaflo> {canoe}\n"));
+        type(0, "% note\n");
+        var ready = assertInstanceOf(ViewEditPlanner.Ready.class,
+            planner(false).prepare(document.getId(), insertion));
+        assertEquals(end + 7, ready.edits().get(0).start());
+        // an offset in the inserted text, and one before every edit
+        assertEquals(end + 7 + 2, ready.moveResultOffset(end + 2));
+        assertEquals(7 + 3, ready.moveResultOffset(3));
     }
 }

@@ -105,6 +105,9 @@ public class EditorController {
     /** Style of the line of a media segment while it plays. */
     private static final DisplayStyle PLAYING_STYLE = DisplayStyle.background("#c8f0c8");
     private final DocumentListener mirror = this::mirror;
+    /** Changes of the displayed document, all origins (typing included), after the editor mirrored them. */
+    private final org.reactfx.EventSource<DocumentChange> documentChanges = new org.reactfx.EventSource<>();
+    private final DocumentListener documentChanged = documentChanges::push;
 
     /** Top-level corpus objects of the current file, grammars in rank order. */
     private final ObservableList<CorpusObject> currentFileObjects = FXCollections.observableArrayList();
@@ -689,9 +692,10 @@ public class EditorController {
         resync();
         textArea.setEditable(true);
         selected.addChangeListener(mirror);
+        selected.addChangeListener(documentChanged);
         refreshFromCorpus();
         // back where the user was in this file
-        Optional<CaretMemory.Place> place = caretMemory.recall(selected.getId(), textArea.getLength());
+        Optional<CaretMemory.Place> place = caretMemory.recall(selected);
         textArea.selectRange(place.map(CaretMemory.Place::anchor).orElse(0), place.map(CaretMemory.Place::caret).orElse(0));
         int firstLine = place.map(CaretMemory.Place::firstVisibleLine).orElse(0);
         Platform.runLater(() -> {
@@ -717,6 +721,7 @@ public class EditorController {
         dismissGhost();
         if (document != null) {
             document.removeChangeListener(mirror);
+            document.removeChangeListener(documentChanged);
             rememberPlace();
         }
         highlightedParagraph = clearCurrentLine();
@@ -750,8 +755,14 @@ public class EditorController {
         } catch (RuntimeException e) {
             // not laid out yet: no visible paragraph
         }
-        caretMemory.remember(document.getId(),
-            new CaretMemory.Place(textArea.getCaretPosition(), textArea.getAnchor(), firstVisible));
+        int firstOffset = -1;
+        try {
+            firstOffset = textArea.getAbsolutePosition(firstVisible, 0);
+        } catch (RuntimeException e) {
+            // no such paragraph
+        }
+        caretMemory.remember(document.getId(), new CaretMemory.Place(textArea.getCaretPosition(), textArea.getAnchor(),
+            firstVisible, firstOffset, document.getVersion()));
     }
 
     public BooleanExpression getCurrentTextCouldBeWrittenDownProperty() {
@@ -844,6 +855,14 @@ public class EditorController {
         if (!ghostOperation) {
             ghostDismisser.run();
         }
+    }
+
+    /**
+     * Changes of the displayed document, whoever made them (typing, views, undo, text actions,
+     * assistant), each as the edits of one {@link DocumentChange}; sent after the editor shows them.
+     */
+    public EventStream<DocumentChange> documentChanges() {
+        return documentChanges;
     }
 
     /** Changes of the real text shown (provisional text excluded), whoever made them. */
