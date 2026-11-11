@@ -17,7 +17,6 @@ otherLine : OTHER_LINE NEWLINE? ;
 paragraph
     : singleLineEntry
     | lexSimpleEntry
-    | igt_paragraph
     ;
 
 lexSimpleEntry
@@ -36,15 +35,7 @@ example
   : START_EX TXT_EX SEP_EX TXT_EX END_EX
   ;
 
-/*
- * ---- Form A: three-line group ----
- */
 
-// three consecutive lines with last line a quoted line
-// Groups separated by optional blank lines
-igt_paragraph
-    : START_IMB IMB_NL IMB_LINE IMB_NL IMB_LINE IMB_NL IMB_QUOTED_LINE IMB_NL END_IMB NEWLINE
-    ;
 
 /*
  * ---- Form C: anything else ----

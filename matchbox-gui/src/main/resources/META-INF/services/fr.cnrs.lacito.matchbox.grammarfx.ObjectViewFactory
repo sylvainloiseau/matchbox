@@ -3,3 +3,4 @@ fr.cnrs.lacito.matchbox.gui.view.InterlinearSentenceViewFactory
 fr.cnrs.lacito.matchbox.gui.view.LexicalEntryViewFactory
 fr.cnrs.lacito.matchbox.gui.view.SectionViewFactory
 fr.cnrs.lacito.matchbox.gui.view.MediaSegmentViewFactory
+fr.cnrs.lacito.matchbox.gui.view.InterlinearGlossedTextViewFactory

@@ -2,6 +2,7 @@ package fr.cnrs.lacito.matchbox.grammar.tag;
 
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.corpus.Field;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
@@ -32,6 +33,9 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 public class TagGrammarPlugin extends AbstractGrammarPlugin {
 
     public static final String ID = "tag-grammar";
+
+    /** Code of the "Empty tag" issue. */
+    public static final String CODE_EMPTY = "tag.empty";
     public static final String KIND_TAG = ID + ":tag";
 
     private static final ObjectEditor EDITOR = new TagObjectEditor();
@@ -79,6 +83,8 @@ public class TagGrammarPlugin extends AbstractGrammarPlugin {
               written in (e.g. a sense, a section), else to the whole text.
             - Avoid tags inside the transcription and gloss lines of an IGT (they break the alignment) and in metadata
               values (` #` starts a YAML comment).
+
+            Semantic issue: `tag.empty`, a tag without keyword (`#""`); fix: delete it.
             """;
     }
 
@@ -126,8 +132,11 @@ public class TagGrammarPlugin extends AbstractGrammarPlugin {
                 String inner = t.getText().substring(2, t.getText().length() - 1);
                 String name = inner.strip();
                 if (name.isEmpty()) {
-                    diagnostics.add(new Diagnostic(text, ID, t.getLine(), t.getCharPositionInLine(),
-                        "Empty tag", t.getStartIndex(), t.getStopIndex(), List.of()));
+                    diagnostics.add(Diagnostic.semantic(text, ID, t.getLine(), t.getCharPositionInLine(),
+                            "Empty tag", t.getStartIndex(), t.getStopIndex(), Diagnostic.Severity.ERROR)
+                        .withCode(CODE_EMPTY)
+                        .withFixes(List.of(new Diagnostic.Fix("Delete the empty tag",
+                            List.of(TextEdit.replace(content, t.getStartIndex(), t.getStopIndex() + 1, ""))))));
                     continue;
                 }
                 int start = t.getStartIndex() + 2 + (inner.length() - inner.stripLeading().length());
@@ -136,7 +145,7 @@ public class TagGrammarPlugin extends AbstractGrammarPlugin {
             }
             diagnostics.addAll(errors.getDiagnostics());
         } catch (RuntimeException e) {
-            diagnostics.add(Diagnostic.at(text, ID, 0, 0, "Internal error of the grammar: " + e));
+            diagnostics.add(Diagnostic.internal(text, ID, 0, "Internal error of the grammar: " + e));
         }
         return new ParseResult(objects, diagnostics);
     }

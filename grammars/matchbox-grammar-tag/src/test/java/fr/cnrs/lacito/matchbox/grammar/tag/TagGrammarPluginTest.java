@@ -1,5 +1,6 @@
 package fr.cnrs.lacito.matchbox.grammar.tag;
 
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import static fr.cnrs.lacito.matchbox.corpus.CorpusAssertions.assertCovers;
 import static fr.cnrs.lacito.matchbox.corpus.CorpusAssertions.assertKindsPrefixed;
 import static fr.cnrs.lacito.matchbox.corpus.CorpusAssertions.assertSpansNested;
@@ -109,5 +110,14 @@ class TagGrammarPluginTest {
             assertTrue(r.diagnostics().isEmpty() && !r.objects().isEmpty(), e.caption());
         }
         assertTrue(plugin.getGrammarSource().contains("lexer grammar TagLexer"));
+    }
+
+    @Test
+    void emptyTagIsASemanticErrorWithADeleteFix() {
+        String text = "a #\"\" b\n";
+        Diagnostic d = plugin.getResult(FILE, text).diagnostics().get(0);
+        assertEquals(Diagnostic.Category.SEMANTIC, d.category());
+        assertEquals(TagGrammarPlugin.CODE_EMPTY, d.code());
+        assertEquals("a  b\n", TextEdit.applyAll(text, d.fixes().get(0).edits()));
     }
 }

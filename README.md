@@ -119,7 +119,59 @@ Parsers exist for the following conventions:
 ```
 ```
 
-### Simple IGT
+### Interlinear glossed text (IGT)
+
+The `igt-grammar` plugin reads interlinear glossed text between two `:::` lines, after the
+[Leipzig Glossing Rules](https://www.eva.mpg.de/lingua/resources/glossing-rules.php) (Comrie,
+Haspelmath, Bickel, 2008); every other line is ignored:
+
+```
+:::{id="1.1", olang="fra", mlang="en", media="O1.WAV", offset="1000"}
+je crois pas qu'elle est assez curieuse
+j'crois pas qu'elle est assez curieuse
+1 90 300 420 610 700
+ʒə=kʁwa pa k=ɛl ɛ ase kyRjø-z
+1SG=believe not COMPL=3SG.F be\3SG.PRES enough curious-FEM
+'I don't think she is curious enough'
+:::
+```
+
+- The lines come in this order: **orthographic lines** (optional: the sentence in a spelling whose
+  words need not match the transcription, not segmented), the **word level** (transcriptions,
+  glosses, at most two timelines), the **morpheme level** (the same, words cut with `-` affix,
+  `=` clitic, `~` reduplication, `<…>` infix), then **translations** between single quotes.
+- Every segmented line has the same number of words; at the morpheme level, each word the same
+  number of morphemes and the same boundaries. Lines that do not agree are marked (◆ in the margin,
+  the Semantic issues tab, a `!` in the IGT view).
+- A **timeline** has only numbers: milliseconds after `offset`; one timeline gives the starts (a
+  word ends where the next starts, the last one at `end`, else at the next IGT), a second the ends.
+- The role of a line is guessed (IPA letters → transcription, labels such as `1SG` → gloss, a leading
+  line with another number of words → orthographic line) or declared with
+  `setting="o@fra,t'IPA'@fra,g@en"` (`o` orthographic, `t` transcription, `g` gloss).
+- `setting`, `olang`, `mlang`, `form`, `gloss` and `media` are **inherited**: a key an IGT does not
+  give is taken from the previous IGTs, then from the enclosing sections, then from the file header.
+- `form="2"` / `gloss="3"` (a line number or a line name of the setting) choose the lines compared
+  with the context dictionary.
+- `::: note` and `::: {.class}` are Pandoc divs, not IGTs. Tags written at the end of a line of an IGT
+  apply to the IGT.
+
+The **view** of an IGT shows its metadata (inherited values with their source), the orthographic
+lines, the words in a grid (word level and morpheme level aligned in columns, ▶ to play a word,
+a cell edits its word: a word that does not fit its column is not written without asking), and the
+translations. The ✚ menu of the first line offers Format IGT (align the columns), Insert word,
+Add metadata block, Declare line roles, Number the IGTs of this file.
+
+**Gloss check** (Current project › Project properties… › Gloss check): the grammatical labels of the
+glosses are checked against the Leipzig list, Christian Lehmann's list of
+[grammatical category labels](https://christianlehmann.eu/includes/gramm_category_labels.inc), both
+or none, plus the project's own labels; with a **context dictionary** (a LIFT file, Project
+properties › Inherited context), each (form, lexical gloss) pair of the morpheme level is looked up:
+a form missing from the dictionary, or without a sense with that gloss, is reported with a fix,
+"Declare this form", which writes `p /form/gloss` above the IGT (a notation that will be read later).
+Current project › Reload context dictionary reads the file again.
+
+The notebook grammar no longer reads `:::` blocks: a project whose file types use it gets the IGT
+grammar added when it is opened (saved with the project).
 
 ### Text title and reference
 
@@ -213,6 +265,7 @@ The `tag-grammar` plugin reads inline tags, anywhere in a line, several per line
 
 - Scroll bars, line numbers in the margin (File Mode › Editor › Show line numbers), and **Wrap lines** for long lines; the font size changes with ⌘= / ⌘− / ⌘0 (Ctrl elsewhere). These options, the font family, the highlight of the current line, invisible characters (tabs and trailing spaces tinted) and auto-indentation are also in Settings › Editor, and apply to every file.
 - The margin has the same width on every line, so columns stay aligned: line number, then ▶ (play the media segment of the line), ✚ (actions offered by plugins, e.g. Add header) a red ● on lines with parse errors and an amber ◆ on lines with warnings (point at it for the message; for a reading not kept, the text it covered is outlined). Marks beside the scroll bar show where the errors (red) and warnings (amber) are in the whole file; click one to go there. A thin blue band in the margin shows the lines of the section containing the cursor: sections are coloured on their heading only, so that the objects inside keep their own colours. The Parsing errors tab lists errors and, unless "Show warnings" is unchecked, warnings.
+- **Problems**: the **Parsing errors** tab lists what does not follow a notation; the **Semantic issues** tab what follows it but is wrong or doubtful (a media range ending before it starts, an empty tag, a metadata key given twice, a CoNLL head outside its sentence). Check **All files** to list the problems of the whole project and go through them: Enter (or a double-click) opens the file at the problem, ◀ ▶ go to the previous / next one, Back returns. When a correction is obvious a **Fix** button applies it (also in the ✚ menu of the line, and ⌘. / Ctrl+. at the caret), as one change you can undo. F8 / Shift+F8 go to the next / previous problem of the file, Alt+F8 / Alt+Shift+F8 of the project. Export… writes the list as a CSV file.
 - Keys follow your system. macOS: ⌘← / ⌘→ start / end of line, ⌘↑ / ⌘↓ start / end of file, ⌥← / ⌥→ by word, ⌘⌫ delete to the start of the line, ⌥⌫ delete a word. Windows / Linux: Home / End, Ctrl+Home / Ctrl+End, Ctrl+← / Ctrl+→. Add Shift to select. Home goes to the first non-blank character, then to column 1; Enter keeps the indentation of the line.
 - **Find** (⌘F) opens a bar above the text: match case, whole word, regular expression, number of matches, Enter / ⇧Enter or ⌘G / ⇧⌘G for the next / previous one; **Replace** (⌥⌘F, Ctrl+H elsewhere) and Replace all (one undo step). **Go to line** (⌘L, or click "Ln, Col" above the text). **Lines**: duplicate (⌘D), delete (⇧⌘K), move up / down (⌥↑ / ⌥↓). **Insert special character…** (⇧⌘I): IPA letters, diacritics, tones…, searchable by name ("glottal", "tilde"), recently used first.
 - Coming back to a file puts you where you were. File Mode › Keyboard shortcuts lists all the shortcuts.

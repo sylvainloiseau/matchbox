@@ -77,6 +77,8 @@ public class Project {
 
     /** A LIFT dictionary the lexical information of the project is added to (null: none). */
     private Path contextDictionary;
+    private fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings glossCheck =
+        fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings.defaults();
     /** A Matchbox corpus the data of the project is added to (null: none). */
     private Path contextCorpus;
 
@@ -366,6 +368,18 @@ public class Project {
     public void setContextDictionary(Path dictionary) {
         if (!Objects.equals(dictionary, contextDictionary)) {
             this.contextDictionary = dictionary;
+            markDefinitionChanged();
+        }
+    }
+
+    /** The gloss check of the project (label list, own labels, dictionary check). */
+    public fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings getGlossCheck() {
+        return glossCheck;
+    }
+
+    public void setGlossCheck(fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings settings) {
+        if (!Objects.equals(settings, glossCheck)) {
+            this.glossCheck = Objects.requireNonNull(settings);
             markDefinitionChanged();
         }
     }
@@ -690,6 +704,19 @@ public class Project {
     void recordLoadProblem(String message) {
         logger.warning(message);
         loadProblems.add(message);
+    }
+
+    private final List<String> loadNotes = new ArrayList<>();
+
+    /** A change made to the definition when it was loaded (e.g. a migration), to tell the user. */
+    void recordLoadNote(String message) {
+        logger.info(message);
+        loadNotes.add(message);
+    }
+
+    /** Changes made to the definition when it was loaded (shown on the status line); empty for most projects. */
+    public List<String> getLoadNotes() {
+        return List.copyOf(loadNotes);
     }
 
     /**

@@ -1,5 +1,7 @@
 package fr.cnrs.lacito.matchbox.grammar.markdownheading;
 
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import static fr.cnrs.lacito.matchbox.corpus.CorpusAssertions.assertCovers;
 import static fr.cnrs.lacito.matchbox.corpus.CorpusAssertions.assertKindsPrefixed;
 import static fr.cnrs.lacito.matchbox.corpus.CorpusAssertions.assertSpansNested;
@@ -282,5 +284,28 @@ class MarkdownHeadingGrammarPluginTest {
         assertTrue(actions.actionsFor(with, null).isEmpty());
         Text otherGrammar = Text.builder(FILE, text).add("other", List.<CorpusObject>of(), List.of()).build();
         assertTrue(actions.actionsFor(otherGrammar, null).isEmpty());
+    }
+
+    @Test
+    void duplicateKeyIsASemanticWarningFixedByRemovingTheEarlierLine() {
+        String text = "---\ndate: 2024\ntitle: T\ndate: 2025\n---\nbody\n";
+        ParseResult r = parse(text);
+        Diagnostic d = r.diagnostics().get(0);
+        assertEquals(Diagnostic.Category.SEMANTIC, d.category());
+        assertTrue(d.isWarning());
+        assertEquals(MarkdownHeadingGrammarPlugin.CODE_DUPLICATE_KEY, d.code());
+        assertEquals(4, d.line());
+        Diagnostic.Fix fix = d.fixes().get(0);
+        assertEquals("Remove the earlier 'date' line (line 2)", fix.label());
+        String fixed = TextEdit.applyAll(text, fix.edits());
+        assertEquals("---\ntitle: T\ndate: 2025\n---\nbody\n", fixed);
+        assertTrue(parse(fixed).diagnostics().isEmpty());
+    }
+
+    @Test
+    void unsupportedNotationStaysSyntax() {
+        Diagnostic d = parse("---\n- item\n---\n").diagnostics().get(0);
+        assertEquals(Diagnostic.Category.SYNTAX, d.category());
+        assertEquals(MarkdownHeadingGrammarPlugin.CODE_UNSUPPORTED, d.code());
     }
 }

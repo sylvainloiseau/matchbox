@@ -186,6 +186,10 @@ public class EditorController {
         highlightStyles.addListener(this::highlightText);
         clearEditor();
         workbench.session().addCorpusListener((id, before, after) -> onCorpusTextChanged(id));
+        // the findings of the checks changed (settings, dictionary): the margin and the errors again
+        workbench.problems().addChecksListener(() -> {
+            if (document != null) refreshFromCorpus();
+        });
         // play buttons and the highlight follow what is playing
         workbench.mediaPlayers().playingProperty().addListener((obs, o, n) -> {
             refreshTextActions(displayedText());
@@ -456,7 +460,7 @@ public class EditorController {
     private void refreshFromCorpus() {
         Optional<Text> text = displayedText();
         currentFileObjects.setAll(text.map(Text::objects).orElse(List.of()));
-        currentFileErrors.setAll(text.map(Text::diagnostics).orElse(List.of()));
+        currentFileErrors.setAll(text.map(workbench.problems()::diagnosticsOf).orElse(List.of()));
         outlined = null;
         highlightText();
         updateSectionBand();
@@ -532,10 +536,13 @@ public class EditorController {
                     }
                 }
             }
+            // the fixes of the problems of the text, after the actions of the plugins
+            actions.addAll(fr.cnrs.lacito.matchbox.gui.problems.ProblemFixes.actions(text.get(),
+                workbench.problems().diagnosticsOf(text.get())));
         }
         LineIndex index = new LineIndex(textArea.getText());
         Map<Integer, GutterLayout.Markers> byLine = GutterLayout.markers(index, segments, actions,
-            text.map(Text::diagnostics).orElse(List.of()));
+            text.map(workbench.problems()::diagnosticsOf).orElse(List.of()));
         markers.set(byLine);
         gutterDigits = GutterLayout.digits(textArea.getParagraphs().size());
         boolean sections = text.map(t -> !t.sections().isEmpty()).orElse(false);

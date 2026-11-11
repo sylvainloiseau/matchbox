@@ -100,7 +100,7 @@ public class ProjectPropertiesDialog {
 
         VBox root = new VBox(10,
             nameSection(), descriptionSection(), fileTypesSection(), pluginParametersSection(), inheritedContextSection(),
-            assistantSection(),
+            glossCheckSection(), assistantSection(),
             buttons());
         root.setPadding(new Insets(15));
         ScrollPane scroll = new ScrollPane(root);
@@ -424,6 +424,49 @@ public class ProjectPropertiesDialog {
         File base = !current.isEmpty() ? new File(current).getParentFile()
             : project.fileProperty().get() == null ? null : project.fileProperty().get().getParentFile();
         return Optional.ofNullable(base).filter(File::isDirectory);
+    }
+
+    /** The gloss check of the IGTs: list of labels, the project's labels, the dictionary check. */
+    private VBox glossCheckSection() {
+        var settings = edit.getGlossCheck();
+        javafx.scene.control.ToggleGroup group = new javafx.scene.control.ToggleGroup();
+        HBox lists = new HBox(10);
+        lists.setId("glossLabelLists");
+        for (var list : fr.cnrs.lacito.matchbox.corpus.gloss.GlossLabelList.values()) {
+            javafx.scene.control.RadioButton b = new javafx.scene.control.RadioButton(switch (list) {
+                case LEIPZIG -> "Leipzig Glossing Rules (" + fr.cnrs.lacito.matchbox.corpus.gloss.GlossLabels.leipzig().size() + ")";
+                case LEHMANN -> "Christian Lehmann's list (" + fr.cnrs.lacito.matchbox.corpus.gloss.GlossLabels.lehmann().size() + ")";
+                case BOTH -> "Both";
+                case NONE -> "Do not check the labels";
+            });
+            b.setUserData(list);
+            b.setToggleGroup(group);
+            b.setSelected(list == settings.labels());
+            lists.getChildren().add(b);
+        }
+        TextField own = new TextField(String.join(", ", settings.projectLabels()));
+        own.setId("glossProjectLabels");
+        own.setPromptText("Labels of this project, separated by commas (e.g. COMPL2, TAM1)");
+        CheckBox dictionary = new CheckBox("Check form / gloss pairs against the context dictionary");
+        dictionary.setId("glossDictionaryCheck");
+        dictionary.setSelected(settings.dictionary());
+        Runnable write = () -> edit.setGlossCheck(new fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings(
+            (fr.cnrs.lacito.matchbox.corpus.gloss.GlossLabelList) group.getSelectedToggle().getUserData(),
+            java.util.Arrays.stream(own.getText().split("[,\\s]+")).filter(t -> !t.isBlank())
+                .collect(java.util.stream.Collectors.toSet()),
+            dictionary.isSelected()));
+        group.selectedToggleProperty().addListener((obs, o, n) -> {
+            if (n != null) write.run();
+        });
+        own.textProperty().addListener((obs, o, n) -> write.run());
+        dictionary.selectedProperty().addListener((obs, o, n) -> write.run());
+        Label help = new Label("The grammatical labels of the glosses of interlinear glossed texts (1SG, PST…) are checked "
+            + "against the chosen list and the project's labels; the (form, gloss) pairs, against the context dictionary "
+            + "when there is one. The findings are listed in the Semantic issues tab.");
+        help.setWrapText(true);
+        help.setStyle("-fx-text-fill: #666666;");
+        return section("Gloss check", new Label("Grammatical labels:"), lists, new Label("Project labels:"), own,
+            dictionary, help);
     }
 
     private VBox assistantSection() {

@@ -41,7 +41,7 @@ public class CollectingErrorListener extends BaseErrorListener {
             stopIndex = Math.min(lexer.getCharIndex(), lexer.getInputStream().size() - 1);
         }
         diagnostics.add(new Diagnostic(text, grammarId, line, charPositionInLine, msg,
-            startIndex, stopIndex, expectedTokens(recognizer, e)));
+            startIndex, stopIndex, expectedTokens(recognizer, e)).withCode("syntax"));
     }
 
     /** Display names of the tokens the parser expected; empty for lexer errors. */

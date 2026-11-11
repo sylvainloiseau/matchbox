@@ -120,6 +120,20 @@ public class ProjectXMLSerializer {
             rootElement.appendChild(contextElement);
         }
 
+        // Gloss check (absent: the defaults)
+        var glossCheck = project.getGlossCheck();
+        if (!glossCheck.equals(fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings.defaults())) {
+            Element e = doc.createElement("glossCheck");
+            e.setAttribute("labels", glossCheck.labels().name().toLowerCase(java.util.Locale.ROOT));
+            e.setAttribute("dictionary", String.valueOf(glossCheck.dictionary()));
+            for (String label : glossCheck.projectLabels()) {
+                Element l = doc.createElement("label");
+                l.setTextContent(label);
+                e.appendChild(l);
+            }
+            rootElement.appendChild(e);
+        }
+
         // Restrictions of the AI assistant (absent: no restriction)
         if (!project.isCloudAssistAllowed()) {
             Element assistantElement = doc.createElement("assistant");
@@ -262,6 +276,7 @@ public class ProjectXMLSerializer {
         Project project = new Project(plugins, documentOptions);
         // "Save project" writes back to the file the project was loaded from
         project.setFile(file);
+        boolean migrated = false;
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
@@ -322,6 +337,11 @@ public class ProjectXMLSerializer {
                 }
                 pattern.addGrammar(grammar);
             }
+            if (migrateIgt(pattern)) {
+                migrated = true;
+                project.recordLoadNote("IGT grammar added to the file type '" + name
+                    + "': IGTs (::: blocks) are now read by it, not by the notebook grammar");
+            }
 
             project.addFileType(pattern);
         }
@@ -364,8 +384,50 @@ public class ProjectXMLSerializer {
 
         loadDisplayStyles(rootElement, project);
 
-        // the project is what its file says
-        project.definitionChangedProperty().set(false);
+        NodeList glossList = rootElement.getElementsByTagName("glossCheck");
+        if (glossList.getLength() > 0) {
+            Element e = (Element) glossList.item(0);
+            var labels = fr.cnrs.lacito.matchbox.corpus.gloss.GlossLabelList.LEIPZIG;
+            try {
+                if (!e.getAttribute("labels").isBlank()) {
+                    labels = fr.cnrs.lacito.matchbox.corpus.gloss.GlossLabelList.valueOf(
+                        e.getAttribute("labels").strip().toUpperCase(java.util.Locale.ROOT));
+                }
+            } catch (IllegalArgumentException ex) {
+                project.recordLoadProblem("Unknown list of gloss labels '" + e.getAttribute("labels") + "': Leipzig is used");
+            }
+            java.util.Set<String> own = new java.util.TreeSet<>();
+            NodeList labelList = e.getElementsByTagName("label");
+            for (int i = 0; i < labelList.getLength(); i++) own.add(labelList.item(i).getTextContent());
+            project.setGlossCheck(new fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings(labels, own,
+                !"false".equals(e.getAttribute("dictionary"))));
+        }
+
+        // the project is what its file says (unless it was migrated: saving keeps the change)
+        project.definitionChangedProperty().set(migrated);
         return project;
+    }
+
+    static final String NOTEBOOK_GRAMMAR = "notebook-grammar";
+    static final String IGT_GRAMMAR = "igt-grammar";
+
+    /**
+     * The notebook grammar no longer reads IGTs (::: blocks): a file type using it without the IGT
+     * grammar gets the IGT grammar right after it, when it is installed. True if the type changed.
+     */
+    static boolean migrateIgt(FileType type) {
+        List<GrammarPlugin> grammars = type.getGrammars();
+        int notebook = -1;
+        for (int i = 0; i < grammars.size(); i++) {
+            if (grammars.get(i).getId().equals(IGT_GRAMMAR)) return false;
+            if (grammars.get(i).getId().equals(NOTEBOOK_GRAMMAR)) notebook = i;
+        }
+        if (notebook < 0) return false;
+        GrammarPlugin igt = PluginManager.getAvailableGrammars().stream()
+            .filter(g -> g.getId().equals(IGT_GRAMMAR)).findFirst().orElse(null);
+        if (igt == null) return false;
+        type.addGrammar(igt);
+        type.moveGrammar(type.getGrammars().size() - 1, notebook + 1);
+        return true;
     }
 }

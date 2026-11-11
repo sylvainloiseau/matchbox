@@ -25,6 +25,10 @@ import org.antlr.v4.runtime.CommonTokenStream;
 public class MediaRefGrammarPlugin extends AbstractGrammarPlugin {
 
     public static final String ID = "mediaref-grammar";
+
+    /** Codes of the semantic issues. */
+    public static final String CODE_INVALID_TIME = "mediaref.invalid-time";
+    public static final String CODE_RANGE_ORDER = "mediaref.range-order";
     public static final String KIND_MARKER = ID + ":marker";
 
     private static final ObjectEditor EDITOR = new MediaRefObjectEditor();
@@ -70,6 +74,10 @@ public class MediaRefGrammarPlugin extends AbstractGrammarPlugin {
               separated by `-`; the end is after the start. Without a range, the marker refers to the whole file.
             - `<caption>`: optional free text describing the segment, up to the end of the line.
             - Every other line is ignored.
+
+            Semantic issues (the marker is written correctly but its range is wrong; the marker is not kept):
+            - `mediaref.invalid-time`: a time with 60 or more minutes or seconds (`0:75`);
+            - `mediaref.range-order`: the end is not after the start (`1:20-1:10`); fix: swap start and end.
             """;
     }
 
@@ -121,7 +129,7 @@ public class MediaRefGrammarPlugin extends AbstractGrammarPlugin {
             diagnostics.addAll(errors.getDiagnostics());
             diagnostics.addAll(reader.diagnostics());
         } catch (RuntimeException e) {
-            diagnostics.add(Diagnostic.at(text, ID, 0, 0, "Internal error of the grammar: " + e));
+            diagnostics.add(Diagnostic.internal(text, ID, 0, "Internal error of the grammar: " + e));
         }
         return new ParseResult(objects, diagnostics);
     }

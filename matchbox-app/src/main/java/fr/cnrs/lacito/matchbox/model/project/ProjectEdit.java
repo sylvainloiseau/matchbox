@@ -100,6 +100,8 @@ public final class ProjectEdit {
     private String description;
     private boolean cloudAssistAllowed;
     private Path contextDictionary;
+    private fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings glossCheck =
+        fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings.defaults();
     private Path contextCorpus;
     private DisplayStyles displayStyles;
     private final List<Path> paths;
@@ -125,6 +127,7 @@ public final class ProjectEdit {
             project.getDisplayStyles(), project.getDefinitionPaths(), types);
         edit.contextDictionary = project.getContextDictionary().orElse(null);
         edit.contextCorpus = project.getContextCorpus().orElse(null);
+        edit.glossCheck = project.getGlossCheck();
         return edit;
     }
 
@@ -160,6 +163,14 @@ public final class ProjectEdit {
     /** @param dictionary a LIFT file, or null for none */
     public void setContextDictionary(Path dictionary) {
         this.contextDictionary = dictionary;
+    }
+
+    public fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings getGlossCheck() {
+        return glossCheck;
+    }
+
+    public void setGlossCheck(fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings settings) {
+        this.glossCheck = java.util.Objects.requireNonNull(settings);
     }
 
     /** The Matchbox corpus the data is added to, if any. */
@@ -253,6 +264,7 @@ public final class ProjectEdit {
         project.setCloudAssistAllowed(cloudAssistAllowed);
         project.setContextDictionary(contextDictionary);
         project.setContextCorpus(contextCorpus);
+        project.setGlossCheck(glossCheck);
         project.setDisplayStyles(displayStyles);
 
         // file types first, so that added files are parsed with the new grammars

@@ -14,6 +14,7 @@ import fr.cnrs.lacito.matchbox.corpus.capability.Tag;
 import fr.cnrs.lacito.matchbox.grammar.markdownheading.MarkdownHeadingGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammar.mediaref.MediaRefGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookGrammarPlugin;
+import fr.cnrs.lacito.matchbox.grammar.igt.IgtGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammar.tag.TagGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.TextParser;
@@ -40,7 +41,7 @@ class PluginOverlapTest {
     }
 
     private static List<GrammarPlugin> plugins(boolean markdownFirst) {
-        List<GrammarPlugin> list = new ArrayList<>(List.of(new NotebookGrammarPlugin(), new TagGrammarPlugin(),
+        List<GrammarPlugin> list = new ArrayList<>(List.of(new NotebookGrammarPlugin(), new IgtGrammarPlugin(), new TagGrammarPlugin(),
             new MediaRefGrammarPlugin()));
         list.add(markdownFirst ? 0 : list.size(), new MarkdownHeadingGrammarPlugin());
         return list;
@@ -94,16 +95,16 @@ class PluginOverlapTest {
         List<GrammarPlugin> grammars = new ArrayList<>(plugins(true));
         grammars.add(second);
         Text text = TextParser.parse(TextId.of(file), content, grammars);
-        int igts = (int) text.objects("notebook-grammar").stream().filter(InterlinearSentence.class::isInstance).count();
+        int igts = (int) text.objects("igt-grammar").stream().filter(InterlinearSentence.class::isInstance).count();
         assertTrue(igts > 0);
         assertTrue(text.objects(DuplicateIgtGrammar.ID).isEmpty());
         assertEquals(igts, text.conflicts().stream().filter(MatchConflict::isDropped).count());
         assertEquals(igts, text.diagnostics(DuplicateIgtGrammar.ID).size());
-        assertTrue(text.diagnostics(DuplicateIgtGrammar.ID).get(0).message().contains(new NotebookGrammarPlugin().getDisplayName()),
+        assertTrue(text.diagnostics(DuplicateIgtGrammar.ID).get(0).message().contains(new IgtGrammarPlugin().getDisplayName()),
             text.diagnostics(DuplicateIgtGrammar.ID).get(0).message());
         // the plugin received what the earlier grammars own
-        assertTrue(second.received.claims().stream().anyMatch(c -> c.grammarId().equals("notebook-grammar")));
-        CorpusObject igt = text.objects("notebook-grammar").stream()
+        assertTrue(second.received.claims().stream().anyMatch(c -> c.grammarId().equals("igt-grammar")));
+        CorpusObject igt = text.objects("igt-grammar").stream()
             .filter(InterlinearSentence.class::isInstance).findFirst().orElseThrow();
         assertTrue(second.received.isClaimed(igt.getTextCoordinate().startIndex(), igt.getTextCoordinate().startIndex()));
         assertSame(igt, text.conflicts().stream().filter(MatchConflict::isDropped).findFirst().orElseThrow().other());

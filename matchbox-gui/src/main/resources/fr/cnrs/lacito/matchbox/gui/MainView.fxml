@@ -104,6 +104,12 @@
                     onAction="#handleEditProject"
                     text="Project properties…"
                 />
+               <MenuItem
+                    fx:id="reloadDictionaryMenuItem"
+                    mnemonicParsing="false"
+                    onAction="#handleReloadDictionary"
+                    text="Reload context dictionary"
+                />
                <SeparatorMenuItem mnemonicParsing="false" />
                <MenuItem
                     fx:id="openFileMenu"

@@ -1,7 +1,12 @@
 package fr.cnrs.lacito.matchbox.grammarfx.media;
 
 import fr.cnrs.lacito.matchbox.corpus.CorpusView;
+import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.Text;
+import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearTimeline;
+import fr.cnrs.lacito.matchbox.corpus.igt.InterlinearInheritance;
+import fr.cnrs.lacito.matchbox.corpus.igt.InterlinearReadings;
+import fr.cnrs.lacito.matchbox.corpus.igt.MetadataValue;
 import fr.cnrs.lacito.matchbox.corpus.capability.MediaSegment;
 import fr.cnrs.lacito.matchbox.corpus.capability.Section;
 import fr.cnrs.lacito.matchbox.grammarfx.metadata.MediaPaths;
@@ -25,7 +30,17 @@ public final class MediaResolver {
     public static final String MEDIA_KEY = "media";
 
     /** Where the file of a segment comes from. */
-    public enum Source { EXPLICIT, SECTION, HEADER, NONE }
+    public enum Source {
+        /** Written in the segment. */
+        EXPLICIT,
+        /** Written in a preceding segment of the same section (an {@code @media} line, a previous IGT), see {@link Resolution#sourceTitle()}. */
+        PRECEDING,
+        /** The {@code media} metadata of an enclosing section. */
+        SECTION,
+        /** The {@code media} metadata of the text header. */
+        HEADER,
+        NONE
+    }
 
     /**
      * @param reference   the file as written, if any
@@ -53,6 +68,26 @@ public final class MediaResolver {
         }
         Optional<Text> text = corpus.textOf(segment);
         if (text.isPresent()) {
+            // a timeline of an IGT: the media inherited from a previous IGT
+            if (segment instanceof InterlinearTimeline) {
+                Optional<MetadataValue> inherited = InterlinearReadings.of(text.get()).containing(segment)
+                    .flatMap(r -> Optional.ofNullable(r.metadata().get(InterlinearInheritance.MEDIA)))
+                    .filter(v -> v.source() == MetadataValue.Source.PREVIOUS_IGT && !v.value().isBlank());
+                if (inherited.isPresent()) {
+                    String ref = inherited.get().value().strip();
+                    return new Resolution(Optional.of(ref), Source.PRECEDING,
+                        inherited.get().origin().map(o -> "IGT " + o.getLabel()),
+                        MediaPaths.resolve(ref, projectDirectory, textDirectory));
+                }
+            }
+            // the nearest preceding segment of the same section that names a file
+            Optional<MediaSegment> preceding = preceding(text.get(), segment);
+            if (preceding.isPresent()) {
+                String ref = preceding.get().getMediaReference().orElseThrow();
+                return new Resolution(Optional.of(ref), Source.PRECEDING,
+                    Optional.of("line " + preceding.get().getTextCoordinate().startLine()),
+                    MediaPaths.resolve(ref, projectDirectory, textDirectory));
+            }
             List<Section> enclosing = text.get().enclosingSections(segment);
             for (int i = enclosing.size() - 1; i >= 0; i--) {
                 Optional<String> ref = media(enclosing.get(i).getMetadata());
@@ -69,6 +104,26 @@ public final class MediaResolver {
         }
         return new Resolution(Optional.empty(), Source.NONE, Optional.empty(),
             new MediaPaths.Resolution(Optional.empty(), false));
+    }
+
+    /** The nearest media segment before {@code segment}, in the same innermost section, naming a file. */
+    static Optional<MediaSegment> preceding(Text text, MediaSegment segment) {
+        int start = segment.getTextCoordinate().startIndex();
+        Optional<Section> section = innermost(text, segment);
+        return text.objectsOf(MediaSegment.class).stream()
+            .filter(s -> s != segment && s.getMediaReference().filter(r -> !r.isBlank()).isPresent())
+            .filter(s -> s.getTextCoordinate().startIndex() < start)
+            .filter(s -> sameSection(innermost(text, s), section))
+            .max(java.util.Comparator.comparingInt(s -> s.getTextCoordinate().startIndex()));
+    }
+
+    private static Optional<Section> innermost(Text text, CorpusObject o) {
+        List<Section> sections = text.enclosingSections(o);
+        return sections.isEmpty() ? Optional.empty() : Optional.of(sections.get(sections.size() - 1));
+    }
+
+    private static boolean sameSection(Optional<Section> a, Optional<Section> b) {
+        return a.isEmpty() ? b.isEmpty() : b.isPresent() && a.get() == b.get();
     }
 
     /** Distinct resolved files used by a text: its media segments and its "media" metadata (header, sections). */

@@ -2,6 +2,7 @@ package fr.cnrs.lacito.matchbox.grammar.mediaref;
 
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.corpus.Field;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
@@ -76,11 +77,17 @@ final class MediaRefReader extends MediaRefParserBaseVisitor<Void> {
             OptionalLong s = m.matches() ? TimeCodes.parse(m.group(1)) : OptionalLong.empty();
             OptionalLong e = m.matches() ? TimeCodes.parse(m.group(3)) : OptionalLong.empty();
             if (s.isEmpty() || e.isEmpty()) {
-                report(r, "Invalid time in " + r.getText() + " (seconds and minutes must be below 60)");
+                diagnostics.add(semantic(r, "Invalid time in " + r.getText() + " (seconds and minutes must be below 60)",
+                    MediaRefGrammarPlugin.CODE_INVALID_TIME, List.of()));
                 return null;
             }
             if (e.getAsLong() <= s.getAsLong()) {
-                report(r, "The end of the range must be after its start: " + r.getText());
+                List<Diagnostic.Fix> fixes = e.getAsLong() < s.getAsLong()
+                    ? List.of(new Diagnostic.Fix("Swap start and end", List.of(TextEdit.replace(content,
+                        r.getStartIndex(), r.getStopIndex() + 1, m.group(3) + m.group(2) + m.group(1)))))
+                    : List.of();
+                diagnostics.add(semantic(r, "The end of the range must be after its start: " + r.getText(),
+                    MediaRefGrammarPlugin.CODE_RANGE_ORDER, fixes));
                 return null;
             }
             range = new TimeRange(s.getAsLong(), e.getAsLong());
@@ -118,6 +125,11 @@ final class MediaRefReader extends MediaRefParserBaseVisitor<Void> {
         int i = offset;
         while (i < content.length() && content.charAt(i) != '\n' && content.charAt(i) != '\r') i++;
         return i;
+    }
+
+    private Diagnostic semantic(Token t, String message, String code, List<Diagnostic.Fix> fixes) {
+        return Diagnostic.semantic(text, MediaRefGrammarPlugin.ID, t.getLine(), t.getCharPositionInLine(), message,
+            t.getStartIndex(), t.getStopIndex(), Diagnostic.Severity.ERROR).withCode(code).withFixes(fixes);
     }
 
     private void report(Token t, String message) {

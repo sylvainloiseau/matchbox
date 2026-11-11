@@ -5,29 +5,28 @@ date: 2026-10-14
 id:20261014_2
 ---
 
-@media 01-121
 
-<mami> {pig}
+@media 1-1210 what
 
 <jaflo> {canoe}
-#"dir/allatif"
 
-:::
-a mio-jaflo-m-wi-j
+:::{id="1", setting="t,g"}
+1   101
+100 200
+a   mio-jaflo-m-wi-j
 1sg down-canoe-top-m.sg-pred
 'I went down in canoe'
 :::
 #"dir/allatif"
 
 # Titre 1
-
 ---
 date: 2026-10-14
 ---
 
  
-:::
-a mio-jaflo-m-wi-jo
+:::{id="2"}
+a   mio-jaflo-m-wi-jo
 1sg down-canoe-top-m.sg-pred
 'I went down in canoe'
 :::

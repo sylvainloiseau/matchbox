@@ -7,9 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
-import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearSentence;
 import fr.cnrs.lacito.matchbox.corpus.capability.LexicalEntry;
-import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleLexicalDefinition;
 import fr.cnrs.lacito.matchbox.grammarapi.EditProposal;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
@@ -42,27 +40,23 @@ class NotebookEditingTest {
     @Test
     void fieldSpansCoverTheValuesWithoutDelimiters() {
         ParseResult r = plugin.getResult(FILE, TEXT);
-        SimpleIGT igt = objectsOf(r, SimpleIGT.class).get(0);
-        assertCovers("a mio-jaflo-m-wi-j", igt.field(InterlinearSentence.TRANSCRIPTION).orElseThrow().span(), TEXT);
-        assertCovers("1sg down-canoe-top-m.sg-pred", igt.field(InterlinearSentence.MORPHEMES).orElseThrow().span(), TEXT);
-        assertCovers("I went down in canoe", igt.field(InterlinearSentence.FREE_TRANSLATION).orElseThrow().span(), TEXT);
-        assertEquals("I went down in canoe", igt.field(InterlinearSentence.FREE_TRANSLATION).orElseThrow().value());
         SimpleLexicalDefinition mami = objectsOf(r, SimpleLexicalDefinition.class).get(0);
         assertCovers("mami", mami.field(LexicalEntry.HEADWORD).orElseThrow().span(), TEXT);
+        assertTrue(r.objects().stream().noneMatch(o -> o.getKind().endsWith(":igt")), "IGTs are read by the IGT grammar");
     }
 
     @Test
     void settingAFieldChangesOnlyThatValue() {
         ParseResult r = plugin.getResult(FILE, TEXT);
-        SimpleIGT igt = objectsOf(r, SimpleIGT.class).get(0);
-        EditProposal p = plugin.getObjectEditor().setField(igt, InterlinearSentence.FREE_TRANSLATION, "I went by canoe", TEXT);
+        SimpleLexicalDefinition jaflo = objectsOf(r, SimpleLexicalDefinition.class).get(1);
+        EditProposal p = plugin.getObjectEditor().setField(jaflo, LexicalEntry.HEADWORD, "jaflu", TEXT);
         String edited = TextEdit.applyAll(TEXT, assertInstanceOf(EditProposal.Edits.class, p).edits());
 
         ParseResult after = plugin.getResult(FILE, edited);
         assertTrue(after.diagnostics().isEmpty(), () -> "errors: " + after.diagnostics());
-        assertEquals("'I went by canoe'", objectsOf(after, SimpleIGT.class).get(0).getFreeTranslation());
-        assertEquals(List.of("mami", "jaflo"),
+        assertEquals(List.of("mami", "jaflu"),
             objectsOf(after, SimpleLexicalDefinition.class).stream().map(SimpleLexicalDefinition::getHeadword).toList());
+        assertTrue(edited.contains("1sg down-canoe-top-m.sg-pred"), "the IGT block is untouched");
     }
 
     @Test
@@ -71,12 +65,9 @@ class NotebookEditingTest {
         SimpleLexicalDefinition mami = objectsOf(r, SimpleLexicalDefinition.class).get(0);
         assertInstanceOf(EditProposal.Refused.class,
             plugin.getObjectEditor().setField(mami, LexicalEntry.HEADWORD, "ma>mi", TEXT));
-        SimpleIGT igt = objectsOf(r, SimpleIGT.class).get(0);
         assertInstanceOf(EditProposal.Refused.class,
-            plugin.getObjectEditor().setField(igt, InterlinearSentence.MORPHEMES, "a\nb", TEXT));
+            plugin.getObjectEditor().setField(mami, LexicalEntry.HEADWORD, " ", TEXT));
         assertInstanceOf(EditProposal.Refused.class,
-            plugin.getObjectEditor().setField(igt, InterlinearSentence.TRANSCRIPTION, ":::", TEXT));
-        assertInstanceOf(EditProposal.Refused.class,
-            plugin.getObjectEditor().setField(igt, "unknown", "x", TEXT));
+            plugin.getObjectEditor().setField(mami, "unknown", "x", TEXT));
     }
 }

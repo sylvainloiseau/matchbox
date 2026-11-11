@@ -1,0 +1,443 @@
+# Grammatical category labels (gloss abbreviations), after Christian Lehmann,
+# https://christianlehmann.eu/includes/gramm_category_labels.inc (retrieved 2026-11-10).
+# label<TAB>meaning<TAB>kind: 'label' = recommended label; 'alias' = the meaning is written with this label
+# (the source gives it in parentheses: 'see this label'). Optional letters of the source, e.g. app(r)h,
+# are expanded to both forms; 'cl#' stands for CL followed by a number. Labels are upper case (Leipzig rules).
+1	1st person	label
+2	2nd person	label
+3	3rd person	label
+PRV	abessive	alias
+AVERS	abessive	alias
+HAB	abilitative	alias
+ABL	ablative	label
+ABSL	absolute	label
+ABS	absolutive	label
+ABSTR	abstract	label
+ACC	accusative	label
+ACRS	across	label
+ACNNR	action nominalizer	label
+ACT	active	label
+A	actor	label
+ATOP	actor topic	label
+ADD	additive, -ional	label
+2HON	addressee-honorific	label
+2HML	addressee-humble	label
+ADEL	adelative	label
+ADESS	adessive	label
+HORT	adhortative	alias
+ALL	aditive	alias
+ADJR	adjectiv(al)izer	label
+ADM	admonitive	label
+ADVR	adverbializer	label
+ADRVS	adversative	label
+AFF	affirmative	label
+AFFMT	affirmative	label
+AGNR	agent nominalizer	label
+AG	agentive	label
+AL	alienable	label
+ALL	allative	label
+ALLOC	allocutive	label
+AMB	ambient	label
+AMBV	ambulative	label
+ANA	anaphoric	label
+AND	andative	label
+AN	animate	label
+ATP	antepresent	label
+ANT	anterior	label
+ACAUS	anticausative	label
+APASS	antipassive	label
+AOR	aorist	label
+APPL	applicative	label
+APPH	apprehensional	label
+APPRH	apprehensional	label
+APPB	approbative	label
+APPRB	approbative	label
+APPX	approximative	label
+APPRX	approximative	label
+APUD	apudessive, -lative	label
+ASC	ascensive	label
+ASRT	assertive	label
+ASS	associative	label
+ASSOC	associative	label
+ASS.AND	associated andative	label
+ASS.VEN	associated ventive	label
+ASSUM	assumptive	label
+ATTN	attentional	label
+ATT	attenuative	label
+ATTV	attenuative	label
+AT	attributor	label
+AUD	audible	label
+AUD	auditory	label
+AUG	augmentative	label
+AUTH	authentic	label
+AM	autonomous motion	label
+AUX	auxiliary	label
+AVERS	aversive	label
+BG	background	label
+BEN	benefactive	label
+CARD	cardinal	label
+PRV	caritive	alias
+CAT	catalytic	label
+CAUS	causative	label
+CERT	certitive	label
+COS	change of state	label
+CIRC	circumstantial	label
+EXCL	clamative	alias
+CL#	class #	label
+CLF	classifier	label
+HORT	cohortative	alias
+COLL	collective	label
+COM	comitative	label
+CM	common	label
+COMM	common	label
+CMPR	comparative	label
+COMP	complementizer	label
+CMPL	completive	label
+CMPJ	compounder	label
+CNTV	conative	label
+CONC	concessive	label
+CNCR	concrete	label
+COND	conditional	label
+CNDV	conductive	label
+CONJC	conjectural	label
+CONJ	conjunctive	label
+CONN	connector, -ive	label
+CONSEC	consecutive	label
+CONST	construct	label
+GER	converb	alias
+CONT	continuative	label
+COP	copula	label
+IRR	counterfactual	alias
+CRAS	crastinal	label
+CLM	culminative	label
+HAB	customary	alias
+DAT	dative	label
+ACAUS	deagentive	alias
+DEB	debitive	label
+DECL	declarative	label
+DEFR	deferential	label
+DEF	definite	label
+D12	deictic of 12 person	label
+D1	deictic of 1st person	label
+D2	deictic of 2nd person	label
+D3	deictic of 3rd person	label
+DEL	delative	label
+DEM	demonstrative	label
+SUBJ	dependent verb form	alias
+DEREL	derelationalizer	label
+DESC	descensive	label
+DES	desiderative	label
+DEST	destinative	label
+DET	determiner	label
+DETR	detransitivizer	label
+DS	different subject	label
+DIM	diminutive	label
+DR	direct	label
+DIREV	direct evidential	label
+DO	direct object	label
+DIR	directional	label
+DIRV	directive	label
+DISHAB	dishabilitative	label
+DISJ	disjunctive	label
+DISSOC	dissociative	label
+DIST	distal	label
+DISTR	distributive	label
+DON	donative	label
+INFRA	down(wards)	label
+DU	dual	label
+DL	dual	label
+DE	dual exclusive	label
+DI	dual inclusive	label
+DUB	dubitative	label
+DUR	durative	label
+DYN	dynamic	label
+EGR	egressive	label
+ELAT	elative	label
+ELONG	elongated	label
+EMOT	emotive	label
+EMPH	emphasizer/emphatic	label
+EQT	equative	label
+ERG	ergative	label
+ESS	essive	label
+EU	euphonic	label
+EVID	evidential	label
+EXCL	exclamative	label
+DE	exclusive	alias
+PE	exclusive	alias
+EXIST	exist(ential)	label
+EXPER	experiential	label
+EXT	extensive	label
+EXFOC	extrafocal	label
+EXTRV	extraversive	label
+FACT	factitive	label
+FAM	familiar	label
+F	feminine	label
+FIN	final	label
+FIN	finite	label
+12	first person dual inclusive	label
+PLAN	flat	label
+FOC	focus	label
+FRM	formal	label
+FREQ	frequentative	label
+FUT	future	label
+GNR	generic	label
+GEN	genitive	label
+GER	gerund	label
+DEB	gerundive	alias
+G	goal	label
+HABIL	habilitative	label
+HAB	habitual	label
+HABIT	habitual	label
+HS	hearsay	label
+HESIT	hesitative	label
+HEST	hesternal	label
+HODFUT	hodiernal future	label
+HODPST	hodiernal past	label
+HON	honorific	label
+HOR	horizontal	label
+HORT	hortative	label
+HUM	human	label
+HML	humble	label
+HCR	hypocoristic	label
+HYP	hypothetical	label
+ILL	illative	label
+IMM	immediative	label
+IMMFUT	immediate/imminent future	label
+RECPST	immediate past	alias
+IMP	imperative	label
+IMPC	imperceptible	label
+IMPF	imperfect	label
+IPFV	imperfective	label
+IMPR	impersonal	label
+IPS	impersonal passive	label
+INACT	inactive	label
+INAL	inalienable	label
+INAN	inanimate	label
+INGR	inceptive	alias
+INCH	inchoative	label
+DI	inclusive	alias
+PI	inclusive	alias
+INCMP	incompletive, noncompletive	label
+INCMPL	incompletive, noncompletive	label
+INCONS	inconsequential	label
+INDF	indefinite	label
+INDEP	independent	label
+IND	indicative	label
+INDINT	indirect interrogative	label
+IO	indirect object	label
+INESS	inessive	label
+INFR	inferential	label
+INF	infinitive	label
+INGR	ingressive	label
+INITR	initializer	label
+INJ	injunctive	label
+MAN	instructive	alias
+INSTNR	instrument nominalizer	label
+INST	instrumental	label
+INSTR	instrumental	label
+INTS	intensive	label
+INTL	intentional	label
+INT	interrogative	label
+INTR	intransitive	label
+S	intransitive subject	label
+INTRV	introversive	label
+INV	inverse	label
+INVS	invisible	label
+INVOL	involitive	label
+IRR	irrealis	label
+ITER	iterative	label
+JUSS	jussive	label
+LAT	lative	label
+LIG	ligature	label
+LIM	limitative	label
+LNK	linker	label
+LOC	locative	label
+LTOP	locative topic	label
+LOG	logophoric	label
+MAL	malefactive	label
+MAN	manner	label
+MANNR	manner nominalizer	label
+M	masculine	label
+MHUM	masculine personal	label
+MED	medial	label
+MEDV	medial	label
+MEDT	mediative	label
+MEDP	mediopassive	label
+MID	middle	label
+MIR	mirative	label
+MTV	motivative	label
+MULT	multiple action	label
+MULV	multiplicative	label
+NARR	narrative	label
+NTVR	nativizer	label
+NRFUT	near future	label
+NEG	negative	label
+N	neuter	label
+NTL	neutral	label
+NR	nominalizer	label
+NOM	nominative	label
+N	non-	label
+NFIN	non-finite	label
+NFUT	non-future	label
+NHUM	non-human	label
+NM	non-masculine personal	label
+NPST	non-past	label
+NPL	non-plural	label
+NSG	non-singular	label
+NSPEC	non-specific	label
+NVIS	non-visual	label
+NVOL	non-volitional	label
+CL#	noun class #	label
+NUM	numeral	label
+OBJ	object	label
+OBLG	obligative	label
+OBL	oblique	label
+OBV	obviative	label
+OC	open container	label
+OPT	optative	label
+ORD	ordinal	label
+PAEN	paenitive	label
+PRL	partial affectedness	label
+PTCP	participle	label
+PRTV	partitive	label
+PASS	passive	label
+PST	past	label
+PATNR	patient nominalizer	label
+PAU	paucal	label
+PEJ	pejorative	label
+PF	perfect	label
+PRF	perfect	label
+PFV	perfective	label
+PERL	pergressive	alias
+PERL	perlative	label
+PERM	permanent	label
+PS	person(al)	label
+LOCNR	place nominalizer	label
+PLUP	pluperfect	label
+PL	plural	label
+PE	plural exclusive	label
+PI	plural inclusive	label
+PLO	plural object	label
+PL	pluritive	alias
+PORT	portative	label
+POS	positional	label
+AFF	positive	alias
+POSS	possessive	label
+PCL	possessive classifier	label
+POCRAS	postcrastinal	label
+POSTEL	postelative	label
+POST	posterior	label
+POSTESS	postessive	label
+POHOD	post-hodiernal	label
+POT	potential	label
+PREC	precative	label
+PRED	predicative	label
+PRS	present	label
+PRSMT	presumptive	label
+PST	preterite	alias
+PRHEST	pre-hesternal	label
+PO	primary object	label
+PRV	privative	label
+PRIV	privative	label
+PROC	processive, -ual	label
+PRDNR	product nominalizer	label
+PROG	progressive	label
+PROH	prohibitive	label
+PROLAT	prolative	label
+PRPN	proper name	label
+PPY	property	label
+PPV	proprietive	label
+PROSEC	prosecutive	label
+PROSP	prospective	label
+PROX	proximal	label
+PRX	proximate	label
+PAEN	proximative	alias
+PNCT	punctual	label
+DEST	purposive	alias
+QUL	qualifier	label
+QUALNR	quality nominalizer	label
+INT	question marker	alias
+QUOT	quotative	label
+RLS	realis	label
+RLZ	realization	label
+RECPST	recent past	label
+RCP	reciprocal	label
+RECNF	reconfirmative	label
+3HON	referent-honorific	label
+3HML	referent-humble	label
+RFTL	referential	label
+RFV	referentive	label
+RFL	reflexive	label
+REFL	reflexive	label
+INTNS	reinforcement	alias
+RLR	relational(izer)	label
+REL	relative	label
+RFR	relative	alias
+DIST	remote	alias
+REMPST	remote past	label
+REP	repetitive	label
+RPRT	reportative	label
+LIM	restrictive	alias
+RES	resultative	label
+RVRS	reversive	label
+SS	same subject	label
+SO	secondary object	label
+SMLF	semelfactive	label
+SENS	sensory	label
+ABL	separative	alias
+SEQ	sequential	label
+SIMV	similative	label
+SIM	simultaneous	label
+SG	singular	label
+SGT	singulative	label
+SOC	sociative	label
+1HON	speaker-honorific	label
+1HML	speaker-humble	label
+SPEC	specific	label
+SPECL	speculative	label
+SPHER	spherical	label
+STAT	stative	label
+SUBEL	subelative	label
+SUBESS	subessive	label
+SBJ	subject	label
+SBJV	subjunctive	label
+SUBL	sublative	label
+SR	subordinator	label
+SUPL	superdirective	alias
+SUPEL	superelative	label
+SUPESS	superessive	label
+SUPF	superficial	label
+SUP	superlative	label
+SUPL	super-lative	label
+SUPN	supine	label
+MIR	surprise	alias
+TAG	tag question	label
+TMP	temporal	label
+TEMP	temporary	label
+TERM	terminative	label
+APPH	timitive	alias
+TOP	topic(alizer)	label
+TOT	total affectedness	label
+TRNSF	transformative	label
+TRNL	transitional	label
+TR	transitive	label
+P	transitive patient	label
+A	transitive subject	label
+TRR	transitivizer	label
+TRNSL	translative	label
+TRP	transportative	label
+TRL	trial	label
+U	undergoer	label
+UTOP	undergoer topic	label
+PL	unrestricted	alias
+UNSPEC	unspecified	label
+SUPRA	up(wards)	label
+VR	verbalizer	label
+VBZ	verbalizer	label
+INTV	verbal interrogative	label
+VERT	vertical	label
+VEN	ven(i)tive	label
+VIS	visible	label
+VIS	visual	label
+VOC	vocative	label
+VOL	volitional, volitive	label

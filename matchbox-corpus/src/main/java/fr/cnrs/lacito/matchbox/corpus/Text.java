@@ -206,6 +206,11 @@ public final class Text {
         return diagnosticsByGrammar.getOrDefault(grammarId, List.of());
     }
 
+    /** Diagnostics of one category, of all grammars, in rank order. */
+    public List<Diagnostic> diagnostics(Diagnostic.Category category) {
+        return diagnostics.stream().filter(d -> d.category() == category).toList();
+    }
+
     // ------------------------------------------------------------------
     // Header and sections
     // ------------------------------------------------------------------
@@ -337,12 +342,15 @@ public final class Text {
                     }
                 } else {
                     int line = o == null || o.getTextCoordinate() == null ? 0 : o.getTextCoordinate().startLine();
-                    diags.add(Diagnostic.at(id, grammarId, line, 0,
-                        "Object ignored, the grammar returned an invalid span: " + problem));
+                    diags.add(Diagnostic.internal(id, grammarId, line,
+                        "Object ignored, the grammar returned an invalid span: " + problem).withCode("invalid-span"));
                 }
             }
             OverlapResolver.Outcome outcome = resolver.add(grammarId, grammarName, valid);
             diags.addAll(outcome.warnings());
+            for (CorpusObject o : outcome.kept()) {
+                collectIssues(o, grammarId, diags);
+            }
             this.objects.put(grammarId, outcome.kept());
             this.diagnostics.put(grammarId, List.copyOf(diags));
             return this;
@@ -354,6 +362,40 @@ public final class Text {
          */
         public List<Claim> claims() {
             return resolver.claims();
+        }
+
+        /** Semantic diagnostics of the issues of an object and its descendants (see {@link HasIssues}). */
+        private void collectIssues(CorpusObject o, String grammarId, List<Diagnostic> diags) {
+            if (o instanceof HasIssues withIssues) {
+                List<Issue> issues;
+                try {
+                    issues = withIssues.issues();
+                } catch (RuntimeException e) {
+                    logger.log(java.util.logging.Level.WARNING, "issues() of " + o.getKind() + " failed", e);
+                    issues = List.of(Issue.error("Internal error while checking this object: " + e, "internal"));
+                }
+                for (Issue issue : issues == null ? List.<Issue>of() : issues) {
+                    diags.add(toDiagnostic(issue, o, grammarId));
+                }
+            }
+            for (CorpusObject child : o.getChildren()) {
+                collectIssues(child, grammarId, diags);
+            }
+        }
+
+        private Diagnostic toDiagnostic(Issue issue, CorpusObject o, String grammarId) {
+            TextCoordinate objectSpan = o.getTextCoordinate();
+            Optional<TextCoordinate> inside = issue.span()
+                .filter(s -> Objects.equals(s.text(), id) && !s.isEmpty() && objectSpan.encloses(s));
+            TextCoordinate span = inside.orElse(objectSpan);
+            if (issue.span().isPresent() && inside.isEmpty()) {
+                logger.warning("Issue of " + o.getKind() + " outside the object, reported on the object: " + issue.span().get());
+            }
+            int start = span.startIndex();
+            int lineStart = Math.max(content.lastIndexOf('\n', start - 1), content.lastIndexOf('\r', start - 1)) + 1;
+            return new Diagnostic(id, grammarId, span.startLine(), start - lineStart, issue.message(),
+                start, span.stopIndex(), List.of(), issue.severity(), Diagnostic.Category.SEMANTIC,
+                issue.code(), issue.fixes());
         }
 
         private String findProblem(CorpusObject o, CorpusObject parent) {

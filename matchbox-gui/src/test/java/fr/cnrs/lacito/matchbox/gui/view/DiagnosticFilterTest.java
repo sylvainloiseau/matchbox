@@ -14,7 +14,7 @@ import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class ErrorFilterTest {
+class DiagnosticFilterTest {
 
     private static final TextId T = new TextId(Path.of("t.md"));
     private static final List<GrammarPlugin> INSTALLED =
@@ -35,10 +35,10 @@ class ErrorFilterTest {
     void oneChoicePerPluginAfterAllPlugins() {
         List<Diagnostic> errors = List.of(error("notebook-grammar"), error("markdown-heading-grammar"),
             error("notebook-grammar"), error("gone-grammar"));
-        List<ErrorFilter.Choice> choices = ErrorFilter.choices(errors, INSTALLED);
+        List<DiagnosticFilter.Choice> choices = DiagnosticFilter.choices(errors, INSTALLED);
         assertEquals(List.of("All plugins (4)", "Notebook Grammar (notebook-grammar) — 2",
                 "Markdown headings and metadata (markdown-heading-grammar) — 1", "gone-grammar — 1"),
-            choices.stream().map(ErrorFilter.Choice::toString).toList());
+            choices.stream().map(DiagnosticFilter.Choice::toString).toList());
         assertNull(choices.get(0).grammarId());
         assertTrue(choices.get(0).accepts(errors.get(1)));
         assertTrue(choices.get(1).accepts(errors.get(0)));
@@ -47,28 +47,40 @@ class ErrorFilterTest {
 
     @Test
     void theChosenPluginIsKeptWhileItHasErrors() {
-        List<ErrorFilter.Choice> choices = ErrorFilter.choices(List.of(error("notebook-grammar")), INSTALLED);
-        assertEquals("notebook-grammar", ErrorFilter.keep(choices, "notebook-grammar").grammarId());
-        assertNull(ErrorFilter.keep(choices, "markdown-heading-grammar").grammarId(), "back to all plugins");
-        assertNull(ErrorFilter.keep(ErrorFilter.choices(List.of(), INSTALLED), "notebook-grammar").grammarId());
+        List<DiagnosticFilter.Choice> choices = DiagnosticFilter.choices(List.of(error("notebook-grammar")), INSTALLED);
+        assertEquals("notebook-grammar", DiagnosticFilter.keep(choices, "notebook-grammar").grammarId());
+        assertNull(DiagnosticFilter.keep(choices, "markdown-heading-grammar").grammarId(), "back to all plugins");
+        assertNull(DiagnosticFilter.keep(DiagnosticFilter.choices(List.of(), INSTALLED), "notebook-grammar").grammarId());
     }
 
     @Test
     void tabTitles() {
-        assertEquals("Parsing errors", ErrorFilter.tabTitle(0, 0, false));
-        assertEquals("Parsing errors (12)", ErrorFilter.tabTitle(12, 12, false));
-        assertEquals("Parsing errors (3/12)", ErrorFilter.tabTitle(3, 12, true));
+        assertEquals("Parsing errors", DiagnosticFilter.tabTitle(0, 0, false));
+        assertEquals("Parsing errors (12)", DiagnosticFilter.tabTitle(12, 12, false));
+        assertEquals("Parsing errors (3/12)", DiagnosticFilter.tabTitle(3, 12, true));
     }
 
     @Test
     void tabTitlesCountWarningsApart() {
         Diagnostic warning = Diagnostic.warning(T, "g", 1, 0, "Not kept", 0, 3);
         Diagnostic error = error("g");
-        assertEquals("Parsing errors (2)", ErrorFilter.tabTitle(2, List.of(error, error), false));
-        assertEquals("Parsing errors (1 warning)", ErrorFilter.tabTitle(1, List.of(warning), false));
-        assertEquals("Parsing errors (2 errors, 1 warning)", ErrorFilter.tabTitle(3, List.of(error, warning, error), false));
-        assertEquals("Parsing errors (1/2)", ErrorFilter.tabTitle(1, List.of(error, warning), true));
-        assertEquals("Warning", ErrorFilter.severityLabel(warning));
-        assertEquals("Error", ErrorFilter.severityLabel(error));
+        assertEquals("Parsing errors (2)", DiagnosticFilter.tabTitle(2, List.of(error, error), false));
+        assertEquals("Parsing errors (1 warning)", DiagnosticFilter.tabTitle(1, List.of(warning), false));
+        assertEquals("Parsing errors (2 errors, 1 warning)", DiagnosticFilter.tabTitle(3, List.of(error, warning, error), false));
+        assertEquals("Parsing errors (1/2)", DiagnosticFilter.tabTitle(1, List.of(error, warning), true));
+        assertEquals("Warning", DiagnosticFilter.severityLabel(warning));
+        assertEquals("Error", DiagnosticFilter.severityLabel(error));
+    }
+
+    @Test
+    void tabTitlesOfTheWholeProject() {
+        Diagnostic warning = Diagnostic.warning(T, "g", 1, 0, "Not kept", 0, 3);
+        Diagnostic error = error("g");
+        String s = DiagnosticFilter.SEMANTIC_ISSUES;
+        assertEquals("Semantic issues", DiagnosticFilter.tabTitle(s, 0, List.of(), false, 0));
+        assertEquals("Semantic issues (4 in 3 files)", DiagnosticFilter.tabTitle(s, 4, List.of(error, error, error, error), false, 3));
+        assertEquals("Semantic issues (2 errors, 1 warning in 1 file)",
+            DiagnosticFilter.tabTitle(s, 3, List.of(error, warning, error), false, 1));
+        assertEquals("Semantic issues (1/3 in 2 files)", DiagnosticFilter.tabTitle(s, 1, List.of(error, warning, error), true, 2));
     }
 }

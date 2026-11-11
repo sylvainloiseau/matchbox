@@ -25,6 +25,10 @@ import org.antlr.v4.runtime.CommonTokenStream;
 public class MarkdownHeadingGrammarPlugin extends AbstractGrammarPlugin {
 
     public static final String ID = "markdown-heading-grammar";
+
+    /** Codes of the diagnostics. */
+    public static final String CODE_DUPLICATE_KEY = "markdown.duplicate-key";
+    public static final String CODE_UNSUPPORTED = "markdown.unsupported";
     public static final String KIND_SECTION = ID + ":section";
     public static final String KIND_HEADER = ID + ":header";
 
@@ -74,6 +78,11 @@ public class MarkdownHeadingGrammarPlugin extends AbstractGrammarPlugin {
                 video file, relative to the project or the note, or an http(s) URL), `speakers` (names separated by
                 commas).
             - Nothing is recognised inside fenced code blocks (``` or ~~~).
+
+            Problems reported:
+            - `markdown.unsupported` (parsing error): a list, a nested value or a multi-line value in a metadata block;
+            - `markdown.duplicate-key` (semantic warning): a key given twice in a block; the last value is used;
+              fix: remove the earlier line.
             """;
     }
 
@@ -149,7 +158,7 @@ public class MarkdownHeadingGrammarPlugin extends AbstractGrammarPlugin {
             diagnostics.addAll(errors.getDiagnostics());
             diagnostics.addAll(visitor.diagnostics());
         } catch (RuntimeException e) {
-            diagnostics.add(Diagnostic.at(text, ID, 0, 0, "Internal error of the grammar: " + e));
+            diagnostics.add(Diagnostic.internal(text, ID, 0, "Internal error of the grammar: " + e));
         }
         return new ParseResult(objects, diagnostics);
     }

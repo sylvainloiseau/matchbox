@@ -9,6 +9,7 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleDependencyTree;
 import fr.cnrs.lacito.matchbox.grammarapi.Spans;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -51,8 +52,10 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
         Map<String, String> metadata = new LinkedHashMap<>();
         List<Map<String, String>> tokens = new ArrayList<>();
         List<Integer> heads = new ArrayList<>();
+        List<TextCoordinate> tokenSpans = new ArrayList<>();
 
         String metadataKey = null;
+        Token tokenStart = null;
         boolean afterEquals = false;
         Map<String, String> token = null;
         for (int i = 0; i < ctx.getChildCount(); i++) {
@@ -71,6 +74,7 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
                 }
                 case ConllLexer.EQ_OTHER_HEADER -> afterEquals = true;
                 case ConllLexer.TOKEN_ID -> {
+                    tokenStart = t;
                     token = new LinkedHashMap<>();
                     token.put("ID", t.getText());
                 }
@@ -83,6 +87,9 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
                     if (token != null) {
                         tokens.add(token);
                         heads.add(parseHead(token.get("HEAD")));
+                        int stop = Math.max(t.getStartIndex() - 1, tokenStart.getStopIndex());
+                        tokenSpans.add(new TextCoordinate(filePath, tokenStart.getStartIndex(), stop,
+                            tokenStart.getLine(), tokenStart.getLine()));
                         token = null;
                     }
                 }
@@ -95,7 +102,8 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
             ctx.SENT_ID().getText().strip(),
             metadata,
             tokens,
-            heads
+            heads,
+            tokenSpans
         );
     }
 
@@ -224,7 +232,7 @@ The fields must additionally meet the following constraints:
 
             errors.addAll(errorListener.getDiagnostics());
         } catch (RuntimeException e) {
-            errors.add(Diagnostic.at(filePath, getId(), 0, 0, "Internal error of the grammar: " + e));
+            errors.add(Diagnostic.internal(filePath, getId(), 0, "Internal error of the grammar: " + e));
         }
         return new ParseResult(objects, errors);
     }

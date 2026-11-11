@@ -86,10 +86,11 @@ class MainWindowTest extends MainWindowFixture {
 
     private void editTranslation(FxRobot robot, String from, String to) {
         TextField field = translationField(robot, from);
-        robot.clickOn(field);
-        robot.interact(field::selectAll);
-        robot.write(to);
-        robot.type(KeyCode.ENTER);
+        robot.interact(() -> {
+            field.requestFocus();
+            field.setText(to);
+            field.fireEvent(new javafx.event.ActionEvent());
+        });
     }
 
     // ------------------------------------------------------------------

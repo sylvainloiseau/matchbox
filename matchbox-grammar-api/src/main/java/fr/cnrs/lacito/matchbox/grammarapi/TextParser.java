@@ -46,7 +46,7 @@ public final class TextParser {
             } catch (RuntimeException | LinkageError e) {
                 logger.log(Level.WARNING, "Grammar " + plugin.getId() + " failed on " + id, e);
                 result = new ParseResult(List.of(), List.of(
-                    Diagnostic.at(id, plugin.getId(), 0, 0, "Internal error of the grammar: " + e)
+                    Diagnostic.internal(id, plugin.getId(), 0, "Internal error of the grammar: " + e)
                 ));
             }
             builder.add(plugin.getId(), displayName(plugin), result.objects(), result.diagnostics());

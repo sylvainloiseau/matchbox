@@ -558,6 +558,9 @@ public class MainController {
     /** Shows the problems found when the project was loaded (unreadable files, invalid patterns). */
     private void reportLoadProblems() {
         Project project = project();
+        if (project != null && !project.getLoadNotes().isEmpty()) {
+            workbench.status().info(String.join(" ", project.getLoadNotes()) + " Save the project to keep it.");
+        }
         if (project != null && !project.getLoadProblems().isEmpty()) {
             ErrorReporter.report(
                 primaryStage,
@@ -568,6 +571,18 @@ public class MainController {
                     + " missing files again with Current project › Add file…"
             );
         }
+    }
+
+    /** Current project › Reload context dictionary: reads the LIFT file again (it may have been edited elsewhere). */
+    @FXML
+    public void handleReloadDictionary() {
+        if (project() == null) return;
+        if (project().getContextDictionary().isEmpty()) {
+            workbench.status().info("No context dictionary: choose one in Project properties");
+            return;
+        }
+        workbench.problems().reloadDictionary();
+        workbench.status().info("Reloading " + project().getContextDictionary().get().getFileName() + "…");
     }
 
     public void handleOpenProject() {

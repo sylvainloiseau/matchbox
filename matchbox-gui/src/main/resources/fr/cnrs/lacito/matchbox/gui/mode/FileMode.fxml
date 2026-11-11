@@ -63,34 +63,7 @@
               <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0" />
             </content>
           </Tab>
-          <Tab fx:id="parsingErrorPane" text="Parsing errors">
-            <content>
-              <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                <children>
-                  <VBox spacing="4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                    <children>
-                      <HBox alignment="CENTER_LEFT" spacing="6" style="-fx-padding: 4 4 0 4;">
-                        <children>
-                          <Label text="Plugin:" />
-                          <ChoiceBox fx:id="errorPluginChoice" prefWidth="320" />
-                          <CheckBox fx:id="showWarningsCheck" mnemonicParsing="false" text="Show warnings" />
-                        </children>
-                      </HBox>
-                      <TableView fx:id="errorTableView" VBox.vgrow="ALWAYS">
-                        <columns>
-                          <TableColumn fx:id="severityColumn" prefWidth="90" text="Severity" />
-                          <TableColumn fx:id="lineColumn" prefWidth="60" text="Line" />
-                          <TableColumn fx:id="charPositionColumn" prefWidth="80" text="Position" />
-                          <TableColumn fx:id="pluginColumn" prefWidth="260" text="Plugin" />
-                          <TableColumn fx:id="messageColumn" prefWidth="600" text="Message" />
-                        </columns>
-                      </TableView>
-                    </children>
-                  </VBox>
-                </children>
-              </AnchorPane>
-            </content>
-          </Tab>
+          <Tab fx:id="parsingErrorPane" text="Parsing errors" />
         </tabs>
       </TabPane>
     </VBox>

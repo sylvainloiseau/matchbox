@@ -16,11 +16,9 @@ import fr.cnrs.lacito.matchbox.corpus.Field;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
 import fr.cnrs.lacito.matchbox.corpus.capability.Example;
-import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearSentence;
 import fr.cnrs.lacito.matchbox.corpus.capability.LexicalEntry;
 import fr.cnrs.lacito.matchbox.corpus.capability.Sense;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleExample;
-import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleLexicalDefinition;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleSense;
 import fr.cnrs.lacito.matchbox.grammarapi.Spans;
@@ -37,7 +35,6 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
 
     public static final String ID = "notebook-grammar";
-    public static final String KIND_IGT = ID + ":igt";
     public static final String KIND_ENTRY = ID + ":lexical-entry";
     public static final String KIND_SENSE = ID + ":sense";
     public static final String KIND_EXAMPLE = ID + ":example";
@@ -58,13 +55,12 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
 
     @Override
     public List<String> getObjectKinds() {
-        return List.of(KIND_IGT, KIND_ENTRY, KIND_SENSE, KIND_EXAMPLE);
+        return List.of(KIND_ENTRY, KIND_SENSE, KIND_EXAMPLE);
     }
 
     /** Interlinear glossed texts and lexical entries keep their former highlight colours. */
     @Override
     public DisplayStyle getDefaultDisplayStyle(String kind) {
-        if (KIND_IGT.equals(kind)) return DisplayStyle.background("#fff1c1");
         if (KIND_ENTRY.equals(kind)) return DisplayStyle.background("#dfe7fd");
         return DisplayStyle.EMPTY;
     }
@@ -82,14 +78,13 @@ public class NotebookGrammarPlugin extends AbstractGrammarPlugin {
     @Override
     public String getFormatDocumentation() {
         return """
-This grammar look for two patterns
+This grammar looks for lexical entries.
 
-Both patterns start at the beginning of a line. Every other line (free text, Markdown headings, `---` lines, metadata) is ignored.
+Entries start at the beginning of a line. Every other line (free text, Markdown headings, `---` lines, metadata) is ignored.
 
-- The first one is is a IGT (interlinear glossed text) sentence. It is a group of three Line preceded and followed by a line containing only three columns (:::). The first line contains word, separated by blank and segemented into morphemes by hyphens. The second line contains the exact number of whitespace-separated tokens, each divided in the exact number of hyphen-separated morphemes than their corresponding token on the first line. This line contains a gloss for each morphemes on the first line.
-  - Note that IGT rules allow a equal sign (=) instead of a hyphen (-) for clitic boundaries. In that case, the corresponding morphems gloss in the second line must also have a = sign at the corresponding position.
+- IGTs (interlinear glossed text between ::: lines) are read by the IGT grammar (igt-grammar), not by this one.
 
-- The second pattern is a lexical entry definition. It contains a headword between brackets, followed by a definition between curly braces.
+- The pattern is a lexical entry definition. It contains a headword between brackets, followed by a definition between curly braces.
 
 """;
 
@@ -138,31 +133,6 @@ Both patterns start at the beginning of a line. Every other line (free text, Mar
 
             // Rules produced by error recovery may lack tokens: such objects are skipped
             // (the syntax error is reported anyway), the others are kept.
-            for (var x : listener.getIGTs()) {
-                if (x.exception != null || x.IMB_LINE().size() < 2 || x.IMB_QUOTED_LINE() == null) {
-                    continue;
-                }
-                Token quoted = x.IMB_QUOTED_LINE().getSymbol();
-                objects.add(
-                    new SimpleIGT(
-                        KIND_IGT,
-                        Spans.of(filePath, x),
-                        x.IMB_LINE(0).getText(),
-                        x.IMB_LINE(1).getText(),
-                        x.IMB_QUOTED_LINE().getText(),
-                        List.of(
-                            field(filePath, InterlinearSentence.TRANSCRIPTION, x.IMB_LINE(0)),
-                            field(filePath, InterlinearSentence.MORPHEMES, x.IMB_LINE(1)),
-                            // the translation without its quotes
-                            new Field(InterlinearSentence.FREE_TRANSLATION,
-                                quoted.getText().substring(1, quoted.getText().length() - 1),
-                                new TextCoordinate(filePath, quoted.getStartIndex() + 1, quoted.getStopIndex() - 1,
-                                    quoted.getLine(), quoted.getLine()))
-                        )
-                    )
-                );
-            }
-
             for (var x : listener.getLexicalDefinitions()) {
                 if (x.exception != null || x.TXT() == null) {
                     continue;
@@ -212,7 +182,7 @@ Both patterns start at the beginning of a line. Every other line (free text, Mar
             }
             errors.addAll(errorListener.getDiagnostics());
         } catch (RuntimeException e) {
-            errors.add(Diagnostic.at(filePath, getId(), 0, 0, "Internal error of the grammar: " + e));
+            errors.add(Diagnostic.internal(filePath, getId(), 0, "Internal error of the grammar: " + e));
         }
         return new ParseResult(objects, errors);
     }
@@ -231,7 +201,7 @@ Both patterns start at the beginning of a line. Every other line (free text, Mar
 
     /** Refuses values that would change the structure of the notation, then writes them verbatim. */
     private static final ObjectEditor EDITOR = (object, fieldName, value, content) -> {
-        String forbidden = object instanceof InterlinearSentence ? "" : FORBIDDEN.getOrDefault(fieldName, "");
+        String forbidden = FORBIDDEN.getOrDefault(fieldName, "");
         for (char c : forbidden.toCharArray()) {
             if (value.indexOf(c) >= 0) {
                 return new EditProposal.Refused("The character " + c + " is not allowed here");
@@ -239,10 +209,6 @@ Both patterns start at the beginning of a line. Every other line (free text, Mar
         }
         if (value.isBlank()) {
             return new EditProposal.Refused("The value cannot be empty");
-        }
-        if (object instanceof InterlinearSentence && !fieldName.equals(InterlinearSentence.FREE_TRANSLATION)
-            && (value.startsWith("'") || value.strip().equals(":::"))) {
-            return new EditProposal.Refused("A line of an IGT cannot start with ' or be :::");
         }
         return ObjectEditor.VERBATIM.setField(object, fieldName, value, content);
     };

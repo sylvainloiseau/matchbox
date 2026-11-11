@@ -42,6 +42,7 @@ public final class Workbench implements AutoCloseable {
     private final ViewContext viewContext;
     private final SegmentPlayback playback;
     private final ProjectFiles files;
+    private final Problems problems;
     private HostServices hostServices;
 
     /**
@@ -73,6 +74,7 @@ public final class Workbench implements AutoCloseable {
         this.viewContext = new WorkbenchViewContext(this);
         this.playback = new SegmentPlayback(viewContext, status);
         this.files = new ProjectFiles(this);
+        this.problems = new Problems(session, navigator, edits, status, this::focus, applyExecutor);
         // the players and the hints belong to the files of the previous project
         session.onProjectChanging(() -> {
             mediaPlayers.closeAll();
@@ -125,6 +127,11 @@ public final class Workbench implements AutoCloseable {
     }
 
     /** The files and directories of the project (add, settings, remove). */
+    /** The problems (parsing errors, semantic issues) of the project. */
+    public Problems problems() {
+        return problems;
+    }
+
     public ProjectFiles files() {
         return files;
     }
@@ -220,6 +227,7 @@ public final class Workbench implements AutoCloseable {
     @Override
     public void close() {
         edits.close();
+        problems.close();
         mediaPlayers.closeAll();
         if (assist != null) {
             assist.close();

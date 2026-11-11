@@ -44,4 +44,23 @@ class ProjectLoadParseTest {
         assertTrue(objects(loaded, inDirectory) > 0, "files of a directory too");
         assertFalse(loaded.definitionChangedProperty().get());
     }
+
+    @Test
+    void aProjectReadingIgtsWithTheNotebookGrammarGetsTheIgtGrammar() throws Exception {
+        Path notes = Files.writeString(dir.resolve("old.txt"), "<mami> {pig}\n\n:::\na mio\n1sg go\n'I go'\n:::\n");
+        Path mbx = Files.writeString(dir.resolve("old.mbx"), """
+            <project name="Old">
+              <fileset><file path="%s" /></fileset>
+              <pattern><name>Notes</name><regex>.*\\.txt</regex><grammar id="notebook-grammar" rank="0" /></pattern>
+            </project>
+            """.formatted(notes.toString().replace("&", "&amp;")));
+        Project loaded = Project.loadProject(PluginManager.loadPlugins(), mbx.toFile());
+        assertEquals(java.util.List.of("notebook-grammar", "igt-grammar"),
+            loaded.getFileTypes().get(0).getGrammars().stream().map(g -> g.getId()).toList());
+        assertEquals(1, loaded.getLoadNotes().size());
+        assertTrue(loaded.definitionChangedProperty().get(), "saving keeps the migration");
+        var text = loaded.getCorpus().text(loaded.getParsedText(notes).getId()).orElseThrow();
+        assertEquals(1, text.objectsOf(InterlinearSentence.class).size());
+        assertEquals(1, text.objectsOf(LexicalEntry.class).size());
+    }
 }

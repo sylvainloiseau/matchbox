@@ -2,6 +2,7 @@ package fr.cnrs.lacito.matchbox.grammar.markdownheading;
 
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.corpus.Field;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
@@ -136,6 +137,7 @@ final class MarkdownHeadingVisitor extends MarkdownHeadingParserBaseVisitor<Void
         if (ctx.exception != null || ctx.META_CLOSE() == null) return null;
         Map<String, String> values = new LinkedHashMap<>();
         Map<String, Field> fields = new LinkedHashMap<>();
+        Map<String, Token> entries = new LinkedHashMap<>();
         for (var entry : ctx.entry()) {
             if (entry instanceof KeyValueContext kv && kv.META_ENTRY() != null) {
                 Token t = kv.META_ENTRY().getSymbol();
@@ -145,8 +147,9 @@ final class MarkdownHeadingVisitor extends MarkdownHeadingParserBaseVisitor<Void
                     continue;
                 }
                 if (values.containsKey(e.key())) {
-                    report(t, "Duplicate key '" + e.key() + "': the last value is used");
+                    duplicate(t, e.key(), entries.get(e.key()));
                 }
+                entries.put(e.key(), t);
                 values.remove(e.key());
                 values.put(e.key(), e.value());
                 fields.remove(e.key());
@@ -159,10 +162,23 @@ final class MarkdownHeadingVisitor extends MarkdownHeadingParserBaseVisitor<Void
         return new Block(values, List.copyOf(fields.values()), Spans.of(text, ctx));
     }
 
+    /** A key given twice: a warning on the later line (its value is used), fixed by removing the earlier one. */
+    private void duplicate(Token t, String key, Token earlier) {
+        int stop = t.getStartIndex() + stripEol(t.getText()).length() - 1;
+        List<Diagnostic.Fix> fixes = earlier == null ? List.of() : List.of(new Diagnostic.Fix(
+            "Remove the earlier '" + key + "' line (line " + earlier.getLine() + ")",
+            List.of(TextEdit.replace(content, earlier.getStartIndex(), earlier.getStopIndex() + 1, ""))));
+        diagnostics.add(Diagnostic.semantic(text, MarkdownHeadingGrammarPlugin.ID, t.getLine(), 0,
+                "Duplicate key '" + key + "': the last value is used", t.getStartIndex(),
+                Math.max(stop, t.getStartIndex() - 1), Diagnostic.Severity.WARNING)
+            .withCode(MarkdownHeadingGrammarPlugin.CODE_DUPLICATE_KEY)
+            .withFixes(fixes));
+    }
+
     private void report(Token t, String message) {
         int stop = t.getStartIndex() + stripEol(t.getText()).length() - 1;
         diagnostics.add(new Diagnostic(text, MarkdownHeadingGrammarPlugin.ID, t.getLine(), 0, message,
-            t.getStartIndex(), Math.max(stop, t.getStartIndex() - 1), List.of()));
+            t.getStartIndex(), Math.max(stop, t.getStartIndex() - 1), List.of()).withCode(MarkdownHeadingGrammarPlugin.CODE_UNSUPPORTED));
     }
 
     // ------------------------------------------------------------------

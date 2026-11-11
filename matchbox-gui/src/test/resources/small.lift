@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lift version="0.13">
+  <entry id="kwa_1">
+    <lexical-unit><form lang="fra-x-ipa"><text>kʁwa</text></form></lexical-unit>
+    <sense id="s1">
+      <gloss lang="en"><text>think; suppose</text></gloss>
+      <subsense id="s1a"><gloss lang="en"><text>reckon</text></gloss></subsense>
+    </sense>
+  </entry>
+  <entry id="ase_1">
+    <lexical-unit><form lang="fra-x-ipa"><text>ase</text></form></lexical-unit>
+    <variant><form lang="fra-x-ipa"><text>asse</text></form></variant>
+    <sense id="s2"><gloss lang="en"><text>enough</text></gloss><gloss lang="de"><text>genug</text></gloss></sense>
+  </entry>
+</lift>

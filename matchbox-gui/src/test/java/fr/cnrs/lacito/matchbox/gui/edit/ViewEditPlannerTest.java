@@ -9,8 +9,8 @@ import fr.cnrs.lacito.matchbox.corpus.Corpus;
 import fr.cnrs.lacito.matchbox.corpus.Text;
 import fr.cnrs.lacito.matchbox.corpus.TextEdit;
 import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearSentence;
-import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
-import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookGrammarPlugin;
+import fr.cnrs.lacito.matchbox.corpus.simple.SimpleInterlinearGlossedText;
+import fr.cnrs.lacito.matchbox.grammar.igt.IgtGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.EditProposal;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
@@ -40,18 +40,18 @@ class ViewEditPlannerTest {
 
     @TempDir
     Path dir;
-    private final GrammarPlugin grammar = new NotebookGrammarPlugin();
+    private final GrammarPlugin grammar = new IgtGrammarPlugin();
     private final EditValidator validator = new EditValidator();
     private final Corpus corpus = new Corpus();
     private TextDocument document;
-    private SimpleIGT igt;
+    private SimpleInterlinearGlossedText igt;
 
     @BeforeEach
     void setUp() throws Exception {
         document = new TextDocument(Files.writeString(dir.resolve("notes.txt"), TEXT));
         ParseResult r = grammar.getResult(document.getId(), TEXT);
         corpus.put(Text.builder(document.getId(), TEXT).add(grammar.getId(), r.objects(), r.diagnostics()).build());
-        igt = corpus.text(document.getId()).orElseThrow().objectsOf(SimpleIGT.class).get(0);
+        igt = corpus.text(document.getId()).orElseThrow().objectsOf(SimpleInterlinearGlossedText.class).get(0);
     }
 
     @AfterEach
@@ -99,9 +99,9 @@ class ViewEditPlannerTest {
 
     @Test
     void editsAddingParseErrorsAreRefusedUnlessAllowed() {
-        int at = TEXT.indexOf("1sg");
-        // a line starting with a quote breaks the IGT block
-        List<TextEdit> breaking = List.of(TextEdit.replace(TEXT, at, at + 3, "'1sg"));
+        int at = TEXT.lastIndexOf(":::");
+        // without its closing line the IGT block is not closed
+        List<TextEdit> breaking = List.of(TextEdit.replace(TEXT, at, at + 3, "::"));
         var failed = assertInstanceOf(ViewEditPlanner.Failed.class, planner(true).prepare(igt, breaking));
         assertInstanceOf(EditOutcome.Invalid.class, failed.outcome());
         assertInstanceOf(ViewEditPlanner.Ready.class, planner(false).prepare(igt, breaking));
@@ -144,7 +144,7 @@ class ViewEditPlannerTest {
         ParseResult r = grammar.getResult(document.getId(), text);
         corpus.put(Text.builder(document.getId(), text).version(document.getVersion())
             .add(grammar.getId(), r.objects(), r.diagnostics()).build());
-        igt = corpus.text(document.getId()).orElseThrow().objectsOf(SimpleIGT.class).get(0);
+        igt = corpus.text(document.getId()).orElseThrow().objectsOf(SimpleInterlinearGlossedText.class).get(0);
     }
 
     private List<TextEdit> setTranslationOfParse(String value) {

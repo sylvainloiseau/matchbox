@@ -18,10 +18,19 @@ import java.util.function.Consumer;
  * @param recentCharacters     special characters inserted recently, most recent first
  * @param showWarnings         the Parsing errors table also lists warnings (e.g. readings not kept
  *                             because another grammar reads the same text)
+ * @param problems             settings of the problem tables (scope, warnings, code column)
  */
 public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer fontSize, String fontFamily,
                                  Boolean highlightCurrentLine, Boolean showInvisibles, Boolean autoIndent,
-                                 List<String> recentCharacters, Boolean showWarnings) {
+                                 List<String> recentCharacters, Boolean showWarnings, ProblemsSettingsData problems) {
+
+    /** Settings without {@code problems} (written before it existed): defaults. */
+    public EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer fontSize, String fontFamily,
+                              Boolean highlightCurrentLine, Boolean showInvisibles, Boolean autoIndent,
+                              List<String> recentCharacters, Boolean showWarnings) {
+        this(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent,
+            recentCharacters, showWarnings, null);
+    }
 
     /** Settings without {@code showWarnings} (written before it existed): shown. */
     public EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer fontSize, String fontFamily,
@@ -37,7 +46,8 @@ public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer
     public static final int MAX_RECENT_CHARACTERS = 24;
 
     public static EditorSettingsData defaults() {
-        return new EditorSettingsData(false, true, DEFAULT_FONT_SIZE, null, true, false, true, List.of(), true);
+        return new EditorSettingsData(false, true, DEFAULT_FONT_SIZE, null, true, false, true, List.of(), true,
+            ProblemsSettingsData.defaults());
     }
 
     /** Copy where missing or invalid values are replaced by the defaults. */
@@ -63,7 +73,8 @@ public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer
             recentCharacters == null ? List.of()
                 : recentCharacters.stream().filter(c -> c != null && !c.isEmpty()).distinct()
                     .limit(MAX_RECENT_CHARACTERS).toList(),
-            showWarnings == null ? d.showWarnings : showWarnings);
+            showWarnings == null ? d.showWarnings : showWarnings,
+            this.problems == null ? d.problems : this.problems.validated());
     }
 
     public static int clamp(int size) {
@@ -71,37 +82,47 @@ public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer
     }
 
     public EditorSettingsData withWrapLines(boolean value) {
-        return new EditorSettingsData(value, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings);
+        return new EditorSettingsData(value, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings, problems);
     }
 
     public EditorSettingsData withLineNumbers(boolean value) {
-        return new EditorSettingsData(wrapLines, value, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings);
+        return new EditorSettingsData(wrapLines, value, fontSize, fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings, problems);
     }
 
     public EditorSettingsData withFontSize(int value) {
-        return new EditorSettingsData(wrapLines, lineNumbers, clamp(value), fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings);
+        return new EditorSettingsData(wrapLines, lineNumbers, clamp(value), fontFamily, highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings, problems);
     }
 
     public EditorSettingsData withFontFamily(String value) {
         return new EditorSettingsData(wrapLines, lineNumbers, fontSize, value == null || value.isBlank() ? null : value,
-            highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings);
+            highlightCurrentLine, showInvisibles, autoIndent, recentCharacters, showWarnings, problems);
     }
 
     public EditorSettingsData withHighlightCurrentLine(boolean value) {
-        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, value, showInvisibles, autoIndent, recentCharacters, showWarnings);
+        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, value, showInvisibles, autoIndent, recentCharacters, showWarnings, problems);
     }
 
     public EditorSettingsData withShowInvisibles(boolean value) {
-        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, value, autoIndent, recentCharacters, showWarnings);
+        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, value, autoIndent, recentCharacters, showWarnings, problems);
     }
 
     public EditorSettingsData withAutoIndent(boolean value) {
-        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, value, recentCharacters, showWarnings);
+        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles, value, recentCharacters, showWarnings, problems);
     }
 
     public EditorSettingsData withShowWarnings(boolean value) {
         return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles,
-            autoIndent, recentCharacters, value);
+            autoIndent, recentCharacters, value, problems);
+    }
+
+    public EditorSettingsData withProblems(ProblemsSettingsData value) {
+        return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles,
+            autoIndent, recentCharacters, showWarnings, value);
+    }
+
+    /** Settings of the problem tables, defaults if not set. */
+    public ProblemsSettingsData problemsOrDefaults() {
+        return problems == null ? ProblemsSettingsData.defaults() : problems.validated();
     }
 
     /** A copy where {@code character} is the most recent special character. */
@@ -110,6 +131,6 @@ public record EditorSettingsData(Boolean wrapLines, Boolean lineNumbers, Integer
         recent.add(character);
         if (recentCharacters != null) recentCharacters.stream().filter(c -> !c.equals(character)).forEach(recent::add);
         return new EditorSettingsData(wrapLines, lineNumbers, fontSize, fontFamily, highlightCurrentLine, showInvisibles,
-            autoIndent, recent.stream().limit(MAX_RECENT_CHARACTERS).toList(), showWarnings);
+            autoIndent, recent.stream().limit(MAX_RECENT_CHARACTERS).toList(), showWarnings, problems);
     }
 }

@@ -12,7 +12,7 @@ import fr.cnrs.lacito.matchbox.corpus.Text;
 import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearSentence;
 import fr.cnrs.lacito.matchbox.corpus.capability.Section;
 import fr.cnrs.lacito.matchbox.grammar.markdownheading.MarkdownHeadingGrammarPlugin;
-import fr.cnrs.lacito.matchbox.grammar.notebook.NotebookGrammarPlugin;
+import fr.cnrs.lacito.matchbox.grammar.igt.IgtGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammar.tag.TagGrammarPlugin;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.mode.FileMode;
@@ -107,9 +107,9 @@ class OverlapGuiTest extends MainWindowFixture {
     void the_igt_keeps_its_colour_inside_a_section_whatever_the_order(FxRobot robot) throws IOException {
         for (boolean markdownFirst : new boolean[] {true, false}) {
             if (markdownFirst) {
-                grammars(robot, new MarkdownHeadingGrammarPlugin(), new NotebookGrammarPlugin());
+                grammars(robot, new MarkdownHeadingGrammarPlugin(), new IgtGrammarPlugin());
             } else {
-                grammars(robot, new NotebookGrammarPlugin(), new MarkdownHeadingGrammarPlugin());
+                grammars(robot, new IgtGrammarPlugin(), new MarkdownHeadingGrammarPlugin());
             }
             Path file = open(robot, "story-" + markdownFirst + ".md", NOTES);
             InterlinearSentence igt = igt(file);
@@ -130,7 +130,7 @@ class OverlapGuiTest extends MainWindowFixture {
 
     @Test
     void a_click_in_the_igt_selects_it_and_the_band_follows_the_section(FxRobot robot) throws IOException {
-        grammars(robot, new MarkdownHeadingGrammarPlugin(), new NotebookGrammarPlugin());
+        grammars(robot, new MarkdownHeadingGrammarPlugin(), new IgtGrammarPlugin());
         Path file = open(robot, "click.md", NOTES);
         InterlinearSentence igt = igt(file);
         int offset = igt.getTextCoordinate().startIndex() + 1;
@@ -148,7 +148,7 @@ class OverlapGuiTest extends MainWindowFixture {
 
     @Test
     void a_reading_not_kept_has_a_warning_marker_a_row_and_an_outline(FxRobot robot) throws IOException {
-        grammars(robot, new NotebookGrammarPlugin(), new TagGrammarPlugin(), new DuplicateIgtGrammar());
+        grammars(robot, new IgtGrammarPlugin(), new TagGrammarPlugin(), new DuplicateIgtGrammar());
         Path file = open(robot, "twice.md", NOTES);
         InterlinearSentence igt = igt(file);
         assertTrue(text(file).objects(DuplicateIgtGrammar.ID).isEmpty());
@@ -166,13 +166,14 @@ class OverlapGuiTest extends MainWindowFixture {
 
         // the errors tab lists the warning, with its severity, and counts it
         @SuppressWarnings("unchecked")
-        TableView<Diagnostic> errors = robot.lookup("#errorTableView").queryAs(TableView.class);
-        assertTrue(errors.getItems().stream().anyMatch(Diagnostic::isWarning));
+        TableView<fr.cnrs.lacito.matchbox.gui.problems.ProblemRow> errors =
+            robot.lookup("#errorTableView").queryAs(TableView.class);
+        assertTrue(errors.getItems().stream().anyMatch(r -> r.diagnostic().isWarning()));
         Tab errorsTab = robot.lookup(".tab-pane").queryAllAs(javafx.scene.control.TabPane.class).stream()
             .flatMap(p -> p.getTabs().stream()).filter(t -> t.getText().startsWith("Parsing errors")).findFirst().orElseThrow();
         assertEquals("Parsing errors (1 warning)", errorsTab.getText());
         // hiding the warnings is remembered
-        javafx.scene.control.CheckBox show = robot.lookup("#showWarningsCheck").queryAs(javafx.scene.control.CheckBox.class);
+        javafx.scene.control.CheckBox show = robot.lookup("#errorShowWarningsCheck").queryAs(javafx.scene.control.CheckBox.class);
         robot.interact(() -> show.setSelected(false));
         assertTrue(errors.getItems().isEmpty());
         assertFalse(settings.editorProperty().get().showWarnings());
@@ -183,7 +184,7 @@ class OverlapGuiTest extends MainWindowFixture {
     @Test
     void the_overlaps_tab_lists_the_project_and_shows_both(FxRobot robot) throws IOException {
         // empty state
-        grammars(robot, new NotebookGrammarPlugin(), new DuplicateIgtGrammar());
+        grammars(robot, new IgtGrammarPlugin(), new DuplicateIgtGrammar());
         open(robot, "plain.md", "just prose\n");
         robot.interact(() -> fileMode().showOverlaps());
         @SuppressWarnings("unchecked")

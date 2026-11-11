@@ -152,7 +152,9 @@ final class OverlapResolver {
         conflicts.add(new MatchConflict(kind, object, grammarId, other.object(), other.grammarId(), message));
         TextCoordinate span = object.getTextCoordinate();
         warnings.add(Diagnostic.warning(id, grammarId, span.startLine(), 0, message,
-            span.startIndex(), span.stopIndex()));
+                span.startIndex(), span.stopIndex())
+            .withCategory(Diagnostic.Category.OVERLAP)
+            .withCode("overlap." + kind.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-')));
     }
 
     static String message(MatchConflict.Kind kind, CorpusObject object, Placed other) {

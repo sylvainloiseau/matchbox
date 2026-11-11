@@ -180,6 +180,13 @@ public final class ViewEditService {
 
     /** A field name for the user: "freeTranslation" → "free translation". */
     static String describe(String fieldName) {
+        // the fields of an interlinear glossed text: line/i, line/i/w, meta/key
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("line/(\\d+)(?:/(\\d+))?").matcher(fieldName);
+        if (m.matches()) {
+            int line = Integer.parseInt(m.group(1)) + 1;
+            return m.group(2) == null ? "line " + line : "word " + (Integer.parseInt(m.group(2)) + 1) + " of line " + line;
+        }
+        if (fieldName.startsWith("meta/")) return fieldName.substring("meta/".length());
         return fieldName.replaceAll("([a-z0-9])([A-Z])", "$1 $2").toLowerCase(java.util.Locale.ROOT);
     }
 

@@ -17,9 +17,10 @@ import fr.cnrs.lacito.matchbox.gui.mode.fileMode.FileTree;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.FindBar;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.ShortcutsWindow;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.SpecialCharacterPopup;
-import fr.cnrs.lacito.matchbox.gui.view.ErrorFilter;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.OverlapRows;
 import fr.cnrs.lacito.matchbox.gui.mode.fileMode.OverlapsPane;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.DiagnosticsPane;
+import fr.cnrs.lacito.matchbox.gui.view.DiagnosticFilter;
 import fr.cnrs.lacito.matchbox.gui.view.GrammarNames;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.view.Kinds;
@@ -128,32 +129,6 @@ public class FileMode implements Mode {
     private ToggleButton suggestionsToggle;
 
     @FXML
-    private TableView<Diagnostic> errorTableView;
-
-    @FXML
-    private TableColumn<Diagnostic, String> severityColumn;
-
-    @FXML
-    private TableColumn<Diagnostic, Number> lineColumn;
-
-    @FXML
-    private TableColumn<Diagnostic, Number> charPositionColumn;
-
-    @FXML
-    private TableColumn<Diagnostic, String> messageColumn;
-
-    @FXML
-    private TableColumn<Diagnostic, String> pluginColumn;
-
-    /** Filters the error table by plugin. */
-    @FXML
-    private ChoiceBox<ErrorFilter.Choice> errorPluginChoice;
-
-    /** The table also lists warnings (remembered in the editor settings). */
-    @FXML
-    private javafx.scene.control.CheckBox showWarningsCheck;
-
-    @FXML
     private TabPane bottomTabPane;
 
     /** Overlapping readings of the whole project. */
@@ -162,9 +137,10 @@ public class FileMode implements Mode {
     /** True when the corpus changed while the Overlaps tab was not shown. */
     private boolean overlapsStale = true;
 
-    private FilteredList<Diagnostic> filteredErrors;
-    /** True while the choices are rebuilt (their selection must not filter yet). */
-    private boolean updatingErrorChoices;
+    /** The Parsing errors and Semantic issues tables. */
+    private DiagnosticsPane parsingErrors;
+    private DiagnosticsPane semanticIssues;
+    private Tab semanticIssuesTab;
 
     private final Workbench workbench;
     private final UserSettings settings;
@@ -244,7 +220,7 @@ public class FileMode implements Mode {
         setupEditorArea();
         setupFileListView();
         setupObjectsTab();
-        setupErrorTab();
+        setupProblemTabs();
         setupOverlapsTab();
         setupAssistant();
         setupFocus();
@@ -495,6 +471,21 @@ public class FileMode implements Mode {
         MenuItem shortcuts = item("Keyboard shortcuts", this::showShortcuts);
         MenuItem parse = item("Parse file", this::handleParseText);
         MenuItem showOverlaps = item("Show overlaps", this::showOverlaps);
+        MenuItem showParsingErrors = item("Show parsing errors", this::showParsingErrors);
+        MenuItem showSemanticIssues = item("Show semantic issues", this::showSemanticIssues);
+        MenuItem nextProblem = item("Next problem", () -> nextProblemInFile(true));
+        nextProblem.setAccelerator(new KeyCodeCombination(KeyCode.F8));
+        MenuItem previousProblem = item("Previous problem", () -> nextProblemInFile(false));
+        previousProblem.setAccelerator(new KeyCodeCombination(KeyCode.F8, KeyCombination.SHIFT_DOWN));
+        MenuItem nextInProject = item("Next problem in project", () -> nextProblemInProject(true));
+        nextInProject.setAccelerator(new KeyCodeCombination(KeyCode.F8, KeyCombination.ALT_DOWN));
+        MenuItem previousInProject = item("Previous problem in project", () -> nextProblemInProject(false));
+        previousInProject.setAccelerator(new KeyCodeCombination(KeyCode.F8, KeyCombination.ALT_DOWN, KeyCombination.SHIFT_DOWN));
+        MenuItem fixAtCaret = item("Apply fix at caret", this::applyFixAtCaret);
+        fixAtCaret.setAccelerator(shortcut(KeyCode.PERIOD));
+        Menu problemsMenu = new Menu("Problems", null, showParsingErrors, showSemanticIssues, showOverlaps,
+            new SeparatorMenuItem(), nextProblem, previousProblem, nextInProject, previousInProject,
+            new SeparatorMenuItem(), fixAtCaret);
         MenuItem suggest = item("Suggest completion (Ctrl+Space)", this::requestCompletion);
         CheckMenuItem inline = new CheckMenuItem("Inline suggestions");
         inline.setSelected(assist.data().inlineEnabled());
@@ -519,7 +510,9 @@ public class FileMode implements Mode {
         removeDirectory.disableProperty().bind(directorySelected.not());
 
         Menu result = new Menu("File Mode", null,
-            search, findNext, findPrevious, replace, goToLine, specialCharacter, parse, showOverlaps,
+            search, findNext, findPrevious, replace, goToLine, specialCharacter, parse,
+            new SeparatorMenuItem(),
+            problemsMenu,
             new SeparatorMenuItem(),
             lines, editorOptions,
             new SeparatorMenuItem(),
@@ -852,118 +845,177 @@ public class FileMode implements Mode {
     // Errors tab
     // ------------------------------------------------------------------
 
-    private void setupErrorTab() {
-        severityColumn.setCellValueFactory(cellData -> new SimpleStringProperty(ErrorFilter.severityLabel(cellData.getValue())));
-        severityColumn.setCellFactory(column -> new TableCell<>() {
-            @Override
-            protected void updateItem(String label, boolean empty) {
-                super.updateItem(label, empty);
-                if (empty || label == null) {
-                    setText(null);
-                    setStyle("");
-                    setAccessibleText(null);
-                    return;
-                }
-                boolean warning = "Warning".equals(label);
-                setText((warning ? "◆ " : "● ") + label);
-                setStyle("-fx-text-fill: " + (warning ? "#b07000" : "#d32f2f") + ";");
-                setAccessibleText(label);
-            }
+    private void setupProblemTabs() {
+        java.util.function.Function<String, String> pluginName =
+            id -> GrammarNames.label(id, PluginManager.getAvailableGrammars());
+        var editorSettings = settings.editorProperty();
+        DiagnosticsPane.Config parsing = new DiagnosticsPane.Config(
+            DiagnosticFilter.PARSING_ERRORS, "error", d -> !d.isSemantic(),
+            "Also list the warnings, e.g. a reading not kept because a grammar listed earlier reads the same text",
+            "No parsing errors in this file.", "No parsing errors in the project.",
+            DiagnosticsPane.setting(!Boolean.FALSE.equals(editorSettings.get().showWarnings()),
+                v -> editorSettings.set(editorSettings.get().withShowWarnings(v))),
+            DiagnosticsPane.setting(editorSettings.get().problemsOrDefaults().parsingErrorsAllFiles(),
+                v -> changeProblems(p -> p.withParsingErrorsAllFiles(v))),
+            DiagnosticsPane.setting(editorSettings.get().problemsOrDefaults().showCode(),
+                v -> changeProblems(p -> p.withShowCode(v))));
+        DiagnosticsPane.Config semantic = new DiagnosticsPane.Config(
+            DiagnosticFilter.SEMANTIC_ISSUES, "semantic", Diagnostic::isSemantic,
+            "Also list the warnings, e.g. a metadata key given twice",
+            "No semantic issues in this file.", "No semantic issues in the project.",
+            DiagnosticsPane.setting(editorSettings.get().problemsOrDefaults().showSemanticWarnings(),
+                v -> changeProblems(p -> p.withShowSemanticWarnings(v))),
+            DiagnosticsPane.setting(editorSettings.get().problemsOrDefaults().semanticIssuesAllFiles(),
+                v -> changeProblems(p -> p.withSemanticIssuesAllFiles(v))),
+            parsing.showCode());
+        // the settings may change elsewhere (another window, a reset)
+        editorSettings.addListener((obs, o, n) -> {
+            if (n == null) return;
+            if (n.showWarnings() != null) parsing.showWarnings().set(n.showWarnings());
+            var p = n.problemsOrDefaults();
+            parsing.allFiles().set(p.parsingErrorsAllFiles());
+            parsing.showCode().set(p.showCode());
+            semantic.showWarnings().set(p.showSemanticWarnings());
+            semantic.allFiles().set(p.semanticIssuesAllFiles());
         });
-        showWarningsCheck.setSelected(!Boolean.FALSE.equals(settings.editorProperty().get().showWarnings()));
-        showWarningsCheck.setTooltip(new Tooltip(
-            "Also list the warnings, e.g. a reading not kept because a grammar listed earlier reads the same text"));
-        showWarningsCheck.selectedProperty().addListener((obs, o, n) -> {
-            if (!n.equals(settings.editorProperty().get().showWarnings())) {
-                settings.editorProperty().set(settings.editorProperty().get().withShowWarnings(n));
-            }
-            applyErrorFilter();
-        });
-        settings.editorProperty().addListener((obs, o, n) -> {
-            if (n != null && n.showWarnings() != null && n.showWarnings() != showWarningsCheck.isSelected()) {
-                showWarningsCheck.setSelected(n.showWarnings());
-            }
-        });
-        lineColumn.setCellValueFactory(cellData -> new SimpleIntegerProperty(cellData.getValue().line()));
-        charPositionColumn.setCellValueFactory(cellData -> new SimpleIntegerProperty(cellData.getValue().column()));
-        messageColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().message()));
-        // the plugin that reported the error: display name and id
-        pluginColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
-            GrammarNames.label(cellData.getValue().grammarId(), PluginManager.getAvailableGrammars())));
-        pluginColumn.setCellFactory(column -> new TableCell<>() {
-            @Override
-            protected void updateItem(String label, boolean empty) {
-                super.updateItem(label, empty);
-                setText(empty ? null : label);
-                setTooltip(empty || label == null || label.isEmpty() ? null : new Tooltip(label));
-            }
-        });
-
-        filteredErrors = new FilteredList<>(editorController.getCurrentFileErrors());
-        SortedList<Diagnostic> sortedErrors = new SortedList<>(filteredErrors);
-        sortedErrors.comparatorProperty().bind(errorTableView.comparatorProperty());
-        editorController.getCurrentFileErrors().addListener(
-            (ListChangeListener<Diagnostic>) change -> refreshErrorChoices());
-        errorPluginChoice.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> {
-            if (!updatingErrorChoices) applyErrorFilter();
-        });
-        refreshErrorChoices();
-
-        errorTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldError, newError) -> {
-            if (newError != null) {
-                editorController.selectLinesInEditor(newError);
-            }
-        });
-        errorTableView.setItems(sortedErrors);
 
         MenuItem explain = new MenuItem("Explain");
-        explain.setOnAction(e -> {
-            Diagnostic error = errorTableView.getSelectionModel().getSelectedItem();
-            if (error != null) {
-                setSuggestionPanelVisible(true);
-                suggestionPanel.showError(error, true);
-            }
-        });
         MenuItem show = new MenuItem("Show in suggestions panel");
-        show.setOnAction(e -> {
-            Diagnostic error = errorTableView.getSelectionModel().getSelectedItem();
-            if (error != null) {
-                setSuggestionPanelVisible(true);
-                suggestionPanel.showError(error, false);
-            }
-        });
-        ContextMenu contextMenu = new ContextMenu(explain, show);
-        contextMenu.setOnShowing(e -> {
-            boolean none = errorTableView.getSelectionModel().getSelectedItem() == null;
-            explain.setDisable(none);
-            show.setDisable(none);
-        });
-        errorTableView.setContextMenu(contextMenu);
-    }
+        parsingErrors = new DiagnosticsPane(parsing, parsingErrorPane, workbench.problems(), workbench.status(),
+            this::displayedFile, this::selectInDisplayed, pluginName, this::projectDirectory, List.of(explain, show));
+        explain.setOnAction(e -> parsingErrors.selected().ifPresent(r -> {
+            setSuggestionPanelVisible(true);
+            suggestionPanel.showError(r.diagnostic(), true);
+        }));
+        show.setOnAction(e -> parsingErrors.selected().ifPresent(r -> {
+            setSuggestionPanelVisible(true);
+            suggestionPanel.showError(r.diagnostic(), false);
+        }));
+        parsingErrorPane.setContent(parsingErrors);
 
-    /** Rebuilds the plugin choices from the errors of the current file, keeping the chosen plugin if possible. */
-    private void refreshErrorChoices() {
-        ErrorFilter.Choice previous = errorPluginChoice.getSelectionModel().getSelectedItem();
-        var choices = ErrorFilter.choices(editorController.getCurrentFileErrors(), PluginManager.getAvailableGrammars());
-        updatingErrorChoices = true;
-        try {
-            errorPluginChoice.getItems().setAll(choices);
-            errorPluginChoice.getSelectionModel().select(
-                ErrorFilter.keep(choices, previous == null ? null : previous.grammarId()));
-        } finally {
-            updatingErrorChoices = false;
+        semanticIssuesTab = new Tab(DiagnosticFilter.SEMANTIC_ISSUES);
+        semanticIssuesTab.setId("semanticIssuesTab");
+        semanticIssuesTab.setTooltip(new Tooltip("The text follows the notation, but what it says is wrong or doubtful"));
+        semanticIssues = new DiagnosticsPane(semantic, semanticIssuesTab, workbench.problems(), workbench.status(),
+            this::displayedFile, this::selectInDisplayed, pluginName, this::projectDirectory, List.of());
+        semanticIssuesTab.setContent(semanticIssues);
+        bottomTabPane.getTabs().add(bottomTabPane.getTabs().indexOf(parsingErrorPane) + 1, semanticIssuesTab);
+        for (DiagnosticsPane pane : List.of(parsingErrors, semanticIssues)) {
+            pane.setExportChooser(this::chooseExportFile);
         }
-        applyErrorFilter();
+        // the displayed file changed, or was parsed again
+        editorController.getCurrentFileErrors().addListener((ListChangeListener<Diagnostic>) change -> {
+            parsingErrors.refresh();
+            semanticIssues.refresh();
+        });
     }
 
-    private void applyErrorFilter() {
-        ErrorFilter.Choice choice = errorPluginChoice.getSelectionModel().getSelectedItem();
-        boolean warnings = showWarningsCheck.isSelected();
-        filteredErrors.setPredicate(d -> (warnings || d.isError()) && (choice == null || choice.accepts(d)));
-        boolean filtered = (choice != null && choice.grammarId() != null)
-            || (!warnings && editorController.getCurrentFileErrors().stream().anyMatch(Diagnostic::isWarning));
-        parsingErrorPane.setText(ErrorFilter.tabTitle(filteredErrors.size(),
-            editorController.getCurrentFileErrors(), filtered));
+    private void changeProblems(java.util.function.UnaryOperator<fr.cnrs.lacito.matchbox.settings.ProblemsSettingsData> change) {
+        var current = settings.editorProperty().get();
+        var updated = change.apply(current.problemsOrDefaults());
+        if (!updated.equals(current.problemsOrDefaults())) {
+            settings.editorProperty().set(current.withProblems(updated));
+        }
+    }
+
+    private Optional<fr.cnrs.lacito.matchbox.corpus.TextId> displayedFile() {
+        return editorController.getSelectedDocument().map(d -> d.getId());
+    }
+
+    private void selectInDisplayed(Focus focus) {
+        editorController.selectRange(focus.start(), focus.end());
+    }
+
+    private Optional<java.nio.file.Path> projectDirectory() {
+        return workbench.viewContext().projectDirectory();
+    }
+
+    private Optional<java.nio.file.Path> chooseExportFile(String name) {
+        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+        chooser.setTitle("Export the problems");
+        chooser.setInitialFileName(name);
+        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("CSV files", "*.csv"));
+        projectDirectory().map(java.nio.file.Path::toFile).filter(java.io.File::isDirectory)
+            .ifPresent(chooser::setInitialDirectory);
+        return Optional.ofNullable(chooser.showSaveDialog(workbench.window())).map(java.io.File::toPath);
+    }
+
+    /** Shows the Parsing errors tab and focuses its table (File Mode menu). */
+    public void showParsingErrors() {
+        bottomTabPane.getSelectionModel().select(parsingErrorPane);
+        parsingErrors.focusTable();
+    }
+
+    /** Shows the Semantic issues tab and focuses its table (File Mode menu). */
+    public void showSemanticIssues() {
+        bottomTabPane.getSelectionModel().select(semanticIssuesTab);
+        semanticIssues.focusTable();
+    }
+
+    /** The two problem tables (for tests). */
+    public DiagnosticsPane parsingErrorsPane() {
+        return parsingErrors;
+    }
+
+    public DiagnosticsPane semanticIssuesPane() {
+        return semanticIssues;
+    }
+
+    private int caretLine() {
+        return fileContentCodeArea.getCurrentParagraph() + 1;
+    }
+
+    /** F8 / Shift+F8: the next / previous line with a problem in the displayed file, wrapping. */
+    public void nextProblemInFile(boolean forward) {
+        Optional<fr.cnrs.lacito.matchbox.corpus.TextId> file = displayedFile();
+        if (file.isEmpty()) return;
+        var rows = workbench.problems().index().rows(file.get());
+        var next = fr.cnrs.lacito.matchbox.gui.problems.ProblemNavigator.next(
+            rows.stream().map(fr.cnrs.lacito.matchbox.gui.problems.ProblemRow::diagnostic).toList(), caretLine(), forward);
+        if (next.isEmpty()) {
+            workbench.status().info("No problem in this file");
+            return;
+        }
+        rows.stream().filter(r -> r.diagnostic() == next.get()).findFirst().ifPresent(r -> {
+            workbench.problems().target(r).ifPresent(this::selectInDisplayed);
+            workbench.status().info("Line " + r.line() + ": " + r.diagnostic().message());
+        });
+    }
+
+    /** Alt+F8 / Alt+Shift+F8: the next / previous problem of the project, opening its file. */
+    public void nextProblemInProject(boolean forward) {
+        var next = workbench.problems().index().next(displayedFile().orElse(null), caretLine(), forward, r -> true);
+        if (next.isEmpty()) {
+            workbench.status().info("No problem in the project");
+            return;
+        }
+        workbench.problems().go(next.get());
+    }
+
+    /** Shortcut+.: the fixes of the problems of the caret's line (one is applied, several are offered). */
+    public void applyFixAtCaret() {
+        Optional<fr.cnrs.lacito.matchbox.corpus.TextId> file = displayedFile();
+        int line = caretLine();
+        List<javafx.util.Pair<fr.cnrs.lacito.matchbox.gui.problems.ProblemRow, Diagnostic.Fix>> fixes = file
+            .map(f -> workbench.problems().index().rows(f)).orElse(List.of()).stream()
+            .filter(r -> r.line() == line)
+            .flatMap(r -> r.diagnostic().fixes().stream().map(fix -> new javafx.util.Pair<>(r, fix)))
+            .toList();
+        if (fixes.isEmpty()) {
+            workbench.status().info("No fix for line " + line);
+            return;
+        }
+        if (fixes.size() == 1) {
+            workbench.problems().applyFix(fixes.get(0).getKey(), fixes.get(0).getValue());
+            return;
+        }
+        javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
+        for (var p : fixes) {
+            menu.getItems().add(item(p.getValue().label(), () -> workbench.problems().applyFix(p.getKey(), p.getValue())));
+        }
+        fileContentCodeArea.getCaretBounds().ifPresentOrElse(
+            b -> menu.show(fileContentCodeArea, b.getMinX(), b.getMaxY()),
+            () -> menu.show(fileContentCodeArea, javafx.geometry.Side.TOP, 0, 0));
     }
 
     // ------------------------------------------------------------------

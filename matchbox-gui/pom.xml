@@ -66,6 +66,12 @@
             <version>${revision}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-grammar-igt</artifactId>
+            <version>${revision}</version>
+            <scope>test</scope>
+        </dependency>
         <!-- GUI tests: TestFX drives the real window, Monocle renders it off-screen -->
         <dependency>
             <groupId>org.testfx</groupId>

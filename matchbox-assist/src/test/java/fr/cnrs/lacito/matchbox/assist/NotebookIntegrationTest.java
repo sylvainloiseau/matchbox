@@ -22,7 +22,7 @@ class NotebookIntegrationTest {
 
     @Test
     void quickFixCandidatesAreCheckedWithTheRealGrammar() {
-        String text = "<jaflo> {canoe}\n\n:::\na mio\n:::\n";
+        String text = "<jaflo> {canoe}\n\n<mio> {go\n";
         List<Diagnostic> errors = GRAMMARS.get(0).getResult(FILE, text).diagnostics();
         assertFalse(errors.isEmpty());
         try (EditValidator validator = new EditValidator()) {

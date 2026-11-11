@@ -124,6 +124,7 @@ public class MediaSegmentViewFactory implements ObjectViewFactory<MediaSegment> 
         mediaLine.getChildren().add(link);
         Label source = new Label(switch (media.source()) {
             case EXPLICIT -> "";
+            case PRECEDING -> "(from " + media.sourceTitle().orElse("a preceding line") + ")";
             case SECTION -> "(from section \"" + media.sourceTitle().orElse("") + "\")";
             case HEADER -> "(from the header)";
             case NONE -> "";

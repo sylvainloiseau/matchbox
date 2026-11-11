@@ -18,11 +18,10 @@ lexer grammar NotebookLexer;
         return morphemeSeparators.contains(_input.LA(1));
     }
 
-    /** True if the input starts one of the constructs of this grammar: "<", ":::" or "#LEX". */
+    /** True if the input starts one of the constructs of this grammar: "<" or "#LEX". */
     private boolean constructAhead() {
         int c = _input.LA(1);
         if (c == '<') return true;
-        if (c == ':' && _input.LA(2) == ':' && _input.LA(3) == ':') return true;
         return c == '#' && _input.LA(2) == 'L' && _input.LA(3) == 'E' && _input.LA(4) == 'X';
     }
 }
@@ -45,7 +44,6 @@ OTHER_LINE : {getCharPositionInLine() == 0 && !constructAhead()}? ~[\r\n]+ ;
 
 START_LEX_SIMPLE : '#LEX' -> pushMode(LEX_SIMPLE) ;
 
-START_IMB : ':::' -> pushMode(IMB_MODE) ;
 LBRACE : '{' ;
 RBRACE : '}' ;
 DASH   : '-' ;
@@ -138,19 +136,7 @@ LEX_SIMPLE_FORM : '‹' ~[›]+ '›';
 WS_LEX_SIMPLE : [ ]+ -> skip ;
 END_LEX_SIMPLE : ('\r'? '\n' | '\r') -> popMode;
 
-mode IMB_MODE;
 
-END_IMB : ':::' -> popMode ;
-
-IMB_QUOTED_LINE
-    : '\'' {getCharPositionInLine() == 1}? ~[\r\n]+ '\''
-    ;
-
-IMB_LINE
-    : ~['\r\n] ~[\r\n]+
-    ;
-
-IMB_NL : '\r'? '\n' | '\r' ;
 
 /*
 MORPHEME_LINE

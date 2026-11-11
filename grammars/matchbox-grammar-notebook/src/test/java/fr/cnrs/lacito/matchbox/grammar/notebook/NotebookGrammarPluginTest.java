@@ -11,7 +11,6 @@ import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import fr.cnrs.lacito.matchbox.grammarapi.ParseResult;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleExample;
-import fr.cnrs.lacito.matchbox.corpus.simple.SimpleIGT;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleLexicalDefinition;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleSense;
 import java.io.IOException;
@@ -45,7 +44,7 @@ class NotebookGrammarPluginTest {
     @Test
     void parsesWithoutErrors() {
         assertTrue(result.diagnostics().isEmpty(), () -> "errors: " + result.diagnostics());
-        assertEquals(3, result.objects().size());
+        assertEquals(2, result.objects().size());
         assertSpansNested(result.objects(), text);
         assertKindsPrefixed(result.objects(), NotebookGrammarPlugin.ID);
         for (CorpusObject o : result.objects()) {
@@ -54,16 +53,9 @@ class NotebookGrammarPluginTest {
     }
 
     @Test
-    void extractsIgt() {
-        List<SimpleIGT> igts = objectsOf(SimpleIGT.class);
-        assertEquals(1, igts.size());
-        SimpleIGT igt = igts.get(0);
-        assertEquals("a mio-jaflo-m-wi-j", igt.getTranscription());
-        assertEquals("1sg down-canoe-top-m.sg-pred", igt.getMorphemes());
-        assertEquals("'I went down in canoe'", igt.getFreeTranslation());
-        assertEquals(3, igt.getTextCoordinate().startLine());
-        assertEquals(7, igt.getTextCoordinate().endLine());
-        assertTrue(text.substring(igt.getTextCoordinate().startIndex()).startsWith(":::"));
+    void igtBlocksAreLeftToTheIgtGrammar() {
+        assertTrue(text.contains(":::"));
+        assertTrue(result.objects().stream().noneMatch(o -> o.getKind().endsWith(":igt")));
     }
 
     @Test
@@ -101,21 +93,19 @@ class NotebookGrammarPluginTest {
         assertEquals("mami", mami.getLabel());
         assertEquals(mami.getSenses(), mami.getChildren());
         assertEquals(NotebookGrammarPlugin.KIND_SENSE, mami.getSenses().get(0).getKind());
-        assertEquals(NotebookGrammarPlugin.KIND_IGT, objectsOf(SimpleIGT.class).get(0).getKind());
     }
 
     @Test
-    void incompleteIgtIsSkippedOtherObjectsKept() {
-        String partial = "<jaflo> {canoe}\n\n:::\na mio\n:::\n";
+    void incompleteEntryIsSkippedOtherObjectsKept() {
+        String partial = "<jaflo> {canoe}\n\n<mio> {\n";
         ParseResult r = new NotebookGrammarPlugin().getResult(FILE, partial);
         assertTrue(!r.diagnostics().isEmpty());
-        assertEquals(1, objectsOf(r, SimpleLexicalDefinition.class).size());
-        assertTrue(objectsOf(r, SimpleIGT.class).isEmpty());
+        assertTrue(objectsOf(r, SimpleLexicalDefinition.class).stream().anyMatch(e -> e.getHeadword().equals("jaflo")));
     }
 
     @Test
     void errorsAreLocatedByOffsetsWithExpectedTokens() {
-        String partial = "<jaflo> {canoe}\n\n:::\na mio\n:::\n";
+        String partial = "<jaflo> {canoe}\n\n<mio> {\n";
         ParseResult r = new NotebookGrammarPlugin().getResult(FILE, partial);
         assertTrue(!r.diagnostics().isEmpty());
         for (Diagnostic e : r.diagnostics()) {
@@ -137,7 +127,7 @@ class NotebookGrammarPluginTest {
         ParseResult first = plugin.getResult(FILE, text);
         ParseResult second = plugin.getResult(FILE, "<jaflo> {canoe}\n");
         assertNotSame(first.objects(), second.objects());
-        assertEquals(3, first.objects().size());
+        assertEquals(2, first.objects().size());
         assertEquals(1, second.objects().size());
     }
 
@@ -164,7 +154,7 @@ class NotebookGrammarPluginTest {
         ParseResult r = new NotebookGrammarPlugin().getResult(FILE, withOthers);
         assertTrue(r.diagnostics().isEmpty(), () -> "errors: " + r.diagnostics());
         assertEquals(1, objectsOf(r, SimpleLexicalDefinition.class).size());
-        assertEquals(1, objectsOf(r, SimpleIGT.class).size());
+        assertEquals(1, r.objects().size(), "the IGT is left to the IGT grammar");
         assertSpansNested(r.objects(), withOthers);
     }
 }

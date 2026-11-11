@@ -80,6 +80,14 @@ public interface ViewContext {
     }
 
     /**
+     * As {@link #applyEdits(CorpusObject, List)}, with the label of the change in the undo journal
+     * (e.g. "Insert word"). The default ignores the label.
+     */
+    default EditOutcome applyEdits(CorpusObject object, List<TextEdit> edits, String description) {
+        return applyEdits(object, edits);
+    }
+
+    /**
      * Adds a field to the object (e.g. a metadata entry), written in the notation of the object's
      * grammar ({@code ObjectEditor.addField}).
      */
@@ -108,6 +116,24 @@ public interface ViewContext {
      */
     default EditOutcome runTextAction(TextId text, TextAction action) {
         return runTextAction(action);
+    }
+
+    /**
+     * Problems the application found about an object or its parts (e.g. the gloss check of an IGT),
+     * for its view to mark; empty by default.
+     */
+    default List<ViewFinding> findings(CorpusObject object) {
+        return List.of();
+    }
+
+    /** Applies fix {@code index} of a finding of {@link #findings}, as one undoable change. */
+    default EditOutcome applyFix(CorpusObject object, ViewFinding finding, int index) {
+        return new EditOutcome.NotEditable("Fixes are not available");
+    }
+
+    /** Fixes of several findings at once (e.g. "Declare all"), as one undoable change. */
+    default EditOutcome applyFixes(CorpusObject object, List<ViewFinding> findings, String description) {
+        return new EditOutcome.NotEditable("Fixes are not available");
     }
 
     /** Directory of the saved project file, if any (used to resolve relative paths). */

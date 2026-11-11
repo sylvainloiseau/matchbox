@@ -69,6 +69,27 @@ final class WorkbenchViewContext implements ViewContext {
     }
 
     @Override
+    public List<fr.cnrs.lacito.matchbox.grammarfx.ViewFinding> findings(CorpusObject object) {
+        return workbench.problems().findings(object);
+    }
+
+    @Override
+    public EditOutcome applyFix(CorpusObject object, fr.cnrs.lacito.matchbox.grammarfx.ViewFinding finding, int index) {
+        return workbench.problems().applyFix(object, finding, index);
+    }
+
+    @Override
+    public EditOutcome applyFixes(CorpusObject object, List<fr.cnrs.lacito.matchbox.grammarfx.ViewFinding> findings,
+                                  String description) {
+        return workbench.problems().applyFixes(object, findings, description);
+    }
+
+    @Override
+    public EditOutcome applyEdits(CorpusObject object, List<TextEdit> edits, String description) {
+        return workbench.edits().applyEdits(object, edits, description);
+    }
+
+    @Override
     public EditOutcome addField(CorpusObject object, String fieldName, String value) {
         return workbench.edits().addField(object, fieldName, value);
     }

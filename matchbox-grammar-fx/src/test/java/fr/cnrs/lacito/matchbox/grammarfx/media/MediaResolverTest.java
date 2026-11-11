@@ -50,7 +50,7 @@ class MediaResolverTest {
         SimpleTextHeader header = new SimpleTextHeader("s:header", span(id, 0, 9), Map.of("media", "header.wav"));
         SimpleSection inner = new SimpleSection("s:section", span(id, 40, 79), "Inner", Map.of("Media", "rec/inner.wav"), List.of());
         SimpleSection outer = new SimpleSection("s:section", span(id, 20, 119), "Outer", Map.of("media", "outer.wav"), List.of(inner));
-        Segment explicit = new Segment(span(id, 45, 50), "other.wav");
+        Segment explicit = new Segment(span(id, 56, 60), "other.wav"); // after inInner: not a preceding file
         Segment inInner = new Segment(span(id, 50, 55), null);
         Segment inOuter = new Segment(span(id, 100, 105), null);
         Segment outside = new Segment(span(id, 150, 155), null);
@@ -75,6 +75,28 @@ class MediaResolverTest {
         List<Path> files = MediaResolver.mediaFiles(corpus.text(id).orElseThrow(), corpus, projectDir);
         assertEquals(List.of(notes.resolve("header.wav"), notes.resolve("outer.wav"), project.resolve("rec/inner.wav"),
             project.resolve("other.wav")), files);
+    }
+
+    @Test
+    void aPrecedingSegmentOfTheSameSectionGivesItsFile() {
+        TextId id = new TextId(dir.resolve("t.md"));
+        String content = "x".repeat(200);
+        SimpleSection first = new SimpleSection("s:section", span(id, 0, 99), "One", Map.of("media", "section.wav"), List.of());
+        SimpleSection second = new SimpleSection("s:section", span(id, 100, 199), "Two", Map.of(), List.of());
+        Segment file = new Segment(span(id, 10, 15), "a.wav");
+        Segment range = new Segment(span(id, 20, 25), null);
+        Segment later = new Segment(span(id, 30, 35), "b.wav");
+        Segment last = new Segment(span(id, 40, 45), null);
+        Segment otherSection = new Segment(span(id, 110, 115), null);
+        Corpus corpus = new Corpus();
+        corpus.put(Text.builder(id, content).add("s", List.of(first, second), List.of())
+            .add("g", List.of(file, range, later, last, otherSection), List.of()).build());
+        var r = MediaResolver.resolve(range, corpus, Optional.empty());
+        assertEquals(MediaResolver.Source.PRECEDING, r.source());
+        assertEquals(Optional.of("a.wav"), r.reference());
+        assertEquals(Optional.of("b.wav"), MediaResolver.resolve(last, corpus, Optional.empty()).reference(), "the nearest");
+        assertEquals(MediaResolver.Source.NONE, MediaResolver.resolve(otherSection, corpus, Optional.empty()).source(),
+            "not across sections");
     }
 
     @Test

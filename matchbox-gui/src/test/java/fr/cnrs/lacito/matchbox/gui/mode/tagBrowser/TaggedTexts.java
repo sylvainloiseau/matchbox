@@ -13,7 +13,7 @@ import java.util.List;
 /** Texts parsed with the notebook and tag grammars, for the tests. */
 final class TaggedTexts {
 
-    static final List<GrammarPlugin> GRAMMARS = List.of(new NotebookGrammarPlugin(), new TagGrammarPlugin());
+    static final List<GrammarPlugin> GRAMMARS = List.of(new NotebookGrammarPlugin(), new fr.cnrs.lacito.matchbox.grammar.igt.IgtGrammarPlugin(), new TagGrammarPlugin());
 
     private TaggedTexts() {
     }

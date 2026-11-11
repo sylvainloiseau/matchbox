@@ -1,5 +1,7 @@
 package fr.cnrs.lacito.matchbox.grammar.mediaref;
 
+import fr.cnrs.lacito.matchbox.corpus.TextEdit;
+import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
 import static fr.cnrs.lacito.matchbox.corpus.CorpusAssertions.assertCovers;
 import static fr.cnrs.lacito.matchbox.corpus.CorpusAssertions.assertKindsPrefixed;
 import static fr.cnrs.lacito.matchbox.corpus.CorpusAssertions.assertSpansNested;
@@ -142,5 +144,26 @@ class MediaRefGrammarPluginTest {
             only(parse(e.text()));
         }
         assertTrue(plugin.getGrammarSource().contains("lexer grammar MediaRefLexer"));
+    }
+
+    @Test
+    void semanticIssuesHaveCodesAndFixes() {
+        String text = "x\n@media a.wav 1:20-1:10 greeting\n";
+        ParseResult r = plugin.getResult(FILE, text);
+        Diagnostic d = r.diagnostics().get(0);
+        assertEquals(Diagnostic.Category.SEMANTIC, d.category());
+        assertEquals(MediaRefGrammarPlugin.CODE_RANGE_ORDER, d.code());
+        assertEquals(2, d.line());
+        String fixed = TextEdit.applyAll(text, d.fixes().get(0).edits());
+        assertEquals("x\n@media a.wav 1:10-1:20 greeting\n", fixed);
+        assertEquals(1, only(plugin.getResult(FILE, fixed)).getRange().stream().count());
+
+        Diagnostic same = plugin.getResult(FILE, "@media 1000-1000\n").diagnostics().get(0);
+        assertEquals(MediaRefGrammarPlugin.CODE_RANGE_ORDER, same.code());
+        assertTrue(same.fixes().isEmpty(), "nothing to swap");
+
+        Diagnostic time = plugin.getResult(FILE, "@media 0:75-0:80\n").diagnostics().get(0);
+        assertEquals(Diagnostic.Category.SEMANTIC, time.category());
+        assertEquals(MediaRefGrammarPlugin.CODE_INVALID_TIME, time.code());
     }
 }

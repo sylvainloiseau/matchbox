@@ -23,6 +23,7 @@
         <module>grammars/matchbox-grammar-markdownheading</module>
         <module>grammars/matchbox-grammar-mediaref</module>
         <module>grammars/matchbox-grammar-tag</module>
+        <module>grammars/matchbox-grammar-igt</module>
         <module>matchbox-corpus</module>
         <module>matchbox-gui</module>
         <module>matchbox-grammar-api</module>
@@ -36,7 +37,8 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <javafx.version>23.0.2</javafx.version>
+        <javafx.version>25.0.1</javafx.version>
+        <lift-api.version>0.1.1</lift-api.version>
         <antlr.version>4.13.1</antlr.version>
         <junit.version>5.10.2</junit.version>
         <jackson.version>2.20.1</jackson.version>
@@ -49,6 +51,23 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- LIFT dictionaries (the context dictionary of a project), used by matchbox-app only.
+                 Its command line (picocli) and LaTeX export settings (jackson-jr) are not used. -->
+            <dependency>
+                <groupId>io.github.sylvainloiseau</groupId>
+                <artifactId>lift-api</artifactId>
+                <version>${lift-api.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>info.picocli</groupId>
+                        <artifactId>picocli</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.fasterxml.jackson.jr</groupId>
+                        <artifactId>jackson-jr-objects</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
             <dependency>
                 <groupId>fr.cnrs.lacito</groupId>
                 <artifactId>matchbox-gui</artifactId>

@@ -48,7 +48,7 @@ A file is parsed by the grammars of every file type it matches, **in order** (`P
 | `SCOPE` | `Section` | may contain anything (gives context to what it contains) |
 | `ANNOTATION` | `Tag` | may be written inside anything |
 
-**The rule** (applied by `Text.Builder`, nothing to do in a plugin): an exclusive object of a grammar may not overlap, include or cross an exclusive object of a grammar listed **earlier** for the file. It is then **not kept**, and a *warning* (`Diagnostic.Severity.WARNING`) of the later grammar names the reading that won; the user sees it in the margin (◆), the Parsing errors tab and the Overlaps tab (`Text.conflicts()`, `MatchConflict`). Also reported, but kept: an exclusive child of a scope meeting an earlier claim, a scope crossing an exclusive object of another grammar (a heading inside an IGT block), overlapping objects of one grammar.
+**The rule** (applied by `Text.Builder`, nothing to do in a plugin): an exclusive object of a grammar may not overlap, include or cross an exclusive object of a grammar listed **earlier** for the file. It is then **not kept**, and a *warning* (`Diagnostic.Severity.WARNING`) of the later grammar names the reading that won; the user sees it in the margin (◆), the Parsing errors tab and the Overlaps tab (category `OVERLAP`) (`Text.conflicts()`, `MatchConflict`). Also reported, but kept: an exclusive child of a scope meeting an earlier claim, a scope crossing an exclusive object of another grammar (a heading inside an IGT block), overlapping objects of one grammar.
 
 The role also sets how objects are drawn and clicked (`Text.layered()`, `Text.objectAt`): scopes underneath (a section is coloured on its heading line only; the margin shows its extent), exclusive objects above, annotations on top; a click selects what is drawn on top.
 
@@ -56,5 +56,25 @@ For plugin authors:
 
 - an object meant to be written inside the objects of other notations (a mark, a reference) must override `getMatchRole()` to return `ANNOTATION`; a region grouping other objects, `SCOPE`;
 - `getResult(TextId, String, ParseContext)` (default: calls `getResult(TextId, String)`) gives the characters already owned by the earlier grammars (`ParseContext.claims()`, `isClaimed(start, stop)`): override it to skip that text, or not to report errors there (a grammar flagging every line it does not understand). The objects meeting a claim are dropped anyway.
+
+## Reporting problems: syntax and semantic issues
+
+A `Diagnostic` has a **severity** (`ERROR`, `WARNING`: how serious) and a **category** (what kind of problem), which decides where File Mode lists it:
+
+| Category | Meaning | Listed in | Created by |
+|---|---|---|---|
+| `SYNTAX` | the text does not follow the notation | Parsing errors | `CollectingErrorListener`; the 8/9-argument constructors, `Diagnostic.at`, `Diagnostic.warning` (as before categories existed) |
+| `SEMANTIC` | the text follows the notation, but what it says is wrong or doubtful (a range ending before it starts, an empty tag, a key given twice) | **Semantic issues** | `Diagnostic.semantic(text, grammarId, line, column, message, start, stop, severity)`, or an object implementing `HasIssues` |
+| `OVERLAP` | a reading not kept, or crossing another (see above) | Parsing errors, Overlaps | `Text.Builder` |
+| `INTERNAL` | the grammar failed or returned an invalid object | Parsing errors | `Diagnostic.internal(text, grammarId, line, message)`, `TextParser`, `Text.Builder` |
+
+Every problem is also shown in the editor margin (● error, ◆ warning) and the error ruler, whatever its category. Both tables can list the current file or the whole project ("All files").
+
+Two optional parts, added with `withCode` / `withFixes`:
+
+- a **code**, a stable identifier of the kind of problem, prefixed by the grammar's short name (`mediaref.range-order`); document the codes of your plugin in `getFormatDocumentation()`;
+- **fixes** (`Diagnostic.Fix(label, List<TextEdit>)`): edits relative to the parsed content that correct the problem ("Swap start and end"). The user applies one from the table, the ✚ menu of the line or Shortcut+. ; it is one undoable change, rebased if the text changed since the parse.
+
+**Checks that belong to a concept** go in the object rather than in the grammar: implement `HasIssues` (`List<Issue> issues()`, `Issue.error(message, code)` / `Issue.warning`, `.at(span)`, `.withFixes`). `Text.Builder` turns the issues of the objects it keeps (and of their children) into semantic diagnostics of the object's grammar, so every notation producing the class gets them (e.g. `SimpleDependencyTree` checks token IDs, heads, roots and cycles). Objects not kept (invalid span, overlap) report nothing.
 
 How to write a plugin: see the `write-grammar` skill (`.claude/skills/write-grammar/SKILL.md`) and the reference plugins `grammars/matchbox-grammar-notebook` and `grammars/matchbox-grammar-conll`.

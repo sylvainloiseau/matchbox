@@ -18,6 +18,7 @@ import java.util.Optional;
  *       inside {@code C} (anywhere without {@code C}); the outermost one is taken on each side;</li>
  *   <li>target: the adjacent object above, else below, else {@code C}, else the text.</li>
  * </ol>
+ * The parts of an interlinear glossed text (lines, metadata block) are not candidates: the IGT is.
  */
 final class TagAttachment {
 
@@ -60,6 +61,9 @@ final class TagAttachment {
             TextCoordinate span = o.getTextCoordinate();
             objects.add(new Placed(o, lineOf(span.startIndex()), lineOf(lastCharOfLine(span)), rank, depth));
         }
+        // the parts of an interlinear glossed text (its lines, its metadata) are not targets: a tag
+        // written in or next to an IGT applies to the IGT
+        if (o instanceof fr.cnrs.lacito.matchbox.corpus.capability.InterlinearGlossedText) return;
         for (CorpusObject child : o.getChildren()) {
             place(child, rank, depth + 1);
         }

@@ -3,6 +3,8 @@ package fr.cnrs.lacito.matchbox.gui.view;
 import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.MatchRole;
 import fr.cnrs.lacito.matchbox.corpus.Text;
+import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearGlossedText;
+import fr.cnrs.lacito.matchbox.corpus.capability.InterlinearLine;
 import fr.cnrs.lacito.matchbox.corpus.capability.Sense;
 import fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle;
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
@@ -59,7 +61,9 @@ public class HighlightStyles {
     /** The style of an object of {@code text} (its grammar is found in the text). */
     public DisplayStyle styleFor(Text text, CorpusObject object) {
         String grammar = text == null ? null : text.grammarIdOf(object).orElse(null);
-        return resolve(grammar == null ? grammarOfKind(object.getKind()) : grammar, object);
+        boolean partOfIgt = object instanceof InterlinearLine || (text != null
+            && text.parentOf(object).map(InterlinearGlossedText.class::isInstance).orElse(false));
+        return resolve(grammar == null ? grammarOfKind(object.getKind()) : grammar, object, partOfIgt);
     }
 
     /** The style of an object of the current corpus. */
@@ -75,11 +79,11 @@ public class HighlightStyles {
         return styleFor(object).backgroundColor();
     }
 
-    private DisplayStyle resolve(String grammarId, CorpusObject object) {
+    private DisplayStyle resolve(String grammarId, CorpusObject object, boolean partOfIgt) {
         String kind = object.getKind();
-        // a sense shows the colour of its entry; a scope (section) gets no colour of its own: it
-        // would tint pages of prose and the objects it contains
-        DisplayStyle fallback = object instanceof Sense || object.getMatchRole() == MatchRole.SCOPE
+        // a sense shows the colour of its entry, a line of an IGT the colour of the IGT; a scope
+        // (section) gets no colour of its own: it would tint pages of prose and the objects it contains
+        DisplayStyle fallback = object instanceof Sense || partOfIgt || object.getMatchRole() == MatchRole.SCOPE
             ? DisplayStyle.EMPTY : DisplayStyle.background(paletteColor(kind));
         if (grammarId == null) return fallback;
         Project project = session.project();
