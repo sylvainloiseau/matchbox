@@ -40,7 +40,7 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <javafx.version>25.0.1</javafx.version>
+        <javafx.version>25.0.5</javafx.version>
         <!-- The LIFT libraries. Until lift-api 0.1.2 (extract), lift-patchbox 0.2.0 (ranges,
              rewind/resumeFrom, RecordPolicy) and lift-fx 1.0.3 (read-only editor) are released,
              the versions installed locally from ../lift-api, ../lift-patchbox and
