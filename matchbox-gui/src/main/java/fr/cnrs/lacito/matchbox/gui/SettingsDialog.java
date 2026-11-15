@@ -53,6 +53,10 @@ public class SettingsDialog {
 
     @FXML
     private CheckBox allowInvalidViewEditsCheckBox;
+    @FXML
+    private TextField emptyObjectLanguageField;
+    @FXML
+    private TextField emptyMetaLanguageField;
 
     @FXML
     private CheckBox wrapLinesCheckBox;
@@ -129,6 +133,10 @@ public class SettingsDialog {
         recentProjectsLimitField.setText(String.valueOf(current.maxRecentProjects()));
         openLastProjectCheckBox.setSelected(current.openLastProject());
         allowInvalidViewEditsCheckBox.setSelected(current.allowInvalidViewEdits());
+        var history = current.dictionaryHistory() == null
+            ? fr.cnrs.lacito.matchbox.settings.DictionaryHistorySettingsData.defaults() : current.dictionaryHistory();
+        emptyObjectLanguageField.setText(history.emptyObjectLanguage());
+        emptyMetaLanguageField.setText(history.emptyMetaLanguage());
         EditorSettingsData editor = current.editor();
         wrapLinesCheckBox.setSelected(editor.wrapLines());
         lineNumbersCheckBox.setSelected(editor.lineNumbers());
@@ -171,8 +179,22 @@ public class SettingsDialog {
             current.assist(),
             allowInvalidViewEditsCheckBox.isSelected(),
             current.tagBrowser(),
-            editedEditor(current.editor())
+            editedEditor(current.editor()),
+            current.fileMode(),
+            editedHistory(current.dictionaryHistory())
         );
+    }
+
+    /** The languages of the empty dictionary; the other settings of the mode are kept. */
+    private fr.cnrs.lacito.matchbox.settings.DictionaryHistorySettingsData editedHistory(
+            fr.cnrs.lacito.matchbox.settings.DictionaryHistorySettingsData current) {
+        var base = current == null ? fr.cnrs.lacito.matchbox.settings.DictionaryHistorySettingsData.defaults() : current;
+        String object = emptyObjectLanguageField.getText() == null ? "" : emptyObjectLanguageField.getText().strip();
+        String meta = emptyMetaLanguageField.getText() == null ? "" : emptyMetaLanguageField.getText().strip();
+        if (object.isEmpty() || object.contains(" ") || meta.isEmpty() || meta.contains(" ")) {
+            throw new IllegalArgumentException("A language of the empty dictionary is a code without space (e.g. tww, en)");
+        }
+        return base.withEmptyLanguages(object, meta);
     }
 
     /** The values of the Editor tab; throws IllegalArgumentException with a message for the user. */

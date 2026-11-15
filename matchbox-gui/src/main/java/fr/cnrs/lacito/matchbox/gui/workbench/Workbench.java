@@ -43,6 +43,7 @@ public final class Workbench implements AutoCloseable {
     private final SegmentPlayback playback;
     private final ProjectFiles files;
     private final Problems problems;
+    private final DictionaryHistoryService history;
     private HostServices hostServices;
 
     /**
@@ -75,6 +76,7 @@ public final class Workbench implements AutoCloseable {
         this.playback = new SegmentPlayback(viewContext, status);
         this.files = new ProjectFiles(this);
         this.problems = new Problems(session, navigator, edits, status, this::focus, applyExecutor);
+        this.history = new DictionaryHistoryService(session, problems, settings, status, applyExecutor);
         // the players and the hints belong to the files of the previous project
         session.onProjectChanging(() -> {
             mediaPlayers.closeAll();
@@ -130,6 +132,19 @@ public final class Workbench implements AutoCloseable {
     /** The problems (parsing errors, semantic issues) of the project. */
     public Problems problems() {
         return problems;
+    }
+
+    /**
+     * The workbench behind a view context, for the views built into the application (a plugin's view
+     * never needs it: it only sees {@code ViewContext}).
+     */
+    public static Optional<Workbench> of(fr.cnrs.lacito.matchbox.grammarfx.ViewContext context) {
+        return context instanceof WorkbenchViewContext w ? Optional.of(w.workbench()) : Optional.empty();
+    }
+
+    /** The history of the project's dictionary (the mutation commands applied to it). */
+    public DictionaryHistoryService history() {
+        return history;
     }
 
     public ProjectFiles files() {
@@ -227,6 +242,7 @@ public final class Workbench implements AutoCloseable {
     @Override
     public void close() {
         edits.close();
+        history.close();
         problems.close();
         mediaPlayers.closeAll();
         if (assist != null) {

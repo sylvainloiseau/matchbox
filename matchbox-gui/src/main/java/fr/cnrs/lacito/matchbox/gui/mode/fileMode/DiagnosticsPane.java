@@ -193,7 +193,10 @@ public final class DiagnosticsPane extends VBox {
         TableColumn<ProblemRow, String> object = textColumn("Object", 140, ProblemRow::objectLabel,
             r -> r.object().map(o -> o.getKind() + ": " + o.getLabel()).orElse("No object at this place"));
         TableColumn<ProblemRow, String> message = textColumn("Message", 520, r -> r.diagnostic().message(),
-            r -> r.diagnostic().message() + (r.diagnostic().code().isEmpty() ? "" : "\nCode: " + r.diagnostic().code()));
+            r -> r.diagnostic().message() + (r.diagnostic().code().isEmpty() ? "" : "\nCode: " + r.diagnostic().code())
+                + "\nLine " + r.line() + ", position " + r.diagnostic().column()
+                + " · " + pluginName.apply(r.diagnostic().grammarId())
+                + r.object().map(o -> " · " + o.getLabel()).orElse(""));
         codeColumn = textColumn("Code", 160, r -> r.diagnostic().code(), r -> r.diagnostic().code());
         TableColumn<ProblemRow, ProblemRow> fix = new TableColumn<>("Fix");
         fix.setPrefWidth(60);
@@ -203,6 +206,10 @@ public final class DiagnosticsPane extends VBox {
         table.getColumns().addAll(List.of(severity, fileColumn, line, column, plugin, object, message, codeColumn, fix));
         fileColumn.visibleProperty().bind(config.allFiles());
         codeColumn.visibleProperty().bind(config.showCode());
+        // a narrow panel shows the essential columns only
+        var compact = javafx.beans.binding.Bindings.createBooleanBinding(
+            () -> fr.cnrs.lacito.matchbox.gui.problems.ProblemColumns.isCompact(table.getWidth()), table.widthProperty());
+        for (TableColumn<ProblemRow, ?> c : List.of(column, plugin, object)) c.visibleProperty().bind(compact.not());
 
         SortedList<ProblemRow> sorted = new SortedList<>(filtered);
         sorted.comparatorProperty().bind(javafx.beans.binding.Bindings.createObjectBinding(

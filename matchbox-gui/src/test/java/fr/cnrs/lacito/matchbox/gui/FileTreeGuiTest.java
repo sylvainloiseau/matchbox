@@ -82,11 +82,12 @@ class FileTreeGuiTest extends MainWindowFixture {
         addNotes(robot);
         addFile(robot, "alone.txt", "x\n");
         waitUntil(() -> tree(robot).getRoot().getChildren().size() == 2);
-        TreeItem<FileTree.Node> top = tree(robot).getRoot().getChildren().get(0);
+        // top nodes in path order: alone.txt before notes/
+        assertEquals(alone, tree(robot).getRoot().getChildren().get(0).getValue().path());
+        TreeItem<FileTree.Node> top = tree(robot).getRoot().getChildren().get(1);
         assertEquals(new FileTree.TopDirectory(notes), top.getValue());
         assertTrue(top.isExpanded(), "top directories are expanded at first");
         assertEquals(List.of("2024", "A.txt", "b.txt"), top.getChildren().stream().map(i -> i.getValue().name()).toList());
-        assertEquals(alone, tree(robot).getRoot().getChildren().get(1).getValue().path());
         assertTrue(project().directorySettings(notes).orElseThrow().recursive());
     }
 

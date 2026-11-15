@@ -26,7 +26,11 @@ public final class Modes {
                 shortcut(KeyCode.DIGIT1), FileMode::new),
             new ModeDescriptor(TagBrowserMode.ID, "Tags", "Tag Browser",
                 "Browse, count, rename and reorganise all the tags of the corpus",
-                shortcut(KeyCode.DIGIT2), TagBrowserMode::new, Tag.class::isInstance)
+                shortcut(KeyCode.DIGIT2), TagBrowserMode::new, Tag.class::isInstance),
+            new ModeDescriptor(DictionaryHistoryMode.ID, "History", "Dictionary History",
+                "The dictionary as the commands of the notes leave it, and the commands that shaped each entry",
+                shortcut(KeyCode.DIGIT3), DictionaryHistoryMode::new,
+                fr.cnrs.lacito.matchbox.corpus.capability.LexiconMutationCommand.class::isInstance)
         );
     }
 

@@ -372,6 +372,26 @@ public class Project {
         }
     }
 
+    /** The order of the files: of the dictionary history and of the file list. */
+    private final SimpleObjectProperty<ProjectFileOrder> fileOrder = new SimpleObjectProperty<>(ProjectFileOrder.PATH);
+
+    /** The order of the files of the project (the order the history applies their commands in). */
+    public ProjectFileOrder getFileOrder() {
+        return fileOrder.get();
+    }
+
+    public ReadOnlyObjectProperty<ProjectFileOrder> fileOrderProperty() {
+        return fileOrder;
+    }
+
+    public void setFileOrder(ProjectFileOrder order) {
+        Objects.requireNonNull(order, "order");
+        if (order != fileOrder.get()) {
+            fileOrder.set(order);
+            markDefinitionChanged();
+        }
+    }
+
     /** The gloss check of the project (label list, own labels, dictionary check). */
     public fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings getGlossCheck() {
         return glossCheck;

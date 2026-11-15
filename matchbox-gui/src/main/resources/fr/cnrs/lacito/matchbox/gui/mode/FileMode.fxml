@@ -1,71 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.ChoiceBox?>
-<?import javafx.scene.control.Separator?>
-<?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ListView?>
-<?import javafx.scene.control.TreeView?>
 <?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
-<?import javafx.scene.control.TableColumn?>
-<?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.control.ToolBar?>
-<?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.control.TreeView?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<SplitPane dividerPositions="0.25" style="-fx-background-color: #cccccc;" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" AnchorPane.bottomAnchor="0.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1">
-  <VBox style="-fx-background-color: #cccccc;">
-      <Label style="-fx-font-weight: bold; -fx-padding: 5;" text="Files" />
-      <TextField fx:id="filterFileTextField" promptText="Filter" />
-      <TreeView fx:id="fileTreeView" VBox.vgrow="ALWAYS" />
-  </VBox>
-  <SplitPane fx:id="topSplitPane" dividerPositions="0.5" orientation="VERTICAL">
-    <VBox style="-fx-background-color: #cccccc;">
-        <ToolBar fx:id="editorToolBar" prefHeight="40.0" prefWidth="200.0">
+<!--
+  File Mode: three panels (files, editor, objects and problems), arranged by FileMode from its
+  FileModeLayout: three columns, or the objects under the editor. The panels are defined here and
+  put in ColumnSplitPanes by the code (see .claude/plans/FILE_MODE_LAYOUT_PLAN.md).
+-->
+<StackPane fx:id="layoutRoot" style="-fx-background-color: #cccccc;" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1">
+  <fx:define>
+    <VBox fx:id="filesPane" minWidth="120.0" style="-fx-background-color: #cccccc;">
+        <Label fx:id="filesTitle" style="-fx-font-weight: bold; -fx-padding: 5;" text="Files" />
+        <TextField fx:id="filterFileTextField" promptText="Filter" />
+        <TreeView fx:id="fileTreeView" VBox.vgrow="ALWAYS" />
+    </VBox>
+    <VBox fx:id="editorPane" minWidth="240.0" style="-fx-background-color: #cccccc;">
+        <ToolBar fx:id="editorToolBar" prefHeight="40.0">
           <items>
             <Button fx:id="saveButton" mnemonicParsing="false" onAction="#handleSaveCurrentFile" text="Save" />
             <Button fx:id="parseButton" mnemonicParsing="false" onAction="#handleParseText" text="Parse" />
             <Button fx:id="closeButton" mnemonicParsing="false" onAction="#handleCloseFile" text="Close" />
-          <Button mnemonicParsing="false" text="Insert intermorphemic gloss bloc" />
             <Separator orientation="VERTICAL" />
             <ToggleButton fx:id="suggestionsToggle" mnemonicParsing="false" text="Suggestions" />
           </items>
         </ToolBar>
-        <SplitPane fx:id="editorSplitPane" dividerPositions="0.72" VBox.vgrow="ALWAYS">
+        <SplitPane fx:id="editorSplitPane" VBox.vgrow="ALWAYS">
           <org.fxmisc.richtext.InlineCssTextArea fx:id="fileContentCodeArea" />
         </SplitPane>
     </VBox>
-    <VBox style="-fx-border-color: #cccccc;">
-      <TabPane fx:id="bottomTabPane" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+    <VBox fx:id="objectsPane" minWidth="240.0" style="-fx-border-color: #cccccc;">
+      <TabPane fx:id="objectTabPane" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
         <tabs>
           <Tab text="Objects">
             <content>
-              <SplitPane fx:id="objectsSplitPane" dividerPositions="0.55" orientation="VERTICAL">
+              <SplitPane fx:id="objectsSplitPane" orientation="VERTICAL">
                 <TabPane fx:id="objectKindTabPane" tabClosingPolicy="UNAVAILABLE" />
                 <ScrollPane fx:id="objectDetailPane" fitToWidth="true" fitToHeight="true" />
               </SplitPane>
-            </content>
-          </Tab>
-          <Tab text="Session">
-            <content>
-              <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0" />
-            </content>
-          </Tab>
-          <Tab text="Tag">
-            <content>
-              <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0" />
             </content>
           </Tab>
           <Tab fx:id="parsingErrorPane" text="Parsing errors" />
         </tabs>
       </TabPane>
     </VBox>
-  </SplitPane>
-</SplitPane>
+  </fx:define>
+</StackPane>

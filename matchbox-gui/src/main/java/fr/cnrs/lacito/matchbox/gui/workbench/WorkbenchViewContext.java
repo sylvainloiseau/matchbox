@@ -23,6 +23,10 @@ final class WorkbenchViewContext implements ViewContext {
         this.workbench = workbench;
     }
 
+    Workbench workbench() {
+        return workbench;
+    }
+
     @Override
     public void selectInEditor(TextCoordinate span) {
         workbench.navigator().showInEditor(span);

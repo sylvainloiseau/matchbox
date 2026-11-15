@@ -30,6 +30,8 @@ import java.util.function.Consumer;
  * @param allowInvalidViewEdits apply edits made in object views even if they add parse errors
  * @param tagBrowser         settings of the Tag Browser mode
  * @param editor             settings of the text editor of File Mode
+ * @param fileMode           layout of File Mode (panels shown, sizes)
+ * @param dictionaryHistory  settings of the Dictionary History mode
  */
 public record SettingsData(
     Integer version,
@@ -44,8 +46,29 @@ public record SettingsData(
     AssistSettingsData assist,
     Boolean allowInvalidViewEdits,
     TagBrowserSettingsData tagBrowser,
-    EditorSettingsData editor
+    EditorSettingsData editor,
+    FileModeSettingsData fileMode,
+    DictionaryHistorySettingsData dictionaryHistory
 ) {
+    /** Settings without {@code dictionaryHistory} (written before it existed): its defaults. */
+    public SettingsData(Integer version, String charset, String morphemeSeparators, List<String> fileExtensions,
+                        List<String> filePatterns, Integer maxRecentFiles, Integer maxRecentProjects,
+                        Boolean openLastProject, String logFile, AssistSettingsData assist,
+                        Boolean allowInvalidViewEdits, TagBrowserSettingsData tagBrowser, EditorSettingsData editor,
+                        FileModeSettingsData fileMode) {
+        this(version, charset, morphemeSeparators, fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects,
+            openLastProject, logFile, assist, allowInvalidViewEdits, tagBrowser, editor, fileMode, null);
+    }
+
+
+    /** Settings without {@code fileMode} (written before it existed): default layout. */
+    public SettingsData(Integer version, String charset, String morphemeSeparators, List<String> fileExtensions,
+                        List<String> filePatterns, Integer maxRecentFiles, Integer maxRecentProjects,
+                        Boolean openLastProject, String logFile, AssistSettingsData assist,
+                        Boolean allowInvalidViewEdits, TagBrowserSettingsData tagBrowser, EditorSettingsData editor) {
+        this(version, charset, morphemeSeparators, fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects,
+            openLastProject, logFile, assist, allowInvalidViewEdits, tagBrowser, editor, null, null);
+    }
 
     public static final int CURRENT_VERSION = 2;
 
@@ -64,7 +87,9 @@ public record SettingsData(
             AssistSettingsData.defaults(),
             false,
             TagBrowserSettingsData.defaults(),
-            EditorSettingsData.defaults()
+            EditorSettingsData.defaults(),
+            FileModeSettingsData.defaults(),
+            DictionaryHistorySettingsData.defaults()
         );
     }
 
@@ -95,7 +120,9 @@ public record SettingsData(
             assist == null ? d.assist : assist.validated(problems),
             allowInvalidViewEdits == null ? d.allowInvalidViewEdits : allowInvalidViewEdits,
             tagBrowser == null ? d.tagBrowser : tagBrowser.validated(problems),
-            editor == null ? d.editor : editor.validated(problems)
+            editor == null ? d.editor : editor.validated(problems),
+            fileMode == null ? d.fileMode : fileMode.validated(problems),
+            dictionaryHistory == null ? d.dictionaryHistory : dictionaryHistory.validated(problems)
         );
     }
 
@@ -103,21 +130,35 @@ public record SettingsData(
     public SettingsData withAssist(AssistSettingsData newAssist) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist, allowInvalidViewEdits,
-            tagBrowser, editor);
+            tagBrowser, editor, fileMode, dictionaryHistory);
     }
 
     /** Copy with other Tag Browser settings. */
     public SettingsData withTagBrowser(TagBrowserSettingsData newTagBrowser) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
-            newTagBrowser, editor);
+            newTagBrowser, editor, fileMode, dictionaryHistory);
     }
 
     /** Copy with other editor settings. */
     public SettingsData withEditor(EditorSettingsData newEditor) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
-            tagBrowser, newEditor);
+            tagBrowser, newEditor, fileMode, dictionaryHistory);
+    }
+
+    /** Copy with other Dictionary History settings. */
+    public SettingsData withDictionaryHistory(DictionaryHistorySettingsData newHistory) {
+        return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
+            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
+            tagBrowser, editor, fileMode, newHistory);
+    }
+
+    /** Copy with another File Mode layout. */
+    public SettingsData withFileMode(FileModeSettingsData newFileMode) {
+        return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
+            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
+            tagBrowser, editor, newFileMode, dictionaryHistory);
     }
 
     /** Validated copy, problems ignored. */

@@ -85,7 +85,7 @@ class StartPageTest extends MainWindowFixture {
         assertTrue(item(assistant, "Refresh project examples").isDisable());
         assertFalse(item(assistant, "AI assistant settings").isDisable());
         robot.lookup("#toolBar .toggle-button").queryAllAs(ToggleButton.class)
-            .forEach(b -> assertTrue(b.isDisable(), b.getText()));
+            .forEach(b -> assertTrue(b.isDisabled(), b.getText()));
         assertEquals("Matchbox", stage.getTitle());
     }
 
@@ -172,6 +172,6 @@ class StartPageTest extends MainWindowFixture {
         loader.setController(new SettingsDialog(settings, stage));
         loader.load();
         TabPane tabs = (TabPane) loader.getNamespace().get("tabs");
-        assertEquals(List.of("Grammar", "Files", "Editor", "Application"), tabs.getTabs().stream().map(Tab::getText).toList());
+        assertEquals(List.of("Grammar", "Files", "Editor", "Application", "Dictionary history"), tabs.getTabs().stream().map(Tab::getText).toList());
     }
 }

@@ -98,6 +98,23 @@ public final class Navigator {
         });
     }
 
+    /**
+     * Shows a place in a mode, if the mode can show it (a jump, for Back).
+     *
+     * @return false, and nothing changes, when the mode has nothing to show there
+     */
+    public boolean browseIn(String modeId, Focus focus) {
+        if (host == null) return false;
+        Optional<Place> from = here();
+        Mode mode = host.activate(modeId);
+        if (mode.reveal(focus)) {
+            from.ifPresent(history::jumped);
+            return true;
+        }
+        from.ifPresent(p -> host.activate(p.modeId()));
+        return false;
+    }
+
     public void back() {
         here().flatMap(history::back).ifPresent(this::go);
     }

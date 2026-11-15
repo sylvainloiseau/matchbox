@@ -56,6 +56,8 @@ public final class UserSettings implements AutoCloseable {
     private final BooleanProperty allowInvalidViewEdits = new SimpleBooleanProperty();
     private final ObjectProperty<TagBrowserSettingsData> tagBrowser = new SimpleObjectProperty<>();
     private final ObjectProperty<EditorSettingsData> editor = new SimpleObjectProperty<>();
+    private final ObjectProperty<FileModeSettingsData> fileMode = new SimpleObjectProperty<>();
+    private final ObjectProperty<DictionaryHistorySettingsData> dictionaryHistory = new SimpleObjectProperty<>();
     private String logFile;
     private final ObjectProperty<AssistSettingsData> assist = new SimpleObjectProperty<>();
     private final RecentItems recentFiles = new RecentItems(maxRecentFiles);
@@ -88,7 +90,7 @@ public final class UserSettings implements AutoCloseable {
 
         for (Observable o : List.<Observable>of(charset, morphemeSeparators,
                 fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, assist,
-                allowInvalidViewEdits, tagBrowser, editor)) {
+                allowInvalidViewEdits, tagBrowser, editor, fileMode, dictionaryHistory)) {
             o.addListener(obs -> settingsChanged());
         }
         recentFiles.items().addListener((Observable obs) -> recentChanged());
@@ -167,6 +169,10 @@ public final class UserSettings implements AutoCloseable {
     /** Settings of the Tag Browser mode (replace the whole value to change them). */
     public ObjectProperty<TagBrowserSettingsData> tagBrowserProperty() { return tagBrowser; }
     public ObjectProperty<EditorSettingsData> editorProperty() { return editor; }
+    /** Layout of File Mode (panels shown, sizes). */
+    public ObjectProperty<FileModeSettingsData> fileModeProperty() { return fileMode; }
+    /** Settings of the Dictionary History mode (replace the whole value to change them). */
+    public ObjectProperty<DictionaryHistorySettingsData> dictionaryHistoryProperty() { return dictionaryHistory; }
     public StringProperty morphemeSeparatorsProperty() { return morphemeSeparators; }
     /** Normalised extensions (lower case, without dot); empty means all files. */
     public ObservableList<String> fileExtensions() { return fileExtensions; }
@@ -219,7 +225,9 @@ public final class UserSettings implements AutoCloseable {
             assist.get(),
             allowInvalidViewEdits.get(),
             tagBrowser.get(),
-            editor.get()
+            editor.get(),
+            fileMode.get(),
+            dictionaryHistory.get()
         );
     }
 
@@ -247,6 +255,8 @@ public final class UserSettings implements AutoCloseable {
         allowInvalidViewEdits.set(d.allowInvalidViewEdits());
         tagBrowser.set(d.tagBrowser());
         editor.set(d.editor());
+        fileMode.set(d.fileMode());
+        dictionaryHistory.set(d.dictionaryHistory());
     }
 
     // ------------------------------------------------------------------

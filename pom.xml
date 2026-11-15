@@ -24,6 +24,9 @@
         <module>grammars/matchbox-grammar-mediaref</module>
         <module>grammars/matchbox-grammar-tag</module>
         <module>grammars/matchbox-grammar-igt</module>
+        <module>grammars/matchbox-grammar-lift-patchbox-common</module>
+        <module>grammars/matchbox-grammar-lift-patchbox-short</module>
+        <module>grammars/matchbox-grammar-lift-patchbox-ref</module>
         <module>matchbox-corpus</module>
         <module>matchbox-gui</module>
         <module>matchbox-grammar-api</module>
@@ -38,7 +41,13 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>25.0.1</javafx.version>
-        <lift-api.version>0.1.1</lift-api.version>
+        <!-- The LIFT libraries. Until lift-api 0.1.2 (extract), lift-patchbox 0.2.0 (ranges,
+             rewind/resumeFrom, RecordPolicy) and lift-fx 1.0.3 (read-only editor) are released,
+             the versions installed locally from ../lift-api, ../lift-patchbox and
+             ../DictionaryEditor (mvn install) are used. -->
+        <lift-api.version>0.1-SNAPSHOT</lift-api.version>
+        <lift-patchbox.version>0.1-SNAPSHOT</lift-patchbox.version>
+        <lift-fx.version>0.1-SNAPSHOT</lift-fx.version>
         <antlr.version>4.13.1</antlr.version>
         <junit.version>5.10.2</junit.version>
         <jackson.version>2.20.1</jackson.version>
@@ -53,6 +62,37 @@
         <dependencies>
             <!-- LIFT dictionaries (the context dictionary of a project), used by matchbox-app only.
                  Its command line (picocli) and LaTeX export settings (jackson-jr) are not used. -->
+            <!-- LiftPatch: the command model (matchbox-corpus, matchbox-app) and the parsers of its
+                 two syntaxes (the two LiftPatch plugins); the command-line tool's picocli is not used. -->
+            <dependency>
+                <groupId>io.github.sylvainloiseau</groupId>
+                <artifactId>lift-patchbox-core</artifactId>
+                <version>${lift-patchbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.sylvainloiseau</groupId>
+                <artifactId>lift-patchbox-language</artifactId>
+                <version>${lift-patchbox.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>info.picocli</groupId>
+                        <artifactId>picocli</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>io.github.sylvainloiseau</groupId>
+                <artifactId>lift-patchbox-core</artifactId>
+                <version>${lift-patchbox.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+            <!-- The JavaFX editors of LIFT entries (the Dictionary History mode, matchbox-gui). -->
+            <dependency>
+                <groupId>io.github.sylvainloiseau</groupId>
+                <artifactId>lift-fx</artifactId>
+                <version>${lift-fx.version}</version>
+            </dependency>
             <dependency>
                 <groupId>io.github.sylvainloiseau</groupId>
                 <artifactId>lift-api</artifactId>

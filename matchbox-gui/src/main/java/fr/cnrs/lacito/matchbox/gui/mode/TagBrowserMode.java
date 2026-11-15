@@ -5,6 +5,10 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusView;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
 import fr.cnrs.lacito.matchbox.corpus.capability.Tag;
 import fr.cnrs.lacito.matchbox.gui.ErrorReporter;
+import fr.cnrs.lacito.matchbox.gui.layout.ColumnLayout;
+import fr.cnrs.lacito.matchbox.gui.layout.ColumnSplitPane;
+import fr.cnrs.lacito.matchbox.gui.layout.PanelModel;
+import fr.cnrs.lacito.matchbox.gui.layout.PanelToggles;
 import fr.cnrs.lacito.matchbox.gui.edit.ViewEditService;
 import fr.cnrs.lacito.matchbox.gui.mode.tagBrowser.OccurrenceCell;
 import fr.cnrs.lacito.matchbox.gui.mode.tagBrowser.OccurrenceExport;
@@ -81,7 +85,10 @@ public final class TagBrowserMode extends AbstractMode {
 
     public static final String ID = "tag";
 
-    private final SplitPane root = new SplitPane();
+    private final javafx.scene.layout.StackPane root = new javafx.scene.layout.StackPane();
+    /** The tree and the occurrences, which can be hidden (toolbar toggles, Panels menu). */
+    private ColumnSplitPane split;
+    private PanelToggles<ColumnLayout> panelToggles;
     private final TextField filterField = new TextField();
     private final ChoiceBox<TagTree.Sort> sortChoice = new ChoiceBox<>();
     private final TreeView<TagNode> tree = new TreeView<>();
@@ -132,8 +139,7 @@ public final class TagBrowserMode extends AbstractMode {
         afterSpinner.setId("contextAfter");
         appliesTo.setId("appliesTo");
         includeSubTags.setId("includeSubTags");
-        root.getItems().addAll(buildTreePane(), buildOccurrencePane());
-        root.setDividerPositions(0.25);
+        buildPanels(s);
         menu = buildMenu();
     }
 
@@ -333,7 +339,17 @@ public final class TagBrowserMode extends AbstractMode {
         MenuItem export = new MenuItem("Export occurrences as CSV…");
         export.setOnAction(e -> exportCsv());
 
-        Menu result = new Menu("Tag Browser", null, rename, moveTo, new SeparatorMenuItem(), expandAll, collapseAll,
+        Menu panels = new Menu("Panels");
+        panels.getItems().addAll(panelToggles.menuItems());
+        MenuItem showAll = new MenuItem("Show all panels");
+        showAll.setAccelerator(PanelToggles.accelerator(0));
+        showAll.setOnAction(e -> split.layoutProperty().set(split.layoutProperty().get().withOnly(List.of(0, 1))));
+        MenuItem reset = new MenuItem("Reset panel sizes");
+        reset.setOnAction(e -> split.layoutProperty().set(split.layoutProperty().get()
+            .withSizes(TagBrowserSettingsData.DEFAULT_WIDTHS)));
+        panels.getItems().addAll(new SeparatorMenuItem(), showAll, reset);
+
+        Menu result = new Menu("Tag Browser", null, panels, new SeparatorMenuItem(), rename, moveTo, new SeparatorMenuItem(), expandAll, collapseAll,
             new SeparatorMenuItem(), byName, byCount, sub, new SeparatorMenuItem(), edit, copyKeyword, copyOccurrences, export);
         result.setOnShowing(e -> {
             boolean none = selectedNode().isEmpty();
@@ -356,6 +372,32 @@ public final class TagBrowserMode extends AbstractMode {
     @Override
     public Node root() {
         return root;
+    }
+
+    /** The toggles of the tree and the occurrences, at the right end of the main toolbar. */
+    @Override
+    public Optional<Node> toolBarItems() {
+        return Optional.of(panelToggles.toolBarItems());
+    }
+
+    /** The tree | occurrences split, its toggles, its layout saved in the settings. */
+    private void buildPanels(TagBrowserSettingsData s) {
+        Node treePane = buildTreePane();
+        Node occurrencePane = buildOccurrencePane();
+        SplitPane.setResizableWithParent(treePane, false);
+        TagBrowserSettingsData v = s.validated(p -> {});
+        split = new ColumnSplitPane(javafx.geometry.Orientation.HORIZONTAL, List.of(treePane, occurrencePane),
+            new ColumnLayout(List.of(v.showTree(), v.showOccurrences()), v.widths()));
+        split.setFocusOrder(List.of(1, 0), List.of(tree, list));
+        split.node().setId("tagBrowserSplit");
+        root.getChildren().setAll(split.node());
+        split.layoutProperty().addListener((obs, o, n) ->
+            saveSettings(settings().withLayout(n.isShown(0), n.isShown(1), n.sizes())));
+        panelToggles = new PanelToggles<>(List.of(
+            new PanelToggles.Panel("Tags", "Show or hide the tree of tags", "tagTreeToggle", PanelToggles.accelerator(1)),
+            new PanelToggles.Panel("Occurrences", "Show or hide the occurrences of the selected tag",
+                "tagOccurrencesToggle", PanelToggles.accelerator(2))),
+            split.layoutProperty(), PanelModel.columns());
     }
 
     // ------------------------------------------------------------------
@@ -582,6 +624,7 @@ public final class TagBrowserMode extends AbstractMode {
     @Override
     public boolean reveal(Focus focus) {
         if (focus.object().isEmpty() || !(focus.object().get() instanceof Tag)) return false;
+        split.layoutProperty().set(split.layoutProperty().get().withShown(1, true));
         Optional<TagOccurrence> occurrence = index.all().stream()
             .filter(o -> o.text().equals(focus.text()) && o.tag().getTextCoordinate().startIndex() == focus.start())
             .findFirst();

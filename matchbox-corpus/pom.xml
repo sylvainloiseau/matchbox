@@ -20,8 +20,12 @@
     <description
     >The objects created by the parsers representing linguistic data</description>
 
-     <dependencies>
-
+    <dependencies>
+        <!-- The LiftPatch command model (no parser, no ANTLR): what a LexiconMutationCommand holds. -->
+        <dependency>
+            <groupId>io.github.sylvainloiseau</groupId>
+            <artifactId>lift-patchbox-core</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

@@ -27,7 +27,7 @@ public final class ProjectChecks {
     private volatile CheckInputs inputs = CheckInputs.defaults();
 
     public ProjectChecks() {
-        this(List.of(new IgtStructureCheck(), new GlossLabelCheck(), new LexiconCheck()));
+        this(List.of(new IgtStructureCheck(), new GlossLabelCheck(), new LexiconCheck(), new DictionaryHistoryCheck()));
     }
 
     public ProjectChecks(List<CorpusCheck> checks) {

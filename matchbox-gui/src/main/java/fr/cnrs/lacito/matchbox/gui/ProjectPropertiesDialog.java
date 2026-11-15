@@ -100,7 +100,7 @@ public class ProjectPropertiesDialog {
 
         VBox root = new VBox(10,
             nameSection(), descriptionSection(), fileTypesSection(), pluginParametersSection(), inheritedContextSection(),
-            glossCheckSection(), assistantSection(),
+            fileOrderSection(), glossCheckSection(), assistantSection(),
             buttons());
         root.setPadding(new Insets(15));
         ScrollPane scroll = new ScrollPane(root);
@@ -194,7 +194,7 @@ public class ProjectPropertiesDialog {
         });
 
         grammarList = new ListView<>(grammarRows);
-        grammarList.setPrefHeight(150);
+        grammarList.setPrefHeight(240);
         grammarList.setCellFactory(lv -> new GrammarCell());
         grammarList.setId("grammarList");
         Button up = new Button("Up");
@@ -238,7 +238,7 @@ public class ProjectPropertiesDialog {
     private VBox pluginParametersSection() {
         pluginList = new ListView<>(pluginRows);
         pluginList.setId("pluginParameters");
-        pluginList.setPrefHeight(170);
+        pluginList.setPrefHeight(270);
         pluginList.setCellFactory(lv -> new PluginCell());
         Label help = new Label("The display of a plugin is the same in every file type using it. "
             + "Check a plugin in a file type to edit its display.");
@@ -427,6 +427,43 @@ public class ProjectPropertiesDialog {
     }
 
     /** The gloss check of the IGTs: list of labels, the project's labels, the dictionary check. */
+    // ------------------------------------------------------------------
+    // File order
+    // ------------------------------------------------------------------
+
+    /** The order of the files: of the dictionary history (the commands are applied in it) and of the file list. */
+    private VBox fileOrderSection() {
+        javafx.scene.control.ToggleGroup group = new javafx.scene.control.ToggleGroup();
+        VBox choices = new VBox(4);
+        for (fr.cnrs.lacito.matchbox.model.project.ProjectFileOrder order
+                : fr.cnrs.lacito.matchbox.model.project.ProjectFileOrder.values()) {
+            javafx.scene.control.RadioButton b = new javafx.scene.control.RadioButton(order.label());
+            b.setId("fileOrder-" + order.xmlName());
+            b.setToggleGroup(group);
+            b.setUserData(order);
+            b.setSelected(edit.getFileOrder() == order);
+            String help = switch (order) {
+                case PATH -> "a/b/x.txt before a/y.txt: the files and folders of a folder sorted by name together.";
+                case MODIFIED -> "Oldest first. Saving an old file moves it, and its commands, to the end of the history;"
+                    + " copying or checking out files may change their times.";
+                case HEADER_DATE -> "The 'date' of the file header (date: 2025-07-14), oldest first, then by path;"
+                    + " files without a date come last.";
+            };
+            Label h = new Label(help);
+            h.setWrapText(true);
+            h.setStyle("-fx-font-size: 0.9em; -fx-padding: 0 0 0 24;" + (order == fr.cnrs.lacito.matchbox.model.project
+                .ProjectFileOrder.MODIFIED ? " -fx-text-fill: #9a6700;" : " -fx-text-fill: gray;"));
+            choices.getChildren().addAll(b, h);
+        }
+        group.selectedToggleProperty().addListener((obs, o, n) -> {
+            if (n != null) edit.setFileOrder((fr.cnrs.lacito.matchbox.model.project.ProjectFileOrder) n.getUserData());
+        });
+        Label help = new Label("The dictionary commands of the notes are applied in this order of the files, then in the"
+            + " order of each text; the file list shows it.");
+        help.setWrapText(true);
+        return section("File order", help, choices);
+    }
+
     private VBox glossCheckSection() {
         var settings = edit.getGlossCheck();
         javafx.scene.control.ToggleGroup group = new javafx.scene.control.ToggleGroup();

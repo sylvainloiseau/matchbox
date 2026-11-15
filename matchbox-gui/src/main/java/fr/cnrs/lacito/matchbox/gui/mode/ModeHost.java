@@ -26,13 +26,17 @@ import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.Pane;
 
 /**
  * Shows the modes of the window: one toolbar button and one Mode menu item per mode, the active
  * mode's content in the main area and its menu in the menu bar (after the Mode menu). Modes are
  * created the first time they are shown and kept; File Mode is created at once (it owns the
- * editor). The focus of the active mode is the window's {@link #focusProperty() focus}.
+ * editor). The focus of the active mode is the window's {@link #focusProperty() focus}. The
+ * active mode's {@link Mode#toolBarItems() toolbar items} go at the right end of the toolbar.
  */
 public final class ModeHost {
 
@@ -54,6 +58,8 @@ public final class ModeHost {
     private final ChangeListener<Optional<Focus>> focusFollower = (obs, o, n) -> focus.set(n);
     private ObservableValue<Optional<Focus>> followedFocus;
     private Optional<Menu> shownMenu = Optional.empty();
+    /** Right end of the toolbar: the active mode's own controls. */
+    private final HBox modeToolBarSlot = new HBox();
     /** True while the buttons and items are set to the active mode (not a user's choice). */
     private boolean syncing;
 
@@ -88,6 +94,15 @@ public final class ModeHost {
             modeMenu.getItems().add(index++, item);
             itemById.put(d.id(), item);
         }
+        Region spring = new Region();
+        HBox.setHgrow(spring, Priority.ALWAYS);
+        spring.setMinWidth(0);
+        modeToolBarSlot.setId("modeToolBarSlot");
+        // nothing while no project is open (the start page is shown)
+        modeToolBarSlot.visibleProperty().bind(enabled);
+        modeToolBarSlot.managedProperty().bind(enabled);
+        modeToolBarSlot.disableProperty().bind(enabled.not());
+        toolBar.getItems().addAll(spring, modeToolBarSlot);
     }
 
     /** A button or item chosen by the user: a jump (recorded for Back). */
@@ -113,6 +128,7 @@ public final class ModeHost {
             AnchorPane.setRightAnchor(root, 0.0);
             viewPane.getChildren().setAll(root);
             showMenu(mode.menu());
+            modeToolBarSlot.getChildren().setAll(mode.toolBarItems().stream().toList());
             if (followedFocus != null) followedFocus.removeListener(focusFollower);
             followedFocus = mode.focusProperty();
             followedFocus.addListener(focusFollower);

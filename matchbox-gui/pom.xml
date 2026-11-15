@@ -41,6 +41,11 @@
             <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-assist</artifactId>
         </dependency>
+        <!-- The read-only editor of a LIFT entry (the Dictionary History mode, the detail of a command). -->
+        <dependency>
+            <groupId>io.github.sylvainloiseau</groupId>
+            <artifactId>lift-fx</artifactId>
+        </dependency>
         <!-- real grammars for the tests of view editing -->
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
@@ -69,6 +74,18 @@
         <dependency>
             <groupId>fr.cnrs.lacito</groupId>
             <artifactId>matchbox-grammar-igt</artifactId>
+            <version>${revision}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-grammar-lift-patchbox-short</artifactId>
+            <version>${revision}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-grammar-lift-patchbox-ref</artifactId>
             <version>${revision}</version>
             <scope>test</scope>
         </dependency>

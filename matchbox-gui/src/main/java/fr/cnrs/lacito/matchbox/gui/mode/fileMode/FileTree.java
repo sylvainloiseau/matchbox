@@ -17,10 +17,13 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 /**
- * The files of a project as File Mode's tree shows them: one top node per entry of the project
- * definition, in order; a directory groups the files it gives, with its sub-directories as nodes
- * (directories first, then files, each sorted by name with {@link FileOrder#NAMES}); files added alone are top nodes, never
- * grouped. Sub-directories without file are not shown. Pure: no JavaFX control.
+ * The files of a project as File Mode's tree shows them, in the project's path order (the order of
+ * {@code ProjectFileOrder.PATH}, which the dictionary history follows): one top node per entry of the
+ * project definition, sorted by path ({@link FileOrder#PATHS}); a directory groups the files it
+ * gives, with its sub-directories as nodes, files and sub-directories sorted together by name
+ * ({@link FileOrder#NAMES}), so that walking the tree depth first gives the files in path order
+ * ({@code a/b/x.txt} before {@code a/y.txt}); files added alone are top nodes, never grouped.
+ * Sub-directories without file are not shown. Pure: no JavaFX control.
  */
 public final class FileTree {
 
@@ -115,7 +118,13 @@ public final class FileTree {
                 top.add(new Entry(new FileNode(d, Optional.empty()), List.of()));
             }
         }
+        top.sort(Comparator.comparing((Entry e) -> e.node().path(), FileOrder.PATHS));
         return top;
+    }
+
+    /** The files of the tree, depth first: the project's path order. */
+    public static List<TextDocument> files(List<Entry> tree) {
+        return tree.stream().flatMap(Entry::documents).toList();
     }
 
     private static boolean matches(TextDocument d, String filter) {
@@ -151,10 +160,12 @@ public final class FileTree {
             for (Folder sub : subdirectories.values()) {
                 if (!sub.isEmpty()) children.add(sub.toEntry(new SubDirectory(top, sub.path), top));
             }
-            files.stream()
-                .sorted(Comparator.comparing((TextDocument d) -> d.getFilePath().getFileName().toString(),
-                    FileOrder.NAMES))
-                .forEach(d -> children.add(new Entry(new FileNode(d, Optional.of(top)), List.of())));
+            for (TextDocument d : files) {
+                children.add(new Entry(new FileNode(d, Optional.of(top)), List.of()));
+            }
+            // files and sub-directories together, by name: the path order
+            children.sort(Comparator.comparing((Entry e) -> e.node().path().getFileName().toString(),
+                FileOrder.NAMES));
             return new Entry(node, children);
         }
     }

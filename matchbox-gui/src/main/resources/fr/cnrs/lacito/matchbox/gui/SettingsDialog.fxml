@@ -107,6 +107,23 @@
             </VBox>
           </content>
         </Tab>
+        <Tab text="Dictionary history" closable="false">
+          <content>
+            <VBox spacing="10.0" style="-fx-padding: 15;">
+              <children>
+                <Label
+                                    text="Without a context dictionary, the commands of the notes are applied to an empty dictionary with these languages:"
+                                    wrapText="true"
+                                    style="-fx-font-weight: bold;"
+                                />
+                <Label text="Object language (language code of the forms):" />
+                <TextField fx:id="emptyObjectLanguageField" promptText="e.g. tww" />
+                <Label text="Meta language (language code of the glosses):" />
+                <TextField fx:id="emptyMetaLanguageField" promptText="e.g. en" />
+              </children>
+            </VBox>
+          </content>
+        </Tab>
       </tabs>
     </TabPane>
     <Separator />

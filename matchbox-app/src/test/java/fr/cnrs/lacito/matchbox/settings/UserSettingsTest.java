@@ -85,7 +85,8 @@ class UserSettingsTest {
             assertEquals(3, s.maxRecentProjectsProperty().get());
             assertEquals(StandardCharsets.ISO_8859_1, s.documentOptions().charset());
             // invalid Tag Browser values replaced by the defaults, valid ones kept
-            assertEquals(new TagBrowserSettingsData(5, 3, TagBrowserSettingsData.SORT_NAME, false),
+            assertEquals(new TagBrowserSettingsData(5, 3, TagBrowserSettingsData.SORT_NAME, false, true, true,
+                TagBrowserSettingsData.DEFAULT_WIDTHS),
                 s.tagBrowserProperty().get());
             // font size clamped, blank family = default, recent characters cleaned
             assertEquals(new EditorSettingsData(false, false, EditorSettingsData.MAX_FONT_SIZE, null, true, false, true,

@@ -120,6 +120,13 @@ public class ProjectXMLSerializer {
             rootElement.appendChild(contextElement);
         }
 
+        // File order (absent: by path)
+        if (project.getFileOrder() != ProjectFileOrder.PATH) {
+            Element e = doc.createElement("fileOrder");
+            e.setAttribute("by", project.getFileOrder().xmlName());
+            rootElement.appendChild(e);
+        }
+
         // Gloss check (absent: the defaults)
         var glossCheck = project.getGlossCheck();
         if (!glossCheck.equals(fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings.defaults())) {
@@ -374,6 +381,13 @@ public class ProjectXMLSerializer {
             Element contextElement = (Element) contextList.item(0);
             project.setContextDictionary(contextPath(contextElement, "dictionary"));
             project.setContextCorpus(contextPath(contextElement, "corpus"));
+        }
+
+        NodeList orderList = rootElement.getElementsByTagName("fileOrder");
+        if (orderList.getLength() > 0) {
+            String by = ((Element) orderList.item(0)).getAttribute("by");
+            ProjectFileOrder.fromXml(by).ifPresentOrElse(project::setFileOrder,
+                () -> project.recordLoadProblem("Unknown file order '" + by + "': files are ordered by path"));
         }
 
         NodeList assistantList = rootElement.getElementsByTagName("assistant");

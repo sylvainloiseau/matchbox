@@ -65,6 +65,9 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
+import fr.cnrs.lacito.matchbox.gui.layout.ColumnSplitPane;
+import fr.cnrs.lacito.matchbox.gui.layout.PanelToggles;
+import fr.cnrs.lacito.matchbox.gui.mode.fileMode.FileModeLayout;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableCell;
@@ -89,6 +92,13 @@ public class FileMode implements Mode {
 
     @FXML
     private TreeView<FileTree.Node> fileTreeView;
+    @FXML
+    private Label filesTitle;
+    /** The position in the dictionary history of the files holding commands (1, 2, 3…). */
+    private Map<java.nio.file.Path, Integer> historyRank = Map.of();
+    /** The files are listed flat, in the order of a date (the project's file order). */
+    private boolean flatList;
+    private Map<java.nio.file.Path, java.util.Optional<java.time.Instant>> fileDates = Map.of();
 
     @FXML
     private TextField filterFileTextField;
@@ -129,7 +139,27 @@ public class FileMode implements Mode {
     private ToggleButton suggestionsToggle;
 
     @FXML
-    private TabPane bottomTabPane;
+    private TabPane objectTabPane;
+
+    /** The three panels, arranged by {@link #layout}. */
+    @FXML
+    private javafx.scene.layout.StackPane layoutRoot;
+    @FXML
+    private javafx.scene.layout.VBox filesPane;
+    @FXML
+    private javafx.scene.layout.VBox editorPane;
+    @FXML
+    private javafx.scene.layout.VBox objectsPane;
+    @FXML
+    private SplitPane objectsSplitPane;
+
+    /** Which panels are shown, their arrangement and sizes; saved in the settings. */
+    private final ObjectProperty<FileModeLayout> layout = new SimpleObjectProperty<>();
+    /** The splits of the current arrangement (rebuilt when it changes). */
+    private final List<ColumnSplitPane> splits = new ArrayList<>();
+    /** True while the splits are set from {@link #layout}. */
+    private boolean syncingLayout;
+    private PanelToggles<FileModeLayout> panelToggles;
 
     /** Overlapping readings of the whole project. */
     private OverlapsPane overlapsPane;
@@ -188,6 +218,8 @@ public class FileMode implements Mode {
 
     /** One tab per kind of top-level object of the current file, in order of appearance. */
     private final Map<String, Tab> tabsByKind = new LinkedHashMap<>();
+    private javafx.beans.InvalidationListener historyRefresh;
+    private javafx.beans.value.ChangeListener<Object> historyTree;
     /** Object shown in the detail pane. */
     private CorpusObject displayedObject;
     /** True while the selection is propagated, to avoid feedback between table and editor. */
@@ -224,6 +256,7 @@ public class FileMode implements Mode {
         setupOverlapsTab();
         setupAssistant();
         setupFocus();
+        setupLayout();
         this.menu = buildMenu();
         saveButton.disableProperty().bind(editorController.getCurrentTextCouldBeWrittenDownProperty().not());
         // a file of a directory is excluded in the directory settings, not removed alone
@@ -377,10 +410,20 @@ public class FileMode implements Mode {
         return Optional.of(menu);
     }
 
+    /** The toggles of the three panels, at the right end of the main toolbar. */
+    @Override
+    public Optional<Node> toolBarItems() {
+        return Optional.of(panelToggles.toolBarItems());
+    }
+
     /** Opens the file of the focus, then selects its object or range. */
     @Override
     public boolean reveal(Focus target) {
         if (project == null) return false;
+        // a place is shown in the editor; an object also in the Objects panel if the editor is hidden
+        if (target.object().isEmpty() || !layout.get().isShown(FileModeLayout.Panel.OBJECTS)) {
+            ensureShown(FileModeLayout.Panel.EDITOR);
+        }
         if (!isDisplayed(target)) {
             project.document(target.text()).ifPresent(d -> {
                 // the file may be hidden by the filter of the tree
@@ -410,6 +453,19 @@ public class FileMode implements Mode {
         editorController.getClosableProperty().addListener((obs, o, n) -> updateFocus());
     }
 
+    /**
+     * The Dictionary History of the entry at the caret: the entry of the command at the caret, or the
+     * entry whose form is the word at the caret (a word of an IGT, of a note…).
+     */
+    private void showHistoryAtCaret() {
+        updateFocus();
+        focus.get().ifPresent(f -> {
+            if (!workbench.navigator().browseIn(DictionaryHistoryMode.ID, f)) {
+                workbench.status().info("No entry of the dictionary history at the caret");
+            }
+        });
+    }
+
     private void updateFocus() {
         Optional<TextDocument> document = editorController.getSelectedDocument();
         if (document.isEmpty()) {
@@ -423,6 +479,160 @@ public class FileMode implements Mode {
         Optional<CorpusObject> selected = object != null && object.getTextCoordinate().text().equals(document.get().getId())
             ? Optional.of(object) : Optional.empty();
         focus.set(Optional.of(new Focus(document.get().getId(), start, end, selected)));
+    }
+
+    // ------------------------------------------------------------------
+    // Layout: the three panels (plan FILE_MODE_LAYOUT_PLAN.md)
+    // ------------------------------------------------------------------
+
+    private static final List<PanelToggles.Panel> PANELS = List.of(
+        new PanelToggles.Panel("Files", "Show or hide the list of files", "fileListToggle", panelKey(1)),
+        new PanelToggles.Panel("Editor", "Show or hide the editor", "fileEditorToggle", panelKey(2)),
+        new PanelToggles.Panel("Objects", "Show or hide the objects and problems of the file", "fileObjectsToggle",
+            panelKey(3)));
+
+    private static KeyCombination panelKey(int n) {
+        return PanelToggles.accelerator(n);
+    }
+
+    private void setupLayout() {
+        layout.set(FileModeLayout.of(settings.fileModeProperty().get()));
+        javafx.scene.control.SplitPane.setResizableWithParent(filesPane, false);
+        arrange(layout.get());
+        layout.addListener((obs, o, n) -> {
+            if (n.arrangement() != o.arrangement()) {
+                arrange(n);
+            } else {
+                syncSplits(n);
+            }
+            settings.fileModeProperty().set(n.into(settings.fileModeProperty().get()));
+        });
+        panelToggles = new PanelToggles<>(PANELS, layout, FileModeLayout.panels());
+
+        var fileMode = settings.fileModeProperty().get();
+        objectsSplitPane.setDividerPositions(fileMode == null ? 0.55 : fileMode.validated(p -> {}).objectsSplit());
+        rememberDivider(objectsSplitPane, v -> settings.fileModeProperty().set(
+            settings.fileModeProperty().get().withObjectsSplit(v)));
+        rememberDivider(editorSplitPane, v -> {
+            if (editorSplitPane.getItems().size() == 2) {
+                settings.fileModeProperty().set(settings.fileModeProperty().get().withSuggestionsSplit(v));
+            }
+        });
+    }
+
+    /** Puts the panels in the splits of the layout's arrangement. */
+    private void arrange(FileModeLayout l) {
+        for (ColumnSplitPane split : splits) split.node().getItems().clear();
+        splits.clear();
+        javafx.geometry.Orientation horizontal = javafx.geometry.Orientation.HORIZONTAL;
+        ColumnSplitPane outer;
+        if (l.arrangement() == FileModeLayout.Arrangement.COLUMNS) {
+            outer = new ColumnSplitPane(horizontal, List.of(filesPane, editorPane, objectsPane), l.outer());
+            outer.setFocusOrder(List.of(1, 2, 0), List.of(fileTreeView, fileContentCodeArea, objectTabPane));
+            splits.add(outer);
+        } else {
+            ColumnSplitPane stack = new ColumnSplitPane(javafx.geometry.Orientation.VERTICAL,
+                List.of(editorPane, objectsPane), l.inner());
+            stack.setFocusOrder(List.of(0, 1), List.of(fileContentCodeArea, objectTabPane));
+            stack.node().setId("fileModeStack");
+            outer = new ColumnSplitPane(horizontal, List.of(filesPane, stack.node()), l.outer());
+            outer.setFocusOrder(List.of(1, 0), List.of(fileTreeView, fileContentCodeArea));
+            splits.add(outer);
+            splits.add(stack);
+            stack.layoutProperty().addListener((obs, o, n) -> {
+                if (syncingLayout) return;
+                layout.set(layout.get().withInner(n));
+                syncSplits(layout.get());
+            });
+        }
+        outer.node().setId("fileModeSplit");
+        outer.layoutProperty().addListener((obs, o, n) -> {
+            if (syncingLayout) return;
+            layout.set(layout.get().withOuter(n));
+            syncSplits(layout.get());
+        });
+        layoutRoot.getChildren().setAll(outer.node());
+    }
+
+    /** Sets the splits from the layout (same arrangement). */
+    private void syncSplits(FileModeLayout l) {
+        syncingLayout = true;
+        try {
+            splits.get(0).layoutProperty().set(l.outer());
+            if (splits.size() > 1) splits.get(1).layoutProperty().set(l.inner());
+        } finally {
+            syncingLayout = false;
+        }
+    }
+
+    /** Shows a panel if it is hidden (a command or a navigation needs it). */
+    public void ensureShown(FileModeLayout.Panel panel) {
+        layout.set(layout.get().withShown(panel, true));
+    }
+
+    /** The layout of the panels (for tests and the Panels menu). */
+    public ObjectProperty<FileModeLayout> layoutProperty() {
+        return layout;
+    }
+
+    /** Calls {@code save} with the first divider position when the user releases it. */
+    private static void rememberDivider(SplitPane split, java.util.function.DoubleConsumer save) {
+        split.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> {
+            Node n = e.getTarget() instanceof Node t ? t : null;
+            while (n != null && n != split) {
+                if (n.getStyleClass().contains("split-pane-divider") && n.getParent() == split) {
+                    double[] positions = split.getDividerPositions();
+                    if (positions.length > 0) save.accept(positions[0]);
+                    return;
+                }
+                n = n.getParent();
+            }
+        });
+    }
+
+    /** File Mode › Panels: the panels, presets, arrangement and sizes. */
+    private Menu buildPanelsMenu() {
+        Menu panels = new Menu("Panels");
+        panels.getItems().addAll(panelToggles.menuItems());
+        MenuItem all = item("Show all panels", () -> layout.set(layout.get().withPreset(FileModeLayout.Preset.ALL)));
+        all.setAccelerator(panelKey(0));
+        MenuItem writing = item("Writing (editor only)",
+            () -> layout.set(layout.get().withPreset(FileModeLayout.Preset.WRITING)));
+        MenuItem reviewing = item("Reviewing (editor and objects)",
+            () -> layout.set(layout.get().withPreset(FileModeLayout.Preset.REVIEWING)));
+        MenuItem browsing = item("Browsing (files and objects)",
+            () -> layout.set(layout.get().withPreset(FileModeLayout.Preset.BROWSING)));
+        javafx.scene.control.ToggleGroup arrangement = new javafx.scene.control.ToggleGroup();
+        javafx.scene.control.RadioMenuItem beside = new javafx.scene.control.RadioMenuItem("Objects beside the editor");
+        beside.setId("arrangementColumns");
+        javafx.scene.control.RadioMenuItem under = new javafx.scene.control.RadioMenuItem("Objects under the editor");
+        under.setId("arrangementStacked");
+        beside.setToggleGroup(arrangement);
+        under.setToggleGroup(arrangement);
+        Runnable syncArrangement = () -> {
+            boolean columns = layout.get().arrangement() == FileModeLayout.Arrangement.COLUMNS;
+            beside.setSelected(columns);
+            under.setSelected(!columns);
+        };
+        syncArrangement.run();
+        layout.addListener((obs, o, n) -> syncArrangement.run());
+        beside.setOnAction(e -> layout.set(layout.get().withArrangement(FileModeLayout.Arrangement.COLUMNS)));
+        under.setOnAction(e -> layout.set(layout.get().withArrangement(FileModeLayout.Arrangement.STACKED)));
+        MenuItem reset = item("Reset panel sizes", () -> {
+            layout.set(layout.get().withDefaultSizes());
+            FileModeLayout fresh = layout.get();
+            // same layout value when the sizes were already the defaults: apply it anyway
+            syncSplits(fresh);
+            var d = fr.cnrs.lacito.matchbox.settings.FileModeSettingsData.defaults();
+            objectsSplitPane.setDividerPositions(d.objectsSplit());
+            settings.fileModeProperty().set(settings.fileModeProperty().get()
+                .withObjectsSplit(d.objectsSplit()).withSuggestionsSplit(d.suggestionsSplit()));
+            if (editorSplitPane.getItems().size() == 2) editorSplitPane.setDividerPositions(d.suggestionsSplit());
+        });
+        reset.setId("resetPanelSizes");
+        panels.getItems().addAll(new SeparatorMenuItem(), all, writing, reviewing, browsing,
+            new SeparatorMenuItem(), beside, under, new SeparatorMenuItem(), reset);
+        return panels;
     }
 
     // ------------------------------------------------------------------
@@ -441,6 +651,8 @@ public class FileMode implements Mode {
             ? shortcut(KeyCode.F, KeyCombination.ALT_DOWN) : shortcut(KeyCode.H));
         MenuItem goToLine = item("Go to line…", this::goToLine);
         goToLine.setAccelerator(shortcut(KeyCode.L));
+        MenuItem historyAtCaret = item("Show history of entry at caret", this::showHistoryAtCaret);
+        historyAtCaret.setAccelerator(shortcut(KeyCode.H, KeyCombination.SHIFT_DOWN));
         MenuItem specialCharacter = item("Insert special character…", this::insertSpecialCharacter);
         specialCharacter.setAccelerator(shortcut(KeyCode.I, KeyCombination.SHIFT_DOWN));
 
@@ -498,9 +710,6 @@ public class FileMode implements Mode {
         MenuItem reviewFile = item("Review whole file", () -> review("Whole file"));
         CheckMenuItem panel = new CheckMenuItem("Suggestions panel");
         panel.selectedProperty().bindBidirectional(suggestionsToggle.selectedProperty());
-        Menu insert = new Menu("Insert", null,
-            new MenuItem("Insert intermorphemic gloss"),
-            new MenuItem("Insert lexical information"));
 
         MenuItem directorySettings = item("Directory settings…",
             () -> selectedDirectory().ifPresent(workbench.files()::editSettings));
@@ -509,8 +718,20 @@ public class FileMode implements Mode {
         directorySettings.disableProperty().bind(directorySelected.not());
         removeDirectory.disableProperty().bind(directorySelected.not());
 
+        // commands acting at the caret show the editor if it is hidden
+        for (MenuItem i : List.of(search, findNext, findPrevious, replace, goToLine, specialCharacter, duplicate,
+                deleteLine, moveUp, moveDown, nextProblem, previousProblem, fixAtCaret, suggest, explain, reviewBlock,
+                reviewSelection, reviewFile)) {
+            var action = i.getOnAction();
+            i.setOnAction(e -> {
+                ensureShown(FileModeLayout.Panel.EDITOR);
+                action.handle(e);
+            });
+        }
         Menu result = new Menu("File Mode", null,
-            search, findNext, findPrevious, replace, goToLine, specialCharacter, parse,
+            buildPanelsMenu(),
+            new SeparatorMenuItem(),
+            search, findNext, findPrevious, replace, goToLine, specialCharacter, parse, historyAtCaret,
             new SeparatorMenuItem(),
             problemsMenu,
             new SeparatorMenuItem(),
@@ -518,14 +739,12 @@ public class FileMode implements Mode {
             new SeparatorMenuItem(),
             directorySettings, removeDirectory,
             new SeparatorMenuItem(),
-            suggest, inline, explain, reviewBlock, reviewSelection, reviewFile, panel,
-            new SeparatorMenuItem(),
-            insert);
+            suggest, inline, explain, reviewBlock, reviewSelection, reviewFile, panel);
         // everything acts on the displayed file
         var noFile = editorController.getClosableProperty().not();
         result.getItems().addAll(new SeparatorMenuItem(), shortcuts);
         for (MenuItem i : List.of(search, findNext, findPrevious, replace, goToLine, specialCharacter, lines,
-                suggest, explain, reviewBlock, reviewFile, insert)) {
+                suggest, explain, reviewBlock, reviewFile)) {
             i.disableProperty().bind(noFile);
         }
         parse.disableProperty().bind(editorController.getCurrentTextCouldBeParsedAgainProperty().not());
@@ -598,7 +817,8 @@ public class FileMode implements Mode {
         var items = editorSplitPane.getItems();
         if (visible && !items.contains(suggestionPanel.getRoot())) {
             items.add(suggestionPanel.getRoot());
-            editorSplitPane.setDividerPositions(0.72);
+            var fileMode = settings.fileModeProperty().get();
+            editorSplitPane.setDividerPositions(fileMode == null ? 0.72 : fileMode.validated(p -> {}).suggestionsSplit());
         } else if (!visible) {
             items.remove(suggestionPanel.getRoot());
         }
@@ -657,7 +877,29 @@ public class FileMode implements Mode {
         TreeItem<FileTree.Node> selected = fileTreeView.getSelectionModel().getSelectedItem();
         java.nio.file.Path selectedPath = selected == null || selected.getValue() == null ? null : selected.getValue().path();
         List<TreeItem<FileTree.Node>> items = new ArrayList<>();
-        if (project != null) {
+        updateHistoryRank();
+        flatList = project != null && project.getFileOrder() != fr.cnrs.lacito.matchbox.model.project.ProjectFileOrder.PATH;
+        if (filesTitle != null) {
+            filesTitle.setText(!flatList ? "Files" : project.getFileOrder()
+                == fr.cnrs.lacito.matchbox.model.project.ProjectFileOrder.MODIFIED
+                ? "Files — ordered by modification date" : "Files — ordered by header date");
+        }
+        if (project != null && flatList) {
+            // the files in the project's order, flat: a tree cannot show an order by date
+            List<FileTree.FileNode> files = new ArrayList<>();
+            collectFiles(FileTree.build(project, filter), files);
+            Map<java.nio.file.Path, java.util.Optional<java.time.Instant>> dates = new java.util.HashMap<>();
+            var order = project.getFileOrder();
+            for (FileTree.FileNode f : files) dates.put(f.path(), dateOf(order, f.path()));
+            fileDates = dates;
+            var comparator = order.comparator(dates::get);
+            files.sort((a, b) -> comparator.compare(a.path(), b.path()));
+            for (FileTree.FileNode f : files) items.add(new TreeItem<>(f));
+            project.getDerivedFileList().forEach(d -> {
+                watchedDirty.add(d.getCouldBeWrittenBooleanProperty());
+                d.getCouldBeWrittenBooleanProperty().addListener(dirtyRefresh);
+            });
+        } else if (project != null) {
             for (FileTree.Entry e : FileTree.build(project, filter)) items.add(item(e, filtering));
             project.getDerivedFileList().forEach(d -> {
                 watchedDirty.add(d.getCouldBeWrittenBooleanProperty());
@@ -675,6 +917,38 @@ public class FileMode implements Mode {
             rebuilding = false;
         }
         updateSelectionState();
+    }
+
+    /** The position of each file holding commands in the history of the dictionary. */
+    private void updateHistoryRank() {
+        Map<java.nio.file.Path, Integer> rank = new java.util.HashMap<>();
+        List<fr.cnrs.lacito.matchbox.corpus.TextId> ordered = workbench.history().orderedTexts();
+        for (int i = 0; i < ordered.size(); i++) rank.put(ordered.get(i).path(), i + 1);
+        historyRank = rank;
+    }
+
+    private static void collectFiles(List<FileTree.Entry> entries, List<FileTree.FileNode> out) {
+        for (FileTree.Entry e : entries) {
+            if (e.node() instanceof FileTree.FileNode f) out.add(f);
+            collectFiles(e.children(), out);
+        }
+    }
+
+    /** The date of a file for the project's order: on disk, or the date of its header. */
+    private java.util.Optional<java.time.Instant> dateOf(fr.cnrs.lacito.matchbox.model.project.ProjectFileOrder order,
+                                                       java.nio.file.Path path) {
+        return switch (order) {
+            case PATH -> java.util.Optional.empty();
+            case MODIFIED -> {
+                try {
+                    yield java.util.Optional.of(java.nio.file.Files.getLastModifiedTime(path).toInstant());
+                } catch (Exception e) {
+                    yield java.util.Optional.empty();
+                }
+            }
+            case HEADER_DATE -> workbench.session().corpus().text(fr.cnrs.lacito.matchbox.corpus.TextId.of(path))
+                .flatMap(t -> fr.cnrs.lacito.matchbox.model.project.ProjectFileOrder.parseHeaderDate(t.properties().get("date")));
+        };
     }
 
     private TreeItem<FileTree.Node> item(FileTree.Entry entry, boolean filtering) {
@@ -763,16 +1037,29 @@ public class FileMode implements Mode {
             switch (node) {
                 case FileTree.FileNode f -> {
                     var dirty = f.document().getCouldBeWrittenBooleanProperty();
-                    textProperty().bind(Bindings.when(dirty).then("* " + f.name()).otherwise(f.name()));
+                    Integer rank = historyRank.get(f.path());
+                    String name = (rank == null ? "" : rank + " · ") + f.name();
+                    textProperty().bind(Bindings.when(dirty).then("* " + name).otherwise(name));
                     styleProperty().bind(Bindings.when(dirty)
                         .then("-fx-font-weight: bold; -fx-font-style: italic;").otherwise(""));
-                    if (f.directory().isEmpty() && f.path().getParent() != null) {
+                    if (flatList) {
+                        String folder = f.path().getParent() == null ? "" : abbreviate(f.path().getParent());
+                        String date = fileDates.getOrDefault(f.path(), java.util.Optional.empty())
+                            .map(i -> java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
+                                .format(i.atZone(java.time.ZoneId.systemDefault())))
+                            .orElse("no date");
+                        Label where = new Label(folder + " · " + date);
+                        where.setStyle("-fx-text-fill: #888888; -fx-font-size: 0.9em;");
+                        setGraphic(where);
+                        setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+                    } else if (f.directory().isEmpty() && f.path().getParent() != null) {
                         Label where = new Label(abbreviate(f.path().getParent()));
                         where.setStyle("-fx-text-fill: #888888; -fx-font-size: 0.9em;");
                         setGraphic(where);
                         setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
                     }
-                    setTooltip(new Tooltip(f.path().toString()));
+                    setTooltip(new Tooltip(f.path().toString()
+                        + (rank == null ? "" : "\nPosition " + rank + " in the history of the dictionary")));
                     setContextMenu(fileMenu(f));
                 }
                 case FileTree.TopDirectory d -> {
@@ -899,7 +1186,7 @@ public class FileMode implements Mode {
         semanticIssues = new DiagnosticsPane(semantic, semanticIssuesTab, workbench.problems(), workbench.status(),
             this::displayedFile, this::selectInDisplayed, pluginName, this::projectDirectory, List.of());
         semanticIssuesTab.setContent(semanticIssues);
-        bottomTabPane.getTabs().add(bottomTabPane.getTabs().indexOf(parsingErrorPane) + 1, semanticIssuesTab);
+        objectTabPane.getTabs().add(objectTabPane.getTabs().indexOf(parsingErrorPane) + 1, semanticIssuesTab);
         for (DiagnosticsPane pane : List.of(parsingErrors, semanticIssues)) {
             pane.setExportChooser(this::chooseExportFile);
         }
@@ -942,13 +1229,15 @@ public class FileMode implements Mode {
 
     /** Shows the Parsing errors tab and focuses its table (File Mode menu). */
     public void showParsingErrors() {
-        bottomTabPane.getSelectionModel().select(parsingErrorPane);
+        ensureShown(FileModeLayout.Panel.OBJECTS);
+        objectTabPane.getSelectionModel().select(parsingErrorPane);
         parsingErrors.focusTable();
     }
 
     /** Shows the Semantic issues tab and focuses its table (File Mode menu). */
     public void showSemanticIssues() {
-        bottomTabPane.getSelectionModel().select(semanticIssuesTab);
+        ensureShown(FileModeLayout.Panel.OBJECTS);
+        objectTabPane.getSelectionModel().select(semanticIssuesTab);
         semanticIssues.focusTable();
     }
 
@@ -1027,8 +1316,8 @@ public class FileMode implements Mode {
         overlapsTab = new Tab(OverlapRows.tabTitle(0), overlapsPane);
         overlapsTab.setId("overlapsTab");
         overlapsTab.setTooltip(new Tooltip("Readings of the same text by several grammars, in the whole project"));
-        int errorsIndex = bottomTabPane.getTabs().indexOf(parsingErrorPane);
-        bottomTabPane.getTabs().add(errorsIndex + 1, overlapsTab);
+        int errorsIndex = objectTabPane.getTabs().indexOf(parsingErrorPane);
+        objectTabPane.getTabs().add(errorsIndex + 1, overlapsTab);
         overlapsTab.selectedProperty().addListener((obs, o, n) -> {
             if (n && overlapsStale) refreshOverlaps();
         });
@@ -1065,7 +1354,8 @@ public class FileMode implements Mode {
 
     /** Shows the Overlaps tab (File Mode menu). */
     public void showOverlaps() {
-        bottomTabPane.getSelectionModel().select(overlapsTab);
+        ensureShown(FileModeLayout.Panel.OBJECTS);
+        objectTabPane.getSelectionModel().select(overlapsTab);
         if (overlapsStale) refreshOverlaps();
         overlapsPane.table().requestFocus();
         if (overlapsPane.table().getSelectionModel().isEmpty() && !overlapsPane.table().getItems().isEmpty()) {
@@ -1075,6 +1365,7 @@ public class FileMode implements Mode {
 
     /** Shows both readings of an overlap: selects the one kept, outlines the other. */
     void showBoth(OverlapRows.Row row) {
+        ensureShown(FileModeLayout.Panel.EDITOR);
         workbench.navigator().showInEditor(Focus.of(row.selected()));
         var outlined = row.outlined();
         editorController.outline(new int[] {outlined.startIndex(), outlined.stopIndex() + 1});
@@ -1096,6 +1387,27 @@ public class FileMode implements Mode {
         editorController.selectedObjectProperty().addListener(
             (obs, oldObject, newObject) -> onObjectSelected(newObject)
         );
+        // the statuses of dictionary commands follow the history of the dictionary
+        // only the tables listing dictionary commands show what the history says
+        historyRefresh = o -> tabsByKind.values().forEach(t -> {
+            TableView<?> table = (TableView<?>) t.getContent();
+            if (table.getItems().stream().anyMatch(
+                    i -> i instanceof fr.cnrs.lacito.matchbox.corpus.capability.LexiconMutationCommand)) {
+                table.refresh();
+            }
+        });
+        // the positions in the history: the cells are drawn again; a list ordered by date may change order (saves)
+        historyTree = (obs, o, n) -> {
+            Map<java.nio.file.Path, Integer> before = historyRank;
+            if (flatList) rebuildTree();
+            else {
+                updateHistoryRank();
+                if (!historyRank.equals(before)) fileTreeView.refresh();
+            }
+        };
+        workbench.history().resultProperty().addListener(new javafx.beans.value.WeakChangeListener<>(historyTree));
+        workbench.history().resultProperty().addListener(new javafx.beans.WeakInvalidationListener(historyRefresh));
+        workbench.history().computingProperty().addListener(new javafx.beans.WeakInvalidationListener(historyRefresh));
     }
 
     /** Updates the per-kind tables, keeping existing tabs (and their selection state) when possible. */

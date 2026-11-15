@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project
+    xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd"
+>
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>fr.cnrs.lacito</groupId>
+        <artifactId>matchbox</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>matchbox-grammar-lift-patchbox-common</artifactId>
+    <version>${revision}</version>
+    <packaging>jar</packaging>
+
+    <name>Matchbox LiftPatch Grammars (shared)</name>
+    <description>What the two LiftPatch plugins share: reading a script with lift-patchbox into
+        LexiconMutationCommand objects and diagnostics, the kinds and their default styles.
+        Bundled into each plugin's jar; not a plugin itself.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-corpus</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-grammar-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- The parsers of the two syntaxes. The command model (lift-patchbox-core) and the
+             dictionary model (lift-api) come from the application (matchbox-corpus). -->
+        <dependency>
+            <groupId>io.github.sylvainloiseau</groupId>
+            <artifactId>lift-patchbox-language</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.sylvainloiseau</groupId>
+            <artifactId>lift-patchbox-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.github.sylvainloiseau</groupId>
+            <artifactId>lift-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

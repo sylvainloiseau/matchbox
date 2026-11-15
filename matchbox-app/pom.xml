@@ -45,6 +45,13 @@
             <version>${revision}</version>
             <scope>test</scope>
         </dependency>
+        <!-- The dictionary history is tested with commands read by the LiftPatch plugins. -->
+        <dependency>
+            <groupId>fr.cnrs.lacito</groupId>
+            <artifactId>matchbox-grammar-lift-patchbox-short</artifactId>
+            <version>${revision}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>

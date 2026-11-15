@@ -25,7 +25,19 @@ public final class LiftLexicon implements Lexicon {
     private final int loadDiagnostics;
 
     private LiftLexicon(Path file, LiftDictionary dictionary) {
-        this.name = file.getFileName() == null ? file.toString() : file.getFileName().toString();
+        this(file.getFileName() == null ? file.toString() : file.getFileName().toString(), dictionary);
+    }
+
+    /**
+     * The lexicon of a dictionary in memory (e.g. the context dictionary patched by the commands of
+     * the project). Read now: later changes of the dictionary are not seen.
+     */
+    public static LiftLexicon of(String name, LiftDictionary dictionary) {
+        return new LiftLexicon(name, dictionary);
+    }
+
+    private LiftLexicon(String name, LiftDictionary dictionary) {
+        this.name = name;
         this.loadDiagnostics = dictionary.getLoadDiagnostics().size();
         for (LiftEntry e : dictionary.getLiftDictionaryRegistry().getEntries()) {
             Map<String, List<String>> forms = new HashMap<>();

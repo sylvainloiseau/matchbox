@@ -4,19 +4,26 @@
     <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/tuwari.md"/>
     <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/0.conll"/>
     <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/notebook.md"/>
+    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/TranscriptionEvansFedden2027WithGloss.txt"/>
   </fileset>
   <pattern>
     <name>all</name>
-    <regex>.*\..*</regex>
+    <regex>.*\.md</regex>
     <grammar id="notebook-grammar" rank="0"/>
-    <grammar id="mediaref-grammar" rank="1"/>
-    <grammar id="markdown-heading-grammar" rank="2"/>
-    <grammar id="tag-grammar" rank="3"/>
+    <grammar id="igt-grammar" rank="1"/>
+    <grammar id="mediaref-grammar" rank="2"/>
+    <grammar id="markdown-heading-grammar" rank="3"/>
+    <grammar id="tag-grammar" rank="4"/>
   </pattern>
   <pattern>
     <name>conll</name>
     <regex>.+\.conll</regex>
     <grammar id="conll-grammar" rank="0"/>
+  </pattern>
+  <pattern>
+    <name>igt text</name>
+    <regex>.+</regex>
+    <grammar id="igt-grammar" rank="0"/>
   </pattern>
   <inheritedContext>
     <dictionary path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/lift/lift20250717.lift"/>
@@ -25,5 +32,8 @@
     <display bold="true" fontFamily="American Typewriter" grammar="markdown-heading-grammar" kind="markdown-heading-grammar:header"/>
     <display bold="true" grammar="markdown-heading-grammar"/>
     <display background="#6680e6" grammar="mediaref-grammar"/>
+    <display background="#e6e6e6" fontFamily="Al Bayan" grammar="igt-grammar"/>
+    <display fontFamily="Al Bayan" grammar="igt-grammar" italic="true" kind="igt-grammar:translation"/>
+    <display background="#e6e6e6" grammar="igt-grammar" kind="igt-grammar:timeline"/>
   </displayStyles>
 </project>

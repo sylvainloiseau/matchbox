@@ -39,9 +39,13 @@ class SettingsStoreTest {
             "qwen3:8b", false, AssistSettingsData.AUTO, 600, 3000, 500, true, false, "French", List.of("anthropic"));
         SettingsData data = new SettingsData(SettingsData.CURRENT_VERSION, "ISO-8859-1", "-",
             List.of("txt"), List.of("notes-*"), 5, 7, true, "/tmp/m.log", assist, true,
-            new TagBrowserSettingsData(2, 8, TagBrowserSettingsData.SORT_COUNT, true),
+            new TagBrowserSettingsData(2, 8, TagBrowserSettingsData.SORT_COUNT, true, false, true, List.of(0.5, 0.5)),
             new EditorSettingsData(true, false, 16, "Menlo", false, true, false, List.of("ʔ", "ŋ"), false,
-                new ProblemsSettingsData(false, true, false, true)));
+                new ProblemsSettingsData(false, true, false, true)),
+            new FileModeSettingsData(FileModeSettingsData.STACKED, false, true, true, List.of(0.25, 0.5, 0.25),
+                List.of(0.5, 0.5), List.of(0.75, 0.25), 0.5, 0.6),
+            new DictionaryHistorySettingsData("tww", "fr", true, false, true, List.of(0.4, 0.6), List.of(0.5, 0.5),
+                java.util.Map.of("/p.mbx", "tww en"), true));
         store.saveSettings(data);
         store.saveRecent(new RecentData(1, List.of("/a.txt", "/b"), List.of("/p.mbx")));
 

@@ -176,9 +176,13 @@ abstract class MainWindowFixture {
                 && node.path().equals(path)).query();
     }
 
-    /** Shows a file in File Mode by clicking it in the file tree. */
+    /**
+     * Shows a file in File Mode by clicking it in the file tree, near the left of its cell (a cell
+     * can be wider than the narrow file list: its centre may be outside the list).
+     */
     protected void showFile(FxRobot robot, Path file) {
-        robot.clickOn(treeCell(robot, file));
+        robot.clickOn(robot.point(treeCell(robot, file)).atPosition(javafx.geometry.Pos.CENTER_LEFT)
+            .atOffset(new javafx.geometry.Point2D(30, 0)));
         waitUntil(() -> workbench().focus().map(f -> f.text().equals(document(file).getId())).orElse(false));
     }
 }

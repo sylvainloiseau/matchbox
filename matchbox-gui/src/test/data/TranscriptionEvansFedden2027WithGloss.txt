@@ -1,0 +1,71 @@
+---
+setting: "t,g"
+---
+
+:::{id="1"}
+a   kemia-he       simile m-i-se-ne      mi-napi=o                  mo-to-ne    mi=na=o            me-teiolu-ne  upase=ma       mi-faʔu-ne  a   oflei-ne i-ne   ania=mo      mi=o           m-a-ne       a=li    fau-wo
+1sg pandanus-shoot clean  seq-do-dur-med tree(vi)-species=art.vi.sg seq-cut-med tree=dem=art.vi.sg seq-break-med bare_gound=all seq-hit-med 1sg turn-med go-med want\pst=sub tree=art.vi.sg seq-come-med 1sg=obj hit-pred
+‘I was cleaning shoots of pandanus. I cut down a tree; the tree broke and fell down on the ground; I was about to turn and to move away when the tree fell on me.’
+:::
+
+:::{id="2"}
+mine a mio-fau-ne mi-na-o a heitolo-mu faʔo motesela-io
+then 1sg down-hit-med tree-dem-art.vi.sg 1sg bone-? hit broke-pred
+‘I fell down and the tree broke my leg.’
+:::
+
+:::{id="3"}
+heitolomu faʔo motesela=nami a to=le maʔa-ne nomu uaflo-wo o sati=we ia-le iou-a-io oma, aio, a fali kokua-lo-wo
+bone hit broke=after 1sg man=art.pl only-? here lie-pred child np=art.m.sg speech-art.pl shout-pst-pred man, ouch, 1sg pfv bad-cop-pred
+‘Once my leg broke, I stayed there alone and said to Sati’s boy: “Oh boy, I’m really in bad shape.”’
+:::
+
+:::{id="4"}
+meimo eiso-honua to-honua n=le kopulo alo m-a=nami m-a=nami a maha nua-ne m-efaneni-ne pe mi-mi-lo ko opsono-ma ia-io
+then woman-elder man-elder dem=art.pl together all seq-come=after seq-come=after 1sg hold carry-med seq-hold-med stretcher tree-tree-ins top village-all go\pst-pred
+‘Then, once all the elderly women and the men had arrived, they carried me on a stretcher, and we went to the village.’
+:::
+
+:::{id="5"}
+meiato-uaflo honua pasta  toma=we     a   nomo sipia mali-io
+?-lie        elder pastor pn=art.m.sg 1sg eye  close talk-pred
+‘While I was lying down, I prayed with paster Tom.’
+:::
+
+:::{id="6"}
+nomo sipia mali-ne mali-aplo-ne nemesi-no asei watio mi ialo heiefi mi
+eye close talk-med talk-finish-med blood-dem water flow ? cmpr pour_out ?
+‘While we prayed, the blood spurted out like water.’ [ . . . ]
+:::
+
+:::{id="7"}
+[...] a mio-afei=nami a efla moto uaflo-nai-m-wi-i a iowe a-m-wi-i sumwari=ma mi-tete-a heitofu-no sʕənaʕetia nefe a nomu m-u-n-we-ia heitofu-no-nami-o a baluse-mi m-us-uaflo-ne-io tei-o
+_ 1sg down-jump=after 1sg canoe motor lie-irr-top-m.sg.sbj-pred 1sg go go-top-m.sg.sbj-pred pn=all up-stand-pst six-dem five day 1sg there seq-sleep-dem-sg.m.sbj-? six-dem-after-vi.sg 1sg plane-? seq-inside-lie-med leave-pred
+‘[...] I got into a canoe and went upstream to Sumwari [a village with an airstrip]. I slept there for five days and on the sixth day I got on the plane and I leaved.’
+:::
+
+[in the hospital]
+
+:::{id="8"}
+no motoui nami no-wo mle a helefe mio=tau-wo
+week two after dem-pred 3pl 1sg leg down=cut-pred
+‘After two weeks they cut off my leg.’
+:::
+
+:::{id="9"}
+meinamio toulei no saai=nami no-wo toulei=no-wo wa-io heisefe baluse=mi sumwari=ma wa-ia-io
+then three week ?=after dem-pred three=dem-pred back-pred back plane=? sumwari=all back-go\pst-pred
+‘After three weeks I flight back to Sumwari.’ [ . . . ]
+:::
+
+:::{id="10"}
+mine a honu u-me-we-io-na a fefe sinali inane o sihomo nasinasela ne=me=le mu-holua-li-me-we-io-na
+then 1sg here sleep-top-m.sg.sbj-pred-? 1sg taro potato gaden house bush everything dem=top=art.pl ?-work-pst-top-m.sg.sbj-pred-?
+‘Then I lived here, I worked on cultivating taro, sweet potato, garden, building house, in the bush . . . all kind of work.’
+:::
+
+:::{id="11"}
+waʕai me=he=li-a nemehe
+one top=iv=obj-? this
+‘That’s all’.
+:::

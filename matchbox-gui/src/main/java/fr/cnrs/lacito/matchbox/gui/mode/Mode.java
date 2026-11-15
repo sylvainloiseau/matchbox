@@ -52,4 +52,13 @@ public interface Mode {
     default Optional<Menu> menu() {
         return Optional.empty();
     }
+
+    /**
+     * Controls of this mode for the right end of the main toolbar (e.g. the toggles of its
+     * panels), shown while the mode is active and a project is open; built once. Empty for none.
+     * They must also be reachable from the mode's {@link #menu()} (keyboard).
+     */
+    default Optional<Node> toolBarItems() {
+        return Optional.empty();
+    }
 }

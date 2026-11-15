@@ -51,12 +51,12 @@ class FileTreeTest {
         project.addFile(y);
         project.addFile(x);
         List<Entry> tree = FileTree.build(project, "");
-        assertEquals(List.of("y.txt", "x.txt"), names(tree), "definition order");
-        assertEquals(new FileNode(project.getParsedText(y), Optional.empty()), tree.get(0).node());
+        assertEquals(List.of("x.txt", "y.txt"), names(tree), "path order, not the definition order");
+        assertEquals(new FileNode(project.getParsedText(x), Optional.empty()), tree.get(0).node());
     }
 
     @Test
-    void aDirectoryGroupsItsFilesWithSubDirectoriesFirst() throws Exception {
+    void aDirectoryGroupsItsFilesAndSubDirectoriesInPathOrder() throws Exception {
         project.addDirectory(notes, new DirectorySettings(List.of("*.txt"), List.of(), true));
         List<Entry> tree = FileTree.build(project, null);
         assertEquals(1, tree.size());
@@ -65,9 +65,13 @@ class FileTreeTest {
         assertEquals(List.of("2024", "A.txt", "b.txt"), names(top.children()), "empty (no .txt) sub-directory hidden");
         Entry y2024 = top.children().get(0);
         assertEquals(new SubDirectory(notes, notes.resolve("2024")), y2024.node());
-        assertEquals(List.of("jan", "day1.txt"), names(y2024.children()));
+        // files and sub-directories together, by name: day1.txt before jan
+        assertEquals(List.of("day1.txt", "jan"), names(y2024.children()));
         assertEquals(4, top.fileCount());
-        assertEquals(Optional.of(notes), ((FileNode) y2024.children().get(1).node()).directory());
+        assertEquals(Optional.of(notes), ((FileNode) y2024.children().get(0).node()).directory());
+        // depth first, the tree gives the files in path order
+        assertEquals(List.of("2024/day1.txt", "2024/jan/day2.txt", "A.txt", "b.txt"), FileTree.files(tree).stream()
+            .map(d -> notes.relativize(d.getFilePath()).toString().replace('\\', '/')).toList());
     }
 
     @Test

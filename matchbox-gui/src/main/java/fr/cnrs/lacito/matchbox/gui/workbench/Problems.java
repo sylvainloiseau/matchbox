@@ -69,10 +69,35 @@ public final class Problems {
         updateInputs();
     }
 
+    private Optional<fr.cnrs.lacito.matchbox.model.lexicon.history.HistoryResult> history = Optional.empty();
+    private Optional<fr.cnrs.lacito.matchbox.model.lexicon.LexiconIndex> patched = Optional.empty();
+
+    /**
+     * The last history of the dictionary: its problems become findings of the "Dictionary history"
+     * check, and when it is clean the gloss check compares with the patched dictionary.
+     */
+    void setHistory(Optional<fr.cnrs.lacito.matchbox.model.lexicon.history.HistoryResult> result,
+                    Optional<fr.cnrs.lacito.matchbox.model.lexicon.LexiconIndex> patchedIndex) {
+        // a history without command changes no finding (and the patched dictionary is the context one)
+        var relevant = result.filter(r -> r.commandCount() > 0 || !r.diagnostics().isEmpty());
+        var newPatched = relevant.isPresent() && relevant.get().isClean() ? patchedIndex : Optional.<fr.cnrs.lacito.matchbox.model.lexicon.LexiconIndex>empty();
+        // what the checks read: the problems of the history, and the patched dictionary (its entries)
+        boolean same = relevant.isPresent() == history.isPresent()
+            && newPatched.isPresent() == patched.isPresent()
+            && (relevant.isEmpty() || relevant.get().diagnostics().equals(history.get().diagnostics())
+                && (newPatched.isEmpty() || relevant.get().entries().equals(history.get().entries())));
+        if (same) return;   // the findings would be the same: the editor is not refreshed for nothing
+        this.history = relevant;
+        this.patched = newPatched;
+        updateInputs();
+    }
+
     private void updateInputs() {
         Project project = session.project();
+        // the patched dictionary when the history is clean (the commands of the notes count), else the context one
+        var index = patched.isPresent() ? patched : dictionary.index();
         checks.setInputs(new CheckInputs(project == null ? GlossCheckSettings.defaults() : project.getGlossCheck(),
-            dictionary.index()));
+            index, history));
     }
 
     private void dictionaryChanged(ContextDictionary d) {

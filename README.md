@@ -250,16 +250,53 @@ The `tag-grammar` plugin reads inline tags, anywhere in a line, several per line
 - Avoid tags in the transcription and gloss lines of an IGT (they break the alignment) and in YAML
   metadata values (` #` starts a YAML comment there).
 
+### Dictionary commands (LiftPatch)
+
+Two plugins read commands that change a LIFT dictionary, written with the
+[LiftPatch](https://github.com/sylvainloiseau/lift-patchbox) language:
+
+```
+Monday, with Paul. The word for pig:
+c e("mami", s("pig"))          # create the entry mami with a sense "pig"
+p /efe/door                    # make sure efe has a sense "door"
+s /mami/pig (d@en = "A pig")   # set the definition of that sense
+```
+
+- **LiftPatch commands (concise)** reads the concise syntax (LiftPatchShort) among the other lines of
+  your notes: a line is a command when it starts like one (`c`, `p`, `e`, `d`, `m`, `s`, `u`, `l` and
+  what a command starts with); indented lines below a command form a block. If a line of prose looks
+  like a command (`p /a/ before i…`), click ✚ **Declare LiftPatch sigil**: only the lines starting with
+  `>` are then commands.
+- **LiftPatch commands (reference)** reads the reference syntax (LiftPatchRef) in files holding
+  commands only: files named `*.liftpatchref`, or declaring `%liftpatch 1.1 syntax="LiftPatchRef"`.
+- The commands are applied, in the **order of the files** of the project and then of each text, to the
+  **context dictionary** (Project properties › Inherited context), or to an empty dictionary (its
+  languages in Settings › Dictionary history). The context dictionary file is never changed:
+  **Dictionary History › Export patched dictionary…** writes the result to a new file.
+- **While any syntax or static error remains in the project, no command is applied** (the Parsing errors
+  and Semantic issues tabs list them). Applying **stops at the first command that fails** (creating an
+  entry that exists, changing one that does not…): its file is rolled back and the later commands are
+  not applied; the error is in Semantic issues and in the margin.
+- In File Mode the objects table shows, for each command, its entry and what became of it (Applied, No
+  change, Error, Rolled back, Not applied, Not tried); the detail shows the entry as it was after the
+  command, read-only, and **Show history of …**.
+- **Dictionary History** ("History" button, Shortcut+3): the entries of the dictionary as the commands
+  leave it (form and gloss, in the object and meta languages you choose; filter; changed, created or
+  deleted entries), the selected entry, and the commands that shaped it; select a command to see the
+  entry as it was after it, Enter to open it in the editor (Back returns). File Mode › **Show history of
+  entry at caret** (⇧⌘H) opens the entry of a command or of the word at the caret.
+
 ## Projects
 
 - Without an open project the window shows a start page: **New project**, **Open project…**, and your recent projects (click one to open it, × removes it from the list). Check "Reopen the last project at startup" to skip it. You can also drop a `.mbx` file on the window.
 - A new project has a single file type, "All files" (`.*\..*`: every file with an extension), with every installed plugin checked, in the order of their names; change it in **Current project › Project properties…**.
 - The **File** menu deals with project files (new, open, save, close) and the application (Settings…, Quit); the **Current project** menu with its content: Project properties…, adding files (several at once) and directories, saving files, removing files and directories from the project (the files stay on the disk).
 - **Closing a project** (or opening another one, or quitting) asks what to save: the project definition if it changed, and the modified files, each with a check box.
-- **Files and directories** are listed in File Mode as a tree: a directory added to the project groups its files, with its sub-directories; files added one by one stay apart. When you add a directory, choose which files it gives: glob patterns to include (`*.txt`) and exclude (`drafts/**`, `*-old.txt`), and whether sub-directories are included, with a preview. Right-click the directory later: **Edit directory settings…**, **Rescan directory** (files created since), **Remove this directory from the project**. A file of a directory is not removed alone: right-click it, **Exclude this file** (or a sub-directory: **Exclude this sub-directory**). These settings are saved in the project file. A pattern without "/" matches the file name in any sub-directory; case is ignored.
+- **Files and directories** are listed in File Mode as a tree, in path order: a directory added to the project groups its files, with its sub-directories; files added one by one stay apart. When you add a directory, choose which files it gives: glob patterns to include (`*.txt`) and exclude (`drafts/**`, `*-old.txt`), and whether sub-directories are included, with a preview. Right-click the directory later: **Edit directory settings…**, **Rescan directory** (files created since), **Remove this directory from the project**. A file of a directory is not removed alone: right-click it, **Exclude this file** (or a sub-directory: **Exclude this sub-directory**). These settings are saved in the project file. A pattern without "/" matches the file name in any sub-directory; case is ignored.
 - **When several plugins read the same text**: a file is parsed by the plugins of every file type it matches, in the order of the list. A section (a Markdown heading and what follows it) and a tag may contain what other plugins read: an IGT inside a section, a tag inside an IGT. But two readings of the same characters by two plugins are not both kept: **the plugin listed first wins**; the other reading is not kept, and a warning says so (◆ in the margin, the Parsing errors tab, the **Overlaps** tab of File Mode, which lists them for the whole project; Enter shows both readings). Change the order of the plugins in Project properties, or remove one.
 - **Display of the objects**: in Project properties, the **Plugin parameters** section lists the plugins; **Display…** (for the plugins checked in a file type) sets the font family, bold, italic, underline, strikethrough, text and background colours, for all the objects of the plugin and, if you wish, for each kind of object (e.g. glossed sentences and lexical entries). The display of a plugin is the same in every file type; it is saved in the project file and kept when you uncheck the plugin.
 - **Inherited context**: in Project properties, choose a **Context dictionary** (a LIFT file) to which the lexical information of your project is to be added, and a **Context corpus** (a Matchbox corpus) to which its data is to be added. Both are saved in the project file; × removes them.
+- **File order**: in Project properties, the order of the files — of the dictionary history (the commands are applied in it) and of the file list: **by path** (the files and folders of a folder sorted by name together: `a/b/x.txt` before `a/y.txt`), **by last modification date** (saving an old file moves it, with its commands, to the end; copying or checking out files may change the dates), or **by the date of the file header** (`date: 2025-07-14`; undated files last). Ordered by a date, the file list is flat, with the folder and the date of each file; the files holding dictionary commands show their position in the history (1 · notes.txt).
 
 ## The text editor
 
@@ -273,7 +310,8 @@ The `tag-grammar` plugin reads inline tags, anywhere in a line, several per line
 ## Modes, undo and navigation
 
 - **Tag Browser** ("Tags" button, Shortcut+2): all the tags of the project as a tree of their levels (`#"pos/verb/transitive"` → pos › verb › transitive) with the number of tags of each node. Select a node to see its occurrences with a few lines of context (Before / After), filter them by the type of object they apply to, and click **Edit** (or double-click) to open the tag in File Mode; Back returns. **Rename** (F2) renames a level everywhere; **drag and drop** a node onto another (or **Move to…**, F6) moves it with its sub-tags, merging with a node of the same name if there is one. Both show what will change, change every file as one undo step, and save nothing. Right-click a tag badge in any view: "Show all … tags".
-- **Modes** are the ways to browse the corpus in the main area of the window, chosen with the buttons of the toolbar or the Mode menu (Shortcut+1…). **File Mode** lists the files of the project, shows a file in the editor with the objects found in it and the parsing errors. Each mode keeps its state when you switch to another one, and adds its own menu next to Mode (e.g. "File Mode": search in the file, the AI assistant at the cursor, insert).
+- **Modes** are the ways to browse the corpus in the main area of the window, chosen with the buttons of the toolbar or the Mode menu (Shortcut+1…). **File Mode** shows three columns: the files of the project, the editor, and the objects found in the file with its problems (Objects, Parsing errors, Semantic issues, Overlaps). Each mode keeps its state when you switch to another one, and adds its own menu next to Mode (e.g. "File Mode": search in the file, the AI assistant at the cursor).
+- **Panels**: the buttons at the right end of the toolbar (**Files**, **Editor**, **Objects** in File Mode; **Tags**, **Occurrences** in the Tag Browser) show or hide the panels of the mode; also in the mode's menu › Panels, with ⌥⌘1 / ⌥⌘2 / ⌥⌘3 (Ctrl+Shift+F1 / F2 / F3 elsewhere) and ⌥⌘0 (Ctrl+Shift+F4) to show all. Double-click a divider to collapse the narrower panel next to it, and again to bring it back. File Mode › Panels also has layouts in one step (Writing: editor only; Reviewing: editor and objects; Browsing: files and objects), "Objects under the editor" for the former arrangement, and "Reset panel sizes". Going to a place in a file (a problem, Find, Go to line, "show in editor") shows the editor again. The panels and their sizes are remembered. In a narrow panel the problem tables show their essential columns; hover a message for the details.
 - **Undo/Redo is project-wide**: Edit › Undo (or Ctrl+Z / ⌘Z) reverts the last change made anywhere in the project, typed in the editor or made in a table or a view, whatever the file. The menu says what will be undone and in which file, e.g. "Undo Edit Translation (notes.txt)". When the change was in a file that is not shown, the status bar says so, with a **Show** link.
 - **Nothing is saved automatically**: changes made by views or undo in files that are not displayed mark them as unsaved (`*` in the file list); use Save all files. You are asked about unsaved files before closing them or quitting.
 - **Back/Forward** (◀ ▶ in the toolbar, Mode menu, Shortcut+Alt+← / →) return to where you were before a jump, e.g. after "show in editor" from a view.
