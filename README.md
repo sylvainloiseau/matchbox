@@ -370,6 +370,7 @@ if not already present
 
 # Run in dev mode
 
+```
 mvn -pl matchbox-gui javafx:run   
 
 mvn -e -pl matchbox-distribution -am clean package  
@@ -382,6 +383,7 @@ mvn -pl grammars/matchbox-grammar-notebook package
 mvn -pl matchbox-gui -am clean package
 
 bash build/assembly/matchbox-distribution-1.0.0-distribution/bin/matchbox
+```
 
 ### Settings and logs
 
