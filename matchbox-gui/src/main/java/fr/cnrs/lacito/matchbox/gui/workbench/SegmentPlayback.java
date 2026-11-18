@@ -4,7 +4,7 @@ import fr.cnrs.lacito.matchbox.corpus.capability.MediaSegment;
 import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayers;
 import fr.cnrs.lacito.matchbox.grammarfx.media.MediaResolver;
-import fr.cnrs.lacito.matchbox.grammarfx.metadata.MediaPaths;
+import fr.cnrs.lacito.matchbox.corpus.MediaPaths;
 import java.nio.file.Path;
 import java.util.Optional;
 

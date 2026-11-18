@@ -1,5 +1,6 @@
 package fr.cnrs.lacito.matchbox.grammarfx.metadata;
 
+import fr.cnrs.lacito.matchbox.corpus.MediaPaths;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -44,7 +45,8 @@ final class MediaValueEditor implements MetadataValueEditor {
         String name = r.path().map(p -> p.getFileName() == null ? p.toString() : p.getFileName().toString())
             .orElse(cell.value());
         Hyperlink link = new Hyperlink(name.isBlank() ? "(choose a file)" : name);
-        link.setTooltip(new Tooltip(r.path().map(Path::toString).orElse(cell.value())));
+        String where = MediaPaths.describe(r, cell.projectDirectory());
+        link.setTooltip(new Tooltip(where.isEmpty() ? cell.value() : r.exists() ? where : "Not found: " + where));
         link.setOnAction(e -> {
             link.setVisited(false);
             if (cell.editable()) {
@@ -57,6 +59,7 @@ final class MediaValueEditor implements MetadataValueEditor {
             if (!cell.value().isBlank()) {
                 Label missing = new Label("not found");
                 missing.setStyle("-fx-text-fill: #c33;");
+                if (!where.isEmpty()) missing.setTooltip(new Tooltip(where));
                 box.getChildren().add(missing);
             }
         } else if (MediaPaths.kindOf(r.path().get()) == MediaPaths.Kind.UNSUPPORTED) {
@@ -94,7 +97,7 @@ final class MediaValueEditor implements MetadataValueEditor {
                 "*.aac", "*.mp4", "*.m4v", "*.flv"),
             new FileChooser.ExtensionFilter("All files", "*"));
         Optional<Path> dir = current.map(Path::getParent).filter(p -> p.toFile().isDirectory())
-            .or(cell::projectDirectory).or(cell::textDirectory);
+            .or(cell::textDirectory).or(cell::projectDirectory);
         dir.map(Path::toFile).filter(File::isDirectory).ifPresent(chooser::setInitialDirectory);
         File file = chooser.showOpenDialog(owner);
         return Optional.ofNullable(file)

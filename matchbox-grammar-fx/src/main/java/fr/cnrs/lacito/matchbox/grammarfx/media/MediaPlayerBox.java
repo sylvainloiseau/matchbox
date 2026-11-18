@@ -1,7 +1,7 @@
 package fr.cnrs.lacito.matchbox.grammarfx.media;
 
 import fr.cnrs.lacito.matchbox.corpus.capability.TimeRange;
-import fr.cnrs.lacito.matchbox.grammarfx.metadata.MediaPaths;
+import fr.cnrs.lacito.matchbox.corpus.MediaPaths;
 import java.nio.file.Path;
 import java.util.Optional;
 import javafx.application.Platform;

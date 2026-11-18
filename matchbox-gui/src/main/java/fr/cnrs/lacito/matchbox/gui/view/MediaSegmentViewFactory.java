@@ -11,7 +11,7 @@ import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.grammarfx.tags.TagBadges;
 import fr.cnrs.lacito.matchbox.grammarfx.media.MediaPlayerBox;
 import fr.cnrs.lacito.matchbox.grammarfx.media.MediaResolver;
-import fr.cnrs.lacito.matchbox.grammarfx.metadata.MediaPaths;
+import fr.cnrs.lacito.matchbox.corpus.MediaPaths;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
@@ -111,7 +111,8 @@ public class MediaSegmentViewFactory implements ObjectViewFactory<MediaSegment> 
         String name = media.file().path().map(p -> p.getFileName() == null ? p.toString() : p.getFileName().toString())
             .or(() -> media.reference()).orElse("(none)");
         Hyperlink link = new Hyperlink(name);
-        media.file().path().ifPresent(p -> link.setTooltip(new Tooltip(p.toString())));
+        String where = MediaPaths.describe(media.file(), context.projectDirectory());
+        if (!where.isEmpty()) link.setTooltip(new Tooltip(media.file().exists() ? where : "Not found: " + where));
         link.setOnAction(e -> {
             link.setVisited(false);
             if (media.isUrl()) {
@@ -139,7 +140,8 @@ public class MediaSegmentViewFactory implements ObjectViewFactory<MediaSegment> 
         } else if (media.isUrl()) {
             player = hint("Remote media are not played; the link opens the browser.");
         } else if (!media.file().exists()) {
-            player = hint("File not found: " + media.file().path().map(Path::toString).orElse(name));
+            player = hint("File not found: " + media.reference().orElse(name)
+                + (where.isEmpty() ? "" : " — " + where));
         } else if (MediaPaths.kindOf(media.file().path().get()) == MediaPaths.Kind.UNSUPPORTED) {
             player = hint("Format not supported by the player");
         } else {

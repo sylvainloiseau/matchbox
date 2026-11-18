@@ -83,6 +83,7 @@ class ProblemsGuiTest extends MainWindowFixture {
 
     private Path setUp(FxRobot robot) throws IOException {
         grammars(robot, new MarkdownHeadingGrammarPlugin(), new MediaRefGrammarPlugin(), new TagGrammarPlugin());
+        java.nio.file.Files.writeString(dir.resolve("a.wav"), ""); // the media file exists: no Media check issue
         Path a = open(robot, "a.md", A);
         waitUntil(() -> semantic().table().getItems().size() == 2);
         return a;

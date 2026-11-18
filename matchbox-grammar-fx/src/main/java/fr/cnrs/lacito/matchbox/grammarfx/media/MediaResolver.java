@@ -9,19 +9,17 @@ import fr.cnrs.lacito.matchbox.corpus.igt.InterlinearReadings;
 import fr.cnrs.lacito.matchbox.corpus.igt.MetadataValue;
 import fr.cnrs.lacito.matchbox.corpus.capability.MediaSegment;
 import fr.cnrs.lacito.matchbox.corpus.capability.Section;
-import fr.cnrs.lacito.matchbox.grammarfx.metadata.MediaPaths;
+import fr.cnrs.lacito.matchbox.corpus.MediaPaths;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * The media file of a segment: its explicit file, otherwise the {@code media} metadata of the
  * innermost enclosing section that has one, otherwise of the text header; then resolved like the
- * {@code media} values of the metadata editor (project directory, then directory of the text).
+ * {@code media} values of the metadata editor ({@link MediaPaths}: directory of the text, then project directory).
  * No JavaFX.
  */
 public final class MediaResolver {
@@ -103,7 +101,7 @@ public final class MediaResolver {
             }
         }
         return new Resolution(Optional.empty(), Source.NONE, Optional.empty(),
-            new MediaPaths.Resolution(Optional.empty(), false));
+            MediaPaths.Resolution.none());
     }
 
     /** The nearest media segment before {@code segment}, in the same innermost section, naming a file. */
@@ -128,18 +126,25 @@ public final class MediaResolver {
 
     /** Distinct resolved files used by a text: its media segments and its "media" metadata (header, sections). */
     public static List<Path> mediaFiles(Text text, CorpusView corpus, Optional<Path> projectDirectory) {
-        Set<Path> files = new LinkedHashSet<>();
+        return mediaResolutions(text, corpus, projectDirectory).stream().map(r -> r.path().orElseThrow()).toList();
+    }
+
+    /**
+     * The resolutions of the files used by a text (one per distinct resolved file, in the order of
+     * {@link #mediaFiles}), with the candidates looked for.
+     */
+    public static List<MediaPaths.Resolution> mediaResolutions(Text text, CorpusView corpus, Optional<Path> projectDirectory) {
+        Map<Path, MediaPaths.Resolution> files = new java.util.LinkedHashMap<>();
         Optional<Path> textDirectory = Optional.ofNullable(text.id().path().toAbsolutePath().getParent());
-        media(text.properties()).flatMap(r -> MediaPaths.resolve(r, projectDirectory, textDirectory).path())
-            .ifPresent(files::add);
+        java.util.function.Consumer<MediaPaths.Resolution> add = r -> r.path().ifPresent(p -> files.putIfAbsent(p, r));
+        media(text.properties()).map(r -> MediaPaths.resolve(r, projectDirectory, textDirectory)).ifPresent(add);
         for (Section s : text.sections()) {
-            media(s.getMetadata()).flatMap(r -> MediaPaths.resolve(r, projectDirectory, textDirectory).path())
-                .ifPresent(files::add);
+            media(s.getMetadata()).map(r -> MediaPaths.resolve(r, projectDirectory, textDirectory)).ifPresent(add);
         }
         for (MediaSegment segment : text.objectsOf(MediaSegment.class)) {
-            resolve(segment, corpus, projectDirectory).file().path().ifPresent(files::add);
+            add.accept(resolve(segment, corpus, projectDirectory).file());
         }
-        return new ArrayList<>(files);
+        return new ArrayList<>(files.values());
     }
 
     private static Optional<String> media(Map<String, String> metadata) {

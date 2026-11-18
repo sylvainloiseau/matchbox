@@ -13,8 +13,8 @@ import java.util.logging.Logger;
 
 /**
  * The checks of the application ({@link IgtStructureCheck}, {@link GlossLabelCheck},
- * {@link LexiconCheck}) on the texts of a project: computed when asked for a text, kept per parsed
- * {@link Text} (texts are immutable), all dropped when the inputs change (settings, dictionary), which
+ * {@link LexiconCheck}, {@link DictionaryHistoryCheck}, {@link MediaCheck}) on the texts of a project: computed when asked for a text, kept per parsed
+ * {@link Text} (texts are immutable), all dropped when the inputs change (settings, dictionary, project directory), which
  * the listeners are told. Thread-safe.
  */
 public final class ProjectChecks {
@@ -27,7 +27,8 @@ public final class ProjectChecks {
     private volatile CheckInputs inputs = CheckInputs.defaults();
 
     public ProjectChecks() {
-        this(List.of(new IgtStructureCheck(), new GlossLabelCheck(), new LexiconCheck(), new DictionaryHistoryCheck()));
+        this(List.of(new IgtStructureCheck(), new GlossLabelCheck(), new LexiconCheck(), new DictionaryHistoryCheck(),
+            new MediaCheck()));
     }
 
     public ProjectChecks(List<CorpusCheck> checks) {

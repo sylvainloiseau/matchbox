@@ -65,16 +65,41 @@ class MediaResolverTest {
         var r2 = MediaResolver.resolve(inInner, corpus, projectDir);
         assertEquals(MediaResolver.Source.SECTION, r2.source());
         assertEquals(Optional.of("Inner"), r2.sourceTitle());
-        assertEquals(Optional.of(project.resolve("rec/inner.wav")), r2.file().path(), "relative to the project first");
+        assertEquals(Optional.of(project.resolve("rec/inner.wav")), r2.file().path(), "not in the text's directory: the project's");
         var r3 = MediaResolver.resolve(inOuter, corpus, projectDir);
-        assertEquals(Optional.of(notes.resolve("outer.wav")), r3.file().path(), "then relative to the text");
+        assertEquals(Optional.of(notes.resolve("outer.wav")), r3.file().path(), "the text's directory");
         var r4 = MediaResolver.resolve(outside, corpus, Optional.empty());
         assertEquals(MediaResolver.Source.HEADER, r4.source());
         assertTrue(r4.file().exists());
 
         List<Path> files = MediaResolver.mediaFiles(corpus.text(id).orElseThrow(), corpus, projectDir);
         assertEquals(List.of(notes.resolve("header.wav"), notes.resolve("outer.wav"), project.resolve("rec/inner.wav"),
-            project.resolve("other.wav")), files);
+            notes.resolve("other.wav")), files);
+    }
+
+    @Test
+    void aFileInBothDirectoriesIsTheOneOfTheTextDirectory() throws Exception {
+        Path project = Files.createDirectories(dir.resolve("project"));
+        Path notes = Files.createDirectories(project.resolve("notes"));
+        for (Path base : List.of(notes, project)) {
+            Files.createDirectories(base.resolve("rec"));
+            Files.createFile(base.resolve("rec/a.wav"));
+            Files.createFile(base.resolve("rec/h.wav"));
+            Files.createFile(base.resolve("rec/s.wav"));
+        }
+        TextId id = new TextId(notes.resolve("t.md"));
+        SimpleTextHeader header = new SimpleTextHeader("s:header", span(id, 0, 9), Map.of("media", "rec/h.wav"));
+        SimpleSection section = new SimpleSection("s:section", span(id, 100, 199), "S", Map.of("media", "rec/s.wav"), List.of());
+        Segment explicit = new Segment(span(id, 60, 65), "rec/a.wav"); // after fromHeader: not its file
+        Segment fromHeader = new Segment(span(id, 50, 55), null);
+        Segment fromSection = new Segment(span(id, 150, 155), null);
+        Corpus corpus = new Corpus();
+        corpus.put(Text.builder(id, "x".repeat(200)).add("s", List.of(header, section), List.of())
+            .add("g", List.of(explicit, fromHeader, fromSection), List.of()).build());
+        Optional<Path> projectDir = Optional.of(project);
+        assertEquals(Optional.of(notes.resolve("rec/a.wav")), MediaResolver.resolve(explicit, corpus, projectDir).file().path());
+        assertEquals(Optional.of(notes.resolve("rec/h.wav")), MediaResolver.resolve(fromHeader, corpus, projectDir).file().path());
+        assertEquals(Optional.of(notes.resolve("rec/s.wav")), MediaResolver.resolve(fromSection, corpus, projectDir).file().path());
     }
 
     @Test

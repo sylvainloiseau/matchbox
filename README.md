@@ -226,8 +226,17 @@ The `mediaref-grammar` plugin reads one-line media markers, in any note:
 - `@media`, then a file and/or a range, then an optional caption. Times are milliseconds or clock
   times (`m:ss.mmm`, `h:mm:ss.mmm`). Without a range, the marker refers to the whole file; without a
   file, to the `media` metadata of the enclosing section, or of the header.
-- Relative paths are resolved against the project directory, then the directory of the note. A path
+- A media file (after `@media`, or as the `media` of a header, a section or an IGT) is an absolute
+  path, or a path relative to **the directory of the note**, or, if no such file is there, to **the
+  project directory** (the directory of the `.mbx` file). A file chosen with a file chooser is
+  written relative to the note's directory if it is inside it, else to the project directory, else
+  absolute. When a file is not found, the views say where it was looked for ("looked in
+  notes/rec/a.wav, then rec/a.wav"); a found file's tooltip says which directory it comes from. A path
   with spaces, or that looks like a time range, is written between double quotes.
+- **Media check**: each media file written in a note that does not exist is a warning ("Media file
+  not found: …") in the Semantic issues tab and the editor margin, on the file name; references that
+  only inherit a missing file are not reported again. It is checked when the note is parsed: after
+  copying a media file, use File Mode › Parse file.
 - Each marker line has a ▶ button in the editor margin; `Shortcut+Shift+Space` (⇧⌘Space on macOS)
   plays the segment at the caret, or the nearest one above it in the same section. The view of a
   marker lets you edit its times (±100 ms, or from the player position), file and caption.

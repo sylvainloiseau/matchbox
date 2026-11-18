@@ -8,6 +8,7 @@ import fr.cnrs.lacito.matchbox.grammarfx.ViewContext;
 import fr.cnrs.lacito.matchbox.grammarfx.media.MediaResolver;
 import fr.cnrs.lacito.matchbox.grammarfx.tags.TagBadges;
 import fr.cnrs.lacito.matchbox.grammarfx.metadata.MetadataPane;
+import fr.cnrs.lacito.matchbox.corpus.MediaPaths;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -80,15 +81,18 @@ public class TextHeaderViewFactory implements ObjectViewFactory<TextHeader> {
         TagBadges.of(header, context).ifPresent(box.getChildren()::add);
         context.corpus().textOf(header).flatMap(text -> TagBadges.ofText(text, context)).ifPresent(box.getChildren()::add);
         context.corpus().textOf(header).ifPresent(text -> {
-            List<Path> files = MediaResolver.mediaFiles(text, context.corpus(), context.projectDirectory());
+            List<MediaPaths.Resolution> files = MediaResolver.mediaResolutions(text, context.corpus(), context.projectDirectory());
             if (files.isEmpty()) return;
             Label title = new Label("Media used in this text:");
             title.setStyle("-fx-font-weight: bold;");
             box.getChildren().add(title);
-            for (Path f : files) {
-                Label file = new Label(f.getFileName() + (Files.isRegularFile(f) ? "" : "  (not found)"));
-                file.setTooltip(new javafx.scene.control.Tooltip(f.toString()));
-                if (!Files.isRegularFile(f)) file.setStyle("-fx-text-fill: #c33;");
+            for (MediaPaths.Resolution r : files) {
+                Path f = r.path().orElseThrow();
+                boolean found = Files.isRegularFile(f);
+                Label file = new Label(f.getFileName() + (found ? "" : "  (not found)"));
+                String where = MediaPaths.describe(r, context.projectDirectory());
+                file.setTooltip(new javafx.scene.control.Tooltip(found ? where : "Not found: " + where));
+                if (!found) file.setStyle("-fx-text-fill: #c33;");
                 box.getChildren().add(file);
             }
         });

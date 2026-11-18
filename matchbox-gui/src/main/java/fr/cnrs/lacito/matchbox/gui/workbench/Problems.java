@@ -56,11 +56,18 @@ public final class Problems {
 
     private void projectChanged(Project old, Project project) {
         if (old != null && definitionListener != null) old.definitionRevisionProperty().removeListener(definitionListener);
+        if (old != null) old.directoryProperty().removeListener(directoryListener);
         definitionListener = (obs, o, n) -> definitionChanged();
-        if (project != null) project.definitionRevisionProperty().addListener(definitionListener);
+        if (project != null) {
+            project.definitionRevisionProperty().addListener(definitionListener);
+            // Save as…: media references are looked for in another project directory
+            project.directoryProperty().addListener(directoryListener);
+        }
         definitionChanged();
         rebuild();
     }
+
+    private final javafx.beans.InvalidationListener directoryListener = o -> updateInputs();
 
     /** The project's dictionary path or gloss settings may have changed. */
     private void definitionChanged() {
@@ -97,7 +104,7 @@ public final class Problems {
         // the patched dictionary when the history is clean (the commands of the notes count), else the context one
         var index = patched.isPresent() ? patched : dictionary.index();
         checks.setInputs(new CheckInputs(project == null ? GlossCheckSettings.defaults() : project.getGlossCheck(),
-            index, history));
+            index, history, project == null ? Optional.empty() : project.directory()));
     }
 
     private void dictionaryChanged(ContextDictionary d) {
