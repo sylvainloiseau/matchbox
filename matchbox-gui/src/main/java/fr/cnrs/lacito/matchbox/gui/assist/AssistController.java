@@ -50,6 +50,14 @@ public final class AssistController {
     private List<FewShotExample> examples;
     private AssistService service;
 
+    /** Opens Project properties on its AI assistant tab (set by the window). */
+    private Runnable projectPropertiesOpener = () -> {};
+
+    /** What "Project properties…" of the assistant's messages opens (the AI assistant tab). */
+    public void setProjectPropertiesOpener(Runnable opener) {
+        this.projectPropertiesOpener = opener == null ? () -> {} : opener;
+    }
+
     public AssistController(UserSettings settings, Supplier<Window> owner) {
         this.settings = settings;
         this.owner = owner;
@@ -149,12 +157,17 @@ public final class AssistController {
                 return false;
             }
             case BLOCKED_BY_PROJECT: {
+                javafx.scene.control.ButtonType properties = new javafx.scene.control.ButtonType(
+                    "Project properties…", javafx.scene.control.ButtonBar.ButtonData.OTHER);
                 Alert alert = new Alert(Alert.AlertType.WARNING,
-                    "This project allows local AI models only (see Current project › Project properties…). " +
-                    "Select Ollama in Assistant › AI assistant settings…, or change the project settings.");
+                    "This project allows local AI models only (Current project › Project properties… › AI assistant). " +
+                    "Select Ollama in Assistant › AI assistant settings…, or change the project settings.",
+                    properties, javafx.scene.control.ButtonType.OK);
                 alert.initOwner(owner.get());
                 alert.setHeaderText("Cloud AI providers are not allowed for this project");
-                alert.showAndWait();
+                if (alert.showAndWait().orElse(null) == properties) {
+                    projectPropertiesOpener.run();
+                }
                 return false;
             }
             case NEEDS_CONSENT:
@@ -166,6 +179,9 @@ public final class AssistController {
                 }
                 if (answer == CloudConsentDialog.Answer.USE_LOCAL) {
                     openSettings(ProviderKind.OLLAMA);
+                }
+                if (answer == CloudConsentDialog.Answer.PROJECT_PROPERTIES) {
+                    projectPropertiesOpener.run();
                 }
                 return false;
             }

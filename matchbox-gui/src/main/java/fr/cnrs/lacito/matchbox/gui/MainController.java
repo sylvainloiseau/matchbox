@@ -1,5 +1,8 @@
 package fr.cnrs.lacito.matchbox.gui;
 
+import fr.cnrs.lacito.matchbox.gui.properties.ProjectPropertiesDialog;
+import fr.cnrs.lacito.matchbox.gui.properties.ProjectPropertiesPage;
+
 import fr.cnrs.lacito.matchbox.grammarapi.GrammarPlugin;
 import fr.cnrs.lacito.matchbox.gui.assist.AssistController;
 import fr.cnrs.lacito.matchbox.gui.close.CloseAction;
@@ -164,6 +167,10 @@ public class MainController {
     private Exception startupFailure;
     /** Updates the window title when the project's unsaved state changes. */
     private final InvalidationListener titleUpdater = o -> updateTitle();
+    /** The tab Project properties opens on when no tab is asked for: the last one used (not saved). */
+    private ProjectPropertiesPage lastPropertiesPage = ProjectPropertiesPage.GENERAL;
+    /** Opens Project properties on a tab (null: the last one used); replaced in the GUI tests. */
+    private java.util.function.Consumer<ProjectPropertiesPage> propertiesOpener = this::showProjectProperties;
 
     public MainController(UserSettings settings, List<GrammarPlugin> plugins) {
         this(settings, plugins, Optional.empty());
@@ -177,6 +184,7 @@ public class MainController {
         this.settings = settings;
         this.plugins = plugins;
         this.assist = new AssistController(settings, () -> primaryStage);
+        this.assist.setProjectPropertiesOpener(() -> editProject(ProjectPropertiesPage.ASSISTANT));
         this.workbench = new Workbench(settings, assist, () -> primaryStage, Platform::runLater);
         this.commands = new WorkbenchCommands(workbench);
         this.closer = new ProjectCloser(
@@ -566,10 +574,13 @@ public class MainController {
                 primaryStage,
                 "Some parts of the project could not be loaded",
                 String.join("\n\n", project.getLoadProblems()) +
-                    "\n\nCorrect the file types and the display in Current project › Project properties…, the"
+                    "\n\nCorrect the file types and the display in Current project › Project properties… (File"
+                    + " types and Plugins tabs), the"
                     + " directories in the context menu of File Mode's file tree (Directory settings…); add"
                     + " missing files again with Current project › Add file…"
             );
+            workbench.status().info("Some parts of the project could not be loaded.", "Project properties…",
+                () -> editProject(ProjectPropertiesPage.FILE_TYPES));
         }
     }
 
@@ -578,7 +589,8 @@ public class MainController {
     public void handleReloadDictionary() {
         if (project() == null) return;
         if (project().getContextDictionary().isEmpty()) {
-            workbench.status().info("No context dictionary: choose one in Project properties");
+            workbench.status().info("No context dictionary: choose one in Project properties › Corpus.", "Choose…",
+                () -> editProject(ProjectPropertiesPage.CORPUS));
             return;
         }
         workbench.problems().reloadDictionary();
@@ -654,6 +666,7 @@ public class MainController {
         return true;
     }
 
+
     /** A new project with the default file types, after asking what to save of the open one. */
     public void handleNewProject() {
         if (!closer.confirm(project(), CloseAction.NEW)) {
@@ -663,10 +676,27 @@ public class MainController {
         modes.activate(Modes.FILE);
     }
 
+    /** Current project › Project properties…: opens on the last tab used. */
     public void handleEditProject() {
+        editProject(null);
+    }
+
+    /** Opens Project properties on a tab (null: the last one used), for the menu and the links of messages. */
+    public void editProject(ProjectPropertiesPage page) {
         if (project() == null) return;
-        ProjectPropertiesDialog dialog = new ProjectPropertiesDialog(primaryStage, project());
+        propertiesOpener.accept(page);
+    }
+
+    /** For the GUI tests: what opening Project properties does (the dialog is modal). */
+    void setProjectPropertiesOpener(java.util.function.Consumer<ProjectPropertiesPage> opener) {
+        this.propertiesOpener = opener;
+    }
+
+    private void showProjectProperties(ProjectPropertiesPage page) {
+        ProjectPropertiesDialog dialog = new ProjectPropertiesDialog(primaryStage, project(),
+            page == null ? lastPropertiesPage : page);
         dialog.showAndWait();
+        lastPropertiesPage = dialog.selectedPage();
         if (dialog.isSaved()) {
             // the name may have changed
             updateTitle();

@@ -10,15 +10,17 @@ import javafx.stage.Window;
 /** Asks, the first time a cloud provider is used, whether text may be sent to it. */
 final class CloudConsentDialog {
 
-    enum Answer { CONTINUE, USE_LOCAL, CANCEL }
+    enum Answer { CONTINUE, USE_LOCAL, PROJECT_PROPERTIES, CANCEL }
 
     private CloudConsentDialog() {}
 
     static Answer ask(Window owner, String providerName) {
         ButtonType continueButton = new ButtonType("Continue", ButtonBar.ButtonData.OK_DONE);
         ButtonType localButton = new ButtonType("Use a local model instead", ButtonBar.ButtonData.OTHER);
+        ButtonType propertiesButton = new ButtonType("Project properties…", ButtonBar.ButtonData.HELP_2);
         ButtonType cancelButton = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "", continueButton, localButton, cancelButton);
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "", continueButton, localButton, propertiesButton,
+            cancelButton);
         alert.initOwner(owner);
         alert.setTitle("AI assistant");
         alert.setHeaderText("Send parts of your notes to " + providerName + "?");
@@ -28,7 +30,7 @@ final class CloudConsentDialog {
             PrivacyPolicy.whatIsSent() + "\n\n" +
             "If your notes contain personal data of consultants or material under consent " +
             "restrictions, use a local model (Ollama), which keeps everything on this computer, or " +
-            "disallow cloud providers for the project (Current project › Project properties…).\n\n" +
+            "disallow cloud providers for the project (Project properties… › AI assistant).\n\n" +
             "This question is asked once per provider."
         );
         content.setWrapText(true);
@@ -37,6 +39,7 @@ final class CloudConsentDialog {
         ButtonType result = alert.showAndWait().orElse(cancelButton);
         if (result == continueButton) return Answer.CONTINUE;
         if (result == localButton) return Answer.USE_LOCAL;
+        if (result == propertiesButton) return Answer.PROJECT_PROPERTIES;
         return Answer.CANCEL;
     }
 }

@@ -110,9 +110,9 @@ public final class ProjectEdit {
 
     private ProjectEdit(String name, String description, boolean cloudAssistAllowed, DisplayStyles displayStyles,
                         List<Path> paths, List<FileTypeDraft> fileTypes) {
-        this.name = name;
+        this.name = nonNull(name);
         this.displayStyles = displayStyles;
-        this.description = description;
+        this.description = nonNull(description);
         this.cloudAssistAllowed = cloudAssistAllowed;
         this.paths = new ArrayList<>(paths);
         this.fileTypes = new ArrayList<>(fileTypes);
@@ -229,19 +229,77 @@ public final class ProjectEdit {
             .toList();
     }
 
-    /** What prevents applying the edit (invalid regular expressions, unnamed file types). */
-    public List<String> problems() {
-        List<String> problems = new ArrayList<>();
+    /** What part of the definition of a project a setting or a problem belongs to. */
+    public enum Topic {
+        /** Name and description. */
+        GENERAL,
+        /** File types and their grammars. */
+        FILE_TYPES,
+        /** Display styles of the grammars. */
+        DISPLAY,
+        /** Inherited context, file order, gloss check. */
+        CORPUS,
+        /** AI assistant. */
+        ASSISTANT
+    }
+
+    /** What a field of a problem is about. */
+    public enum Field { NAME, REGEX }
+
+    /**
+     * A problem preventing {@link #applyTo}.
+     *
+     * @param fileType the file type it concerns, or null
+     * @param field the faulty field of the file type, or null
+     */
+    public record Problem(Topic topic, FileTypeDraft fileType, Field field, String message) {
+        public Problem {
+            Objects.requireNonNull(topic, "topic");
+            Objects.requireNonNull(message, "message");
+        }
+    }
+
+    /** What prevents applying the edit (invalid regular expressions, unnamed file types), in file type order. */
+    public List<Problem> problems() {
+        List<Problem> problems = new ArrayList<>();
         for (FileTypeDraft t : fileTypes) {
             if (t.getName().isBlank()) {
-                problems.add("A file type has no name");
+                problems.add(new Problem(Topic.FILE_TYPES, t, Field.NAME, "A file type has no name"));
             }
             String regexProblem = FileType.checkRegex(t.getRegex());
             if (regexProblem != null) {
-                problems.add("File type '" + t + "': " + regexProblem);
+                problems.add(new Problem(Topic.FILE_TYPES, t, Field.REGEX, "File type '" + t + "': " + regexProblem));
             }
         }
         return problems;
+    }
+
+    /** The messages of {@link #problems()}. */
+    public List<String> problemMessages() {
+        return problems().stream().map(Problem::message).toList();
+    }
+
+    /** The topics whose settings differ from those of the project (what applying the edit would change). */
+    public Set<Topic> changedTopics(Project project) {
+        Set<Topic> changed = java.util.EnumSet.noneOf(Topic.class);
+        if (!Objects.equals(name, nonNull(project.getName()))
+            || !Objects.equals(description, nonNull(project.getDescription()))) {
+            changed.add(Topic.GENERAL);
+        }
+        if (fileTypesChanged(project)) changed.add(Topic.FILE_TYPES);
+        if (!displayStyles.equals(project.getDisplayStyles())) changed.add(Topic.DISPLAY);
+        if (!Objects.equals(getContextDictionary(), project.getContextDictionary())
+            || !Objects.equals(getContextCorpus(), project.getContextCorpus())
+            || fileOrder != project.getFileOrder()
+            || !glossCheck.equals(project.getGlossCheck())) {
+            changed.add(Topic.CORPUS);
+        }
+        if (cloudAssistAllowed != project.isCloudAssistAllowed()) changed.add(Topic.ASSISTANT);
+        return changed;
+    }
+
+    private static String nonNull(String s) {
+        return s == null ? "" : s;
     }
 
     /** Documents of the project that applying the edit would remove (their paths were removed). */
@@ -267,10 +325,10 @@ public final class ProjectEdit {
      */
     public Result applyTo(Project project) {
         if (!problems().isEmpty()) {
-            throw new IllegalStateException("Invalid project definition: " + problems());
+            throw new IllegalStateException("Invalid project definition: " + problemMessages());
         }
-        if (!Objects.equals(name, project.getName())) project.setName(name);
-        if (!Objects.equals(description, project.getDescription())) project.setDescription(description);
+        if (!Objects.equals(name, nonNull(project.getName()))) project.setName(name);
+        if (!Objects.equals(description, nonNull(project.getDescription()))) project.setDescription(description);
         project.setCloudAssistAllowed(cloudAssistAllowed);
         project.setContextDictionary(contextDictionary);
         project.setContextCorpus(contextCorpus);

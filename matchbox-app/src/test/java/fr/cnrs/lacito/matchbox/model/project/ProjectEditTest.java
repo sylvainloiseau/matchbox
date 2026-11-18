@@ -119,6 +119,15 @@ class ProjectEditTest {
         edit.getFileTypes().get(1).setRegex("*.md(");
         edit.getFileTypes().get(0).setName(" ");
         assertEquals(2, edit.problems().size());
+        ProjectEdit.Problem name = edit.problems().get(0);
+        assertEquals(ProjectEdit.Topic.FILE_TYPES, name.topic());
+        assertEquals(edit.getFileTypes().get(0), name.fileType(), "in file type order");
+        assertEquals(ProjectEdit.Field.NAME, name.field());
+        ProjectEdit.Problem regex = edit.problems().get(1);
+        assertEquals(edit.getFileTypes().get(1), regex.fileType());
+        assertEquals(ProjectEdit.Field.REGEX, regex.field());
+        assertEquals("A file type has no name", edit.problemMessages().get(0));
+        assertTrue(edit.problemMessages().get(1).startsWith("File type 'all': "), edit.problemMessages()::toString);
         assertThrows(IllegalStateException.class, () -> edit.applyTo(project));
         assertEquals("all", project.getFileTypes().get(1).getName());
     }
@@ -180,5 +189,41 @@ class ProjectEditTest {
         none.applyTo(loaded);
         assertTrue(loaded.getContextDictionary().isEmpty());
         assertTrue(loaded.definitionChangedProperty().get());
+    }
+
+    @Test
+    void changedTopicsSayWhatApplyingWouldChange() {
+        ProjectEdit edit = ProjectEdit.of(project);
+        assertTrue(edit.changedTopics(project).isEmpty(), "a fresh copy changes nothing");
+
+        edit.setName("Other");
+        assertEquals(java.util.Set.of(ProjectEdit.Topic.GENERAL), edit.changedTopics(project));
+        edit.setName("Tuwari");
+        assertTrue(edit.changedTopics(project).isEmpty(), "put back");
+
+        edit.getFileTypes().get(1).setUsed(notebook, true);
+        edit.setDisplayStyles(DisplayStyles.NONE.with(DisplayStyles.Key.grammar("x"),
+            fr.cnrs.lacito.matchbox.grammarapi.DisplayStyle.EMPTY.withBold(true)));
+        edit.setFileOrder(ProjectFileOrder.MODIFIED);
+        edit.setCloudAssistAllowed(!project.isCloudAssistAllowed());
+        assertEquals(java.util.EnumSet.of(ProjectEdit.Topic.FILE_TYPES, ProjectEdit.Topic.DISPLAY,
+            ProjectEdit.Topic.CORPUS, ProjectEdit.Topic.ASSISTANT), edit.changedTopics(project));
+
+        ProjectEdit context = ProjectEdit.of(project);
+        context.setContextDictionary(dir.resolve("d.lift"));
+        assertEquals(java.util.Set.of(ProjectEdit.Topic.CORPUS), context.changedTopics(project));
+        ProjectEdit gloss = ProjectEdit.of(project);
+        gloss.setGlossCheck(new fr.cnrs.lacito.matchbox.model.check.GlossCheckSettings(
+            fr.cnrs.lacito.matchbox.corpus.gloss.GlossLabelList.NONE, java.util.Set.of(), false));
+        assertEquals(java.util.Set.of(ProjectEdit.Topic.CORPUS), gloss.changedTopics(project));
+    }
+
+    @Test
+    void aProjectWithoutDescriptionIsNotChangedByApplying() {
+        project.setDescription(null);
+        ProjectEdit edit = ProjectEdit.of(project);
+        assertTrue(edit.changedTopics(project).isEmpty());
+        edit.applyTo(project);
+        assertEquals(null, project.getDescription());
     }
 }
