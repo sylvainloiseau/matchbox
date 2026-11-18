@@ -118,6 +118,16 @@
                     text="Add _file…"
                 />
                <MenuItem
+                    fx:id="createFileMenuItem"
+                    mnemonicParsing="true"
+                    onAction="#handleCreateFile"
+                    text="_Create file…"
+                >
+                  <accelerator>
+                     <KeyCodeCombination alt="DOWN" code="N" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
+               <MenuItem
                     fx:id="openDirItem"
                     mnemonicParsing="true"
                     onAction="#handleOpenDirectory"

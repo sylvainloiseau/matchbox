@@ -161,7 +161,7 @@ class StartPageTest extends MainWindowFixture {
             "Close project", "Settings…", "Quit"), file);
         List<String> current = menu(robot, "Current project").getItems().stream().map(MenuItem::getText)
             .filter(t -> t != null).toList();
-        assertEquals(List.of("Project properties…", "Reload context dictionary", "Add _file…", "Add files in _directory…", "Add recent",
+        assertEquals(List.of("Project properties…", "Reload context dictionary", "Add _file…", "_Create file…", "Add files in _directory…", "Add recent",
             "_Save current file", "Save all files", "Remove file from project", "Remove directory from project…",
             "Remove all files from project…"), current);
     }

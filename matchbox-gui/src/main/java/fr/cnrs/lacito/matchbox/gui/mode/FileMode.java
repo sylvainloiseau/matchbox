@@ -279,7 +279,7 @@ public class FileMode implements Mode {
         errorRuler = new ErrorRuler(line -> goToLine(line + 1));
         javafx.scene.layout.HBox.setHgrow(scroll, javafx.scene.layout.Priority.ALWAYS);
         var withRuler = new javafx.scene.layout.HBox(scroll, errorRuler);
-        Label empty = new Label("Choose a file in the list, or add files with Current project › Add file…");
+        Label empty = new Label("Choose a file in the list, or add files with Current project › Add file… or Create file…");
         empty.setId("editorEmptyState");
         empty.setStyle("-fx-text-fill: #888888; -fx-font-size: 1.1em;");
         empty.setMouseTransparent(true);
@@ -1169,11 +1169,15 @@ public class FileMode implements Mode {
             item("Edit directory settings…", () -> workbench.files().editSettings(d.path())),
             item("Rescan directory", () -> workbench.files().rescan(d.path())),
             new SeparatorMenuItem(),
+            item("New file here…", () -> workbench.files().createFile(java.util.Optional.of(d.path()))),
+            new SeparatorMenuItem(),
             item("Remove this directory from the project", () -> workbench.files().removeDirectory(d.path())));
     }
 
     private ContextMenu subDirectoryMenu(FileTree.SubDirectory d) {
         return new ContextMenu(
+            item("New file here…", () -> workbench.files().createFile(java.util.Optional.of(d.path()))),
+            new SeparatorMenuItem(),
             item("Exclude this sub-directory", () -> workbench.files().excludeSubdirectory(d.top(), d.path())));
     }
 

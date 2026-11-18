@@ -74,6 +74,10 @@ abstract class MainWindowFixture {
     protected java.io.File chosenDirectory;
     /** The answer of the directory settings dialog: by default, the settings it was given. */
     protected java.util.function.UnaryOperator<DirectorySettings> directorySettingsAnswer = s -> s;
+    /** The file "chosen" by Create file… (no save dialog in tests); null: cancelled. */
+    protected java.io.File chosenNewFile;
+    /** What the Create file… dialog was opened with: "initial directory | initial name". */
+    protected final List<String> newFileDialogs = new ArrayList<>();
     /** The confirmations asked by the project files service (all accepted). */
     protected final List<String> confirmations = new ArrayList<>();
 
@@ -105,6 +109,10 @@ abstract class MainWindowFixture {
             (title, header, content, action) -> confirmations.add(header),
             (documents, action) -> true,
             () -> chosenDirectory);
+        controller.workbench().files().setNewFileChooser((directory, name) -> {
+            newFileDialogs.add(directory + " | " + name);
+            return chosenNewFile;
+        });
         if (openProjectAtStart()) {
             controller.workbench().session().setProject(
                 Project.createDefaultProject(PluginManager.loadPlugins(), settings.documentOptions()));

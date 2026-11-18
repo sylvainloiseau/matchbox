@@ -95,9 +95,9 @@ class FileTreeGuiTest extends MainWindowFixture {
     @Test
     void theContextMenusDependOnTheNode(FxRobot robot) throws IOException {
         addNotes(robot);
-        assertEquals(List.of("Edit directory settings…", "Rescan directory", "Remove this directory from the project"),
-            contextMenu(robot, notes));
-        assertEquals(List.of("Exclude this sub-directory"), contextMenu(robot, notes.resolve("2024")));
+        assertEquals(List.of("Edit directory settings…", "Rescan directory", "New file here…",
+            "Remove this directory from the project"), contextMenu(robot, notes));
+        assertEquals(List.of("New file here…", "Exclude this sub-directory"), contextMenu(robot, notes.resolve("2024")));
         assertEquals(List.of("Remove file from project (disabled)", "Exclude this file"),
             contextMenu(robot, notes.resolve("A.txt")));
     }

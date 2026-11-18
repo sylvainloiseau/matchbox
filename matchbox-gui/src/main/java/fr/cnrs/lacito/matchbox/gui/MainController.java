@@ -187,6 +187,7 @@ public class MainController {
         this.assist.setProjectPropertiesOpener(() -> editProject(ProjectPropertiesPage.ASSISTANT));
         this.workbench = new Workbench(settings, assist, () -> primaryStage, Platform::runLater);
         this.commands = new WorkbenchCommands(workbench);
+        workbench.files().setFileTypesOpener(() -> editProject(ProjectPropertiesPage.FILE_TYPES));
         this.closer = new ProjectCloser(
             (state, action) -> CloseProjectDialog.ask(primaryStage, state, action, projectDirectory()),
             this::saveProject,
@@ -438,6 +439,12 @@ public class MainController {
         projectDirectory().map(java.nio.file.Path::toFile).filter(java.io.File::isDirectory).ifPresent(chooser::setInitialDirectory);
         List<File> files = chooser.showOpenMultipleDialog(primaryStage);
         if (files != null) files.forEach(commands::addFileOrDirectory);
+    }
+
+    /** Current project › Create file…: a new, empty file added to the project. */
+    public void handleCreateFile() {
+        if (project() == null) return;
+        commands.createFile();
     }
 
     public void handleOpenDirectory() {

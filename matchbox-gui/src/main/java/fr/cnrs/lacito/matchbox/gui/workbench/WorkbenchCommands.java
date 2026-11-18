@@ -133,6 +133,11 @@ public final class WorkbenchCommands {
         }
     }
 
+    /** Asks for the name of a new file, creates it empty, adds it to the project and opens it. */
+    public void createFile() {
+        workbench.files().createFile(Optional.empty());
+    }
+
     /** Chooses a directory, then its settings, and adds it to the project. */
     public void addDirectory() {
         workbench.files().addDirectory();

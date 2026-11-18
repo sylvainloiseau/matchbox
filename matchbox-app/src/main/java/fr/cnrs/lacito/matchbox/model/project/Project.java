@@ -629,6 +629,69 @@ public class Project {
         }
     }
 
+    /**
+     * The directory of the definition whose settings select a file (inside it, a direct child if
+     * not recursive, accepted by its globs), the first in definition order; empty otherwise. The
+     * file need not exist.
+     */
+    public Optional<Path> owningDirectory(Path file) {
+        Path f = absolute(file);
+        for (Path directory : getDefinitionDirectories()) {
+            Optional<Path> relative = fr.cnrs.lacito.matchbox.corpus.ProjectPaths.relative(f, directory);
+            if (relative.isEmpty() || relative.get().toString().isEmpty()) continue;
+            DirectorySettings settings = directorySettings.get(directory);
+            if (!settings.recursive() && relative.get().getNameCount() > 1) continue;
+            List<String> parts = new ArrayList<>();
+            relative.get().forEach(part -> parts.add(part.toString()));
+            if (settings.accepts(String.join("/", parts))) {
+                return Optional.of(directory);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** A file created by {@link #createFile}: its path and the directory of the definition it belongs to. */
+    public record Created(Path file, Optional<Path> directory) {}
+
+    /**
+     * Creates a new, empty file on the disk and adds it to the project: among the files of the
+     * directory of the definition that selects it ({@link #owningDirectory}), else alone. An
+     * existing file is never written.
+     *
+     * @throws java.nio.file.FileAlreadyExistsException if the file exists
+     * @throws IOException if it cannot be created or read
+     */
+    public Created createFile(Path file) throws IOException {
+        Path f = absolute(file);
+        Optional<Path> owner = owningDirectory(f);
+        if (owner.isPresent()) {
+            // the path a scan of the directory gives (the chosen one may go through a link)
+            f = owner.get().resolve(fr.cnrs.lacito.matchbox.corpus.ProjectPaths.relative(f, owner.get()).orElseThrow());
+        }
+        if (textDocumentByPath.containsKey(f)) {
+            throw new java.nio.file.FileAlreadyExistsException(f.toString(), null, "already in the project");
+        }
+        Files.createFile(f);
+        if (owner.isEmpty()) {
+            addFile(f);
+            return new Created(f, Optional.empty());
+        }
+        // the directory lists the file before it is added: listeners see it in its directory
+        List<Path> before = filesOf(owner.get());
+        List<Path> files = new ArrayList<>(before);
+        files.add(f);
+        files.sort(fr.cnrs.lacito.matchbox.corpus.FileOrder.PATHS);
+        filesByDir.put(owner.get(), files);
+        try {
+            addFileInternal(f);
+        } catch (IOException | RuntimeException e) {
+            filesByDir.put(owner.get(), before);
+            textDocumentByPath.remove(f);
+            throw e;
+        }
+        return new Created(f, owner);
+    }
+
     private void addFileInternal(Path filePath) throws IOException {
         TextDocument textParser = new TextDocument(filePath, documentOptions.charset());
         textDocumentByPath.put(filePath, textParser);
