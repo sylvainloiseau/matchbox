@@ -72,7 +72,7 @@ class ProjectLoadParseTest {
     @Test
     void theTestProjectsUsePathsRelativeToTheirDirectory() throws Exception {
         java.util.regex.Pattern attribute = java.util.regex.Pattern.compile("path=\"([^\"]*)\"");
-        for (String name : java.util.List.of("liftpatchbox.mbx", "projects/tuwari.mbx", "projects/project1.mbx")) {
+        for (String name : java.util.List.of("liftpatchbox.mbx", "tuwari.mbx", "projects/project1.mbx")) {
             Path mbx = Path.of("src", "test", "data").resolve(name);
             var m = attribute.matcher(Files.readString(mbx));
             int count = 0;
