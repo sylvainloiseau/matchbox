@@ -733,6 +733,9 @@ public final class DictionaryHistoryMode extends AbstractMode {
         chooser.setTitle("Export the patched dictionary");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("LIFT dictionary", "*.lift"));
         chooser.setInitialFileName("patched.lift");
+        if (workbench.session().project() != null) {
+            workbench.session().project().directory().map(java.nio.file.Path::toFile).filter(java.io.File::isDirectory).ifPresent(chooser::setInitialDirectory);
+        }
         File file = chooser.showSaveDialog(workbench.window());
         if (file == null) return;
         HistoryResult of = shown;

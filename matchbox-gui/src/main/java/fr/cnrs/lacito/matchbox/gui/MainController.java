@@ -435,6 +435,7 @@ public class MainController {
             new FileChooser.ExtensionFilter("Text Files", "*.txt", "*.md"),
             new FileChooser.ExtensionFilter("All Files", "*.*")
         );
+        projectDirectory().map(java.nio.file.Path::toFile).filter(java.io.File::isDirectory).ifPresent(chooser::setInitialDirectory);
         List<File> files = chooser.showOpenMultipleDialog(primaryStage);
         if (files != null) files.forEach(commands::addFileOrDirectory);
     }
@@ -508,8 +509,7 @@ public class MainController {
 
     private Optional<Path> projectDirectory() {
         Project p = project();
-        if (p == null || p.fileProperty().get() == null) return Optional.empty();
-        return Optional.ofNullable(p.fileProperty().get().toPath().toAbsolutePath().getParent());
+        return p == null ? Optional.empty() : p.directory();
     }
 
     /**
@@ -663,9 +663,22 @@ public class MainController {
             return false;
         }
         settings.recentProjects().add(selected.toPath());
+        reportEntriesOutside(project);
         return true;
     }
 
+    /** After Save as: says how many entries of the project are not in its (new) project directory. */
+    void reportEntriesOutside(Project project) {
+        List<Path> outside = fr.cnrs.lacito.matchbox.gui.mode.fileMode.FileTree.outsideEntries(project);
+        if (outside.isEmpty()) return;
+        String text = outside.size() == 1 ? "1 entry of the file list is not in the project directory"
+            : outside.size() + " entries of the file list are not in the project directory";
+        workbench.status().info(text + " (marked with !): their absolute paths are saved.", "Show", () -> {
+            if (modes.activate(Modes.FILE) instanceof fr.cnrs.lacito.matchbox.gui.mode.FileMode files) {
+                files.selectInFileList(outside.get(0));
+            }
+        });
+    }
 
     /** A new project with the default file types, after asking what to save of the open one. */
     public void handleNewProject() {

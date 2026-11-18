@@ -761,6 +761,9 @@ public final class TagBrowserMode extends AbstractMode {
         chooser.setTitle("Export occurrences");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV files", "*.csv"));
         chooser.setInitialFileName((selectedPath.isEmpty() ? "tags" : String.join("-", selectedPath)) + ".csv");
+        if (workbench.session().project() != null) {
+            workbench.session().project().directory().map(java.nio.file.Path::toFile).filter(java.io.File::isDirectory).ifPresent(chooser::setInitialDirectory);
+        }
         File file = chooser.showSaveDialog(window());
         if (file == null) return;
         try {

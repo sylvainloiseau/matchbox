@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project>
+  <fileset>
+    <file path="dictionary.liftpatchshort"/>
+  </fileset>
+  <pattern>
+    <name>All files</name>
+    <regex>.*\..*</regex>
+    <grammar id="lift-patchbox-short-grammar" rank="0"/>
+  </pattern>
+</project>

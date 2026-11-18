@@ -57,7 +57,7 @@ public class ProjectXMLSerializer {
         for (java.nio.file.Path path : project.getDefinitionPaths()) {
             if (project.isDefinitionDirectory(path)) {
                 Element dirElement = doc.createElement("directory");
-                dirElement.setAttribute("path", path.toString());
+                dirElement.setAttribute("path", stored(path, project));
                 project.directorySettings(path).ifPresent(settings -> {
                     dirElement.setAttribute("recursive", String.valueOf(settings.recursive()));
                     for (String include : settings.includes()) {
@@ -74,7 +74,7 @@ public class ProjectXMLSerializer {
                 filesetElement.appendChild(dirElement);
             } else if (java.nio.file.Files.isRegularFile(path)) {
                 Element fileElement = doc.createElement("file");
-                fileElement.setAttribute("path", path.toString());
+                fileElement.setAttribute("path", stored(path, project));
                 filesetElement.appendChild(fileElement);
             }
         }
@@ -109,12 +109,12 @@ public class ProjectXMLSerializer {
             Element contextElement = doc.createElement("inheritedContext");
             project.getContextDictionary().ifPresent(p -> {
                 Element e = doc.createElement("dictionary");
-                e.setAttribute("path", p.toString());
+                e.setAttribute("path", stored(p, project));
                 contextElement.appendChild(e);
             });
             project.getContextCorpus().ifPresent(p -> {
                 Element e = doc.createElement("corpus");
-                e.setAttribute("path", p.toString());
+                e.setAttribute("path", stored(p, project));
                 contextElement.appendChild(e);
             });
             rootElement.appendChild(contextElement);
@@ -172,12 +172,33 @@ public class ProjectXMLSerializer {
         project.definitionChangedProperty().set(false);
     }
 
+    /**
+     * The value written for a path of the project: relative to the project directory (with
+     * {@code /}) when inside it, else absolute.
+     */
+    private static String stored(java.nio.file.Path path, Project project) {
+        return fr.cnrs.lacito.matchbox.corpus.ProjectPaths.toStored(path, project.directory());
+    }
+
+    /**
+     * The path of a {@code path} attribute: a relative value is relative to the project directory.
+     * Null if the value is not a path on this system (recorded as a load problem).
+     */
+    private static java.nio.file.Path resolved(String value, Project project) {
+        try {
+            return fr.cnrs.lacito.matchbox.corpus.ProjectPaths.resolve(value, project.directory());
+        } catch (java.nio.file.InvalidPathException e) {
+            project.recordLoadProblem("'" + value + "' is not a valid path: " + e.getMessage());
+            return null;
+        }
+    }
+
     /** The path of a child of {@code <inheritedContext>}, null if absent or empty. */
-    private static java.nio.file.Path contextPath(Element context, String tag) {
+    private static java.nio.file.Path contextPath(Element context, String tag, Project project) {
         NodeList list = context.getElementsByTagName(tag);
         if (list.getLength() == 0) return null;
         String path = ((Element) list.item(0)).getAttribute("path");
-        return path.isBlank() ? null : java.nio.file.Path.of(path);
+        return path.isBlank() ? null : resolved(path, project);
     }
 
     /** The settings of a {@code <directory>}, null if it has none (older project files). */
@@ -361,7 +382,10 @@ public class ProjectXMLSerializer {
             // files and directories, in order
             for (Node n = filesetElement.getFirstChild(); n != null; n = n.getNextSibling()) {
                 if (!(n instanceof Element e)) continue;
-                String path = e.getAttribute("path");
+                java.nio.file.Path resolved = resolved(e.getAttribute("path"), project);
+                if (resolved == null) continue;
+                // relative to the project directory; the String methods record failures as load problems
+                String path = resolved.toString();
                 if (e.getTagName().equals("file")) {
                     project.addFile(path);
                 } else if (e.getTagName().equals("directory")) {
@@ -379,8 +403,8 @@ public class ProjectXMLSerializer {
         NodeList contextList = rootElement.getElementsByTagName("inheritedContext");
         if (contextList.getLength() > 0) {
             Element contextElement = (Element) contextList.item(0);
-            project.setContextDictionary(contextPath(contextElement, "dictionary"));
-            project.setContextCorpus(contextPath(contextElement, "corpus"));
+            project.setContextDictionary(contextPath(contextElement, "dictionary", project));
+            project.setContextCorpus(contextPath(contextElement, "corpus", project));
         }
 
         NodeList orderList = rootElement.getElementsByTagName("fileOrder");

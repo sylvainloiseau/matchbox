@@ -79,16 +79,12 @@ public final class MediaPaths {
      * absolute.
      */
     public static String toValue(Path chosen, Optional<Path> projectDirectory, Optional<Path> textDirectory) {
-        Path file = chosen.toAbsolutePath().normalize();
         for (Optional<Path> base : java.util.List.of(projectDirectory, textDirectory)) {
-            if (base.isPresent()) {
-                Path b = base.get().toAbsolutePath().normalize();
-                if (file.startsWith(b)) {
-                    return b.relativize(file).toString().replace('\\', '/');
-                }
+            if (fr.cnrs.lacito.matchbox.corpus.ProjectPaths.isInside(chosen, base)) {
+                return fr.cnrs.lacito.matchbox.corpus.ProjectPaths.toStored(chosen, base);
             }
         }
-        return file.toString();
+        return chosen.toAbsolutePath().normalize().toString();
     }
 
     public static Kind kindOf(Path path) {

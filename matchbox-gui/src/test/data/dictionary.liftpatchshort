@@ -1,0 +1,27 @@
+p /mami/pig
+
+c /mami s("large animal")
+    s (d@en = "A four-legged terrestrial animal")
+    c x("a mami jefi")
+      c o("free", "I shot a pig")
+    c n("general", "recorded at Yakoro, 2025")
+
+# move command
+m /e[f="mami"]/s[g="large animal"] x#1 to /e[f="mami"]/s[g="pig"] at end
+
+c /mami/pig x("a mami o hefafejo")
+
+# delete command
+d /e[f="mami"]/s[g="pig"] x#1
+
+e /mami pig as $pig
+  s (d@en = "A four-legged terrestrial animal")
+  l (d@en)
+
+#d* x[t ~ "^draft"]
+
+#
+p e(f="mami", has-gloss="pig")
+
+# for instance, state that the category of 
+s /mami/pig/c (value = "Noun")

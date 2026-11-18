@@ -188,6 +188,8 @@ public class FileMode implements Mode {
     private final List<javafx.beans.property.ReadOnlyBooleanProperty> watchedDirty = new ArrayList<>();
     private final javafx.beans.InvalidationListener dirtyRefresh = o -> fileTreeView.refresh();
     private final javafx.beans.InvalidationListener definitionListener = o -> rebuildTree();
+    /** Saving the project to another directory changes the marks and the relative names. */
+    private final javafx.beans.InvalidationListener directoryListener = o -> rebuildTree();
     /** True while the tree is rebuilt (its selection changes are not the user's). */
     private boolean rebuilding;
     /** True while a directory node, or a node inside one, is selected. */
@@ -379,6 +381,7 @@ public class FileMode implements Mode {
         if (this.project != null) {
             this.project.getDerivedFileList().removeListener(filesAdded);
             this.project.definitionRevisionProperty().removeListener(definitionListener);
+            this.project.directoryProperty().removeListener(directoryListener);
         }
         this.project = project;
         editorController.setProject(project);
@@ -386,6 +389,7 @@ public class FileMode implements Mode {
         if (project != null) {
             project.getDerivedFileList().addListener(filesAdded);
             project.definitionRevisionProperty().addListener(definitionListener);
+            project.directoryProperty().addListener(directoryListener);
         }
         // no project: an empty tree (the start page covers the mode)
         rebuildTree();
@@ -883,6 +887,9 @@ public class FileMode implements Mode {
             filesTitle.setText(!flatList ? "Files" : project.getFileOrder()
                 == fr.cnrs.lacito.matchbox.model.project.ProjectFileOrder.MODIFIED
                 ? "Files — ordered by modification date" : "Files — ordered by header date");
+            filesTitle.setTooltip(project == null ? null : new Tooltip(project.directory()
+                .map(d -> "Project directory: " + d + "\nFiles outside it are marked with !")
+                .orElse("Save the project to give it a project directory (the directory of the project file)")));
         }
         if (project != null && flatList) {
             // the files in the project's order, flat: a tree cannot show an order by date
@@ -970,6 +977,20 @@ public class FileMode implements Mode {
         return item;
     }
 
+    /**
+     * Shows the file list and selects the node of a file or directory of the project (e.g. an entry
+     * outside the project directory); false if it is not in the list (filtered out).
+     */
+    public boolean selectInFileList(java.nio.file.Path path) {
+        ensureShown(FileModeLayout.Panel.FILES);
+        Optional<TreeItem<FileTree.Node>> item = find(fileTreeView.getRoot(), path);
+        item.ifPresent(i -> {
+            selectItem(i);
+            fileTreeView.requestFocus();
+        });
+        return item.isPresent();
+    }
+
     /** Selects a node, expanding its ancestors, and scrolls to it. */
     private void selectItem(TreeItem<FileTree.Node> item) {
         for (TreeItem<FileTree.Node> p = item.getParent(); p != null; p = p.getParent()) p.setExpanded(true);
@@ -1043,7 +1064,7 @@ public class FileMode implements Mode {
                     styleProperty().bind(Bindings.when(dirty)
                         .then("-fx-font-weight: bold; -fx-font-style: italic;").otherwise(""));
                     if (flatList) {
-                        String folder = f.path().getParent() == null ? "" : abbreviate(f.path().getParent());
+                        String folder = f.path().getParent() == null ? "" : where(f.path().getParent());
                         String date = fileDates.getOrDefault(f.path(), java.util.Optional.empty())
                             .map(i -> java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
                                 .format(i.atZone(java.time.ZoneId.systemDefault())))
@@ -1052,20 +1073,27 @@ public class FileMode implements Mode {
                         where.setStyle("-fx-text-fill: #888888; -fx-font-size: 0.9em;");
                         setGraphic(where);
                         setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
-                    } else if (f.directory().isEmpty() && f.path().getParent() != null) {
-                        Label where = new Label(abbreviate(f.path().getParent()));
+                    } else if (f.directory().isEmpty() && f.path().getParent() != null
+                            && !isProjectDirectory(f.path().getParent())) {
+                        Label where = new Label(where(f.path().getParent()));
                         where.setStyle("-fx-text-fill: #888888; -fx-font-size: 0.9em;");
                         setGraphic(where);
                         setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
                     }
+                    boolean outside = FileTree.outside(f, projectDirectory(), flatList);
                     setTooltip(new Tooltip(f.path().toString()
-                        + (rank == null ? "" : "\nPosition " + rank + " in the history of the dictionary")));
+                        + (rank == null ? "" : "\nPosition " + rank + " in the history of the dictionary")
+                        + (outside ? "\n" + OUTSIDE_FILE : "")));
+                    if (outside) markOutside(OUTSIDE_FILE, f.name());
                     setContextMenu(fileMenu(f));
                 }
                 case FileTree.TopDirectory d -> {
-                    directoryLook(abbreviate(d.path()));
+                    directoryLook(where(d.path()));
                     String settings = project == null ? "" : project.directorySettings(d.path()).map(FileMode::describe).orElse("");
-                    setTooltip(new Tooltip(d.path() + (settings.isEmpty() ? "" : "\n" + settings)));
+                    boolean outside = FileTree.outside(d, projectDirectory(), flatList);
+                    setTooltip(new Tooltip(d.path() + (settings.isEmpty() ? "" : "\n" + settings)
+                        + (outside ? "\n" + OUTSIDE_DIRECTORY : "")));
+                    if (outside) markOutside(OUTSIDE_DIRECTORY, d.path().getFileName() + "");
                     setContextMenu(topDirectoryMenu(d));
                 }
                 case FileTree.SubDirectory d -> {
@@ -1074,6 +1102,18 @@ public class FileMode implements Mode {
                     setContextMenu(subDirectoryMenu(d));
                 }
             }
+        }
+
+        /** A "!" before the cell's other graphic: the entry is not in the project directory. */
+        private void markOutside(String message, String name) {
+            Label mark = new Label("!");
+            mark.getStyleClass().add("outside-mark");
+            mark.setStyle("-fx-text-fill: #9a6700; -fx-font-weight: bold;");
+            mark.setTooltip(new Tooltip(message));
+            mark.setAccessibleText(name + ", not in the project directory");
+            Node other = getGraphic();
+            setGraphic(other == null ? mark : new javafx.scene.layout.HBox(6, mark, other));
+            setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
         }
 
         private void directoryLook(String name) {
@@ -1097,6 +1137,25 @@ public class FileMode implements Mode {
         String in = s.includes().isEmpty() ? "every file" : String.join(", ", s.includes());
         String out = s.excludes().isEmpty() ? "" : " · excludes " + String.join(", ", s.excludes());
         return in + out + (s.recursive() ? " · with sub-directories" : " · without sub-directories");
+    }
+
+    static final String OUTSIDE_FILE = "This file is not in the project directory";
+    static final String OUTSIDE_DIRECTORY = "This directory is not in the project directory";
+
+    /**
+     * How a directory is named in the tree: relative to the project directory when inside it, else
+     * its absolute path with "~" for the home directory.
+     */
+    private String where(java.nio.file.Path dir) {
+        Optional<java.nio.file.Path> base = projectDirectory();
+        if (fr.cnrs.lacito.matchbox.corpus.ProjectPaths.isInside(dir, base)) {
+            return fr.cnrs.lacito.matchbox.corpus.ProjectPaths.display(dir, base);
+        }
+        return abbreviate(dir);
+    }
+
+    private boolean isProjectDirectory(java.nio.file.Path dir) {
+        return projectDirectory().map(d -> d.equals(dir.toAbsolutePath().normalize())).orElse(false);
     }
 
     private static String abbreviate(java.nio.file.Path dir) {

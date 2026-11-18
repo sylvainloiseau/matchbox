@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <project>
   <fileset>
-    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/tuwari.md"/>
-    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/0.conll"/>
-    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/notebook.md"/>
-    <file path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/TranscriptionEvansFedden2027WithGloss.txt"/>
+    <file path="../tuwari.md"/>
+    <file path="../0.conll"/>
+    <file path="../notebook.md"/>
+    <file path="../TranscriptionEvansFedden2027WithGloss.txt"/>
+    <file path="../dictionary.liftpatchshort"/>
   </fileset>
   <pattern>
     <name>all</name>
@@ -25,8 +26,13 @@
     <regex>.+</regex>
     <grammar id="igt-grammar" rank="0"/>
   </pattern>
+  <pattern>
+    <name>liftpatchshort</name>
+    <regex>.+\.liftpatchshort</regex>
+    <grammar id="lift-patchbox-short-grammar" rank="0"/>
+  </pattern>
   <inheritedContext>
-    <dictionary path="/Users/sloiseau/workspace/matchbox/matchbox-gui/src/test/data/lift/lift20250717.lift"/>
+    <dictionary path="../lift/lift20250717.lift"/>
   </inheritedContext>
   <displayStyles>
     <display bold="true" fontFamily="American Typewriter" grammar="markdown-heading-grammar" kind="markdown-heading-grammar:header"/>

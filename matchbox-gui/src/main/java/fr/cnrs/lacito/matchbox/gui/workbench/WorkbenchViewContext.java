@@ -118,8 +118,7 @@ final class WorkbenchViewContext implements ViewContext {
     @Override
     public Optional<Path> projectDirectory() {
         Project project = workbench.session().project();
-        if (project == null || project.fileProperty().get() == null) return Optional.empty();
-        return Optional.ofNullable(project.fileProperty().get().toPath().toAbsolutePath().getParent());
+        return project == null ? Optional.empty() : project.directory();
     }
 
     @Override

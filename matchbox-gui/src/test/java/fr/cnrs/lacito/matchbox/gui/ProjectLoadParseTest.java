@@ -63,4 +63,27 @@ class ProjectLoadParseTest {
         assertEquals(1, text.objectsOf(InterlinearSentence.class).size());
         assertEquals(1, text.objectsOf(LexicalEntry.class).size());
     }
+
+    /**
+     * The projects of the test data use paths relative to their directory, so that they open on
+     * every machine (not all their plugins are on this module's test class path: the paths are
+     * checked, not the projects loaded).
+     */
+    @Test
+    void theTestProjectsUsePathsRelativeToTheirDirectory() throws Exception {
+        java.util.regex.Pattern attribute = java.util.regex.Pattern.compile("path=\"([^\"]*)\"");
+        for (String name : java.util.List.of("liftpatchbox.mbx", "projects/tuwari.mbx", "projects/project1.mbx")) {
+            Path mbx = Path.of("src", "test", "data").resolve(name);
+            var m = attribute.matcher(Files.readString(mbx));
+            int count = 0;
+            while (m.find()) {
+                count++;
+                assertFalse(Path.of(m.group(1)).isAbsolute(), name + ": " + m.group(1));
+                Path resolved = fr.cnrs.lacito.matchbox.corpus.ProjectPaths.resolve(m.group(1),
+                    java.util.Optional.of(mbx.toAbsolutePath().getParent()));
+                assertTrue(Files.exists(resolved), name + ": " + resolved);
+            }
+            assertTrue(count > 0, name);
+        }
+    }
 }

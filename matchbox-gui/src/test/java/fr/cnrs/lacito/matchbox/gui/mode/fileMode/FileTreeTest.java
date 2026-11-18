@@ -96,4 +96,39 @@ class FileTreeTest {
         assertEquals(List.of("+ 2024/day1.txt", "− b.txt", "   A.txt"), p.lines());
         assertEquals("1 file", DirectorySettingsDialog.Preview.of(notes, List.of(a), List.of(a)).summary());
     }
+
+    @Test
+    void entriesOfTheDefinitionOutsideTheProjectDirectoryAreMarked() throws Exception {
+        Path loose = Files.writeString(dir.resolve("loose.txt"), "x");
+        Path projectDir = Files.createDirectories(dir.resolve("proj"));
+        Path inside = Files.writeString(projectDir.resolve("in.txt"), "i");
+        project.addDirectory(notes, new DirectorySettings(List.of("*.txt"), List.of(), true));
+        project.addFile(loose);
+        project.addFile(inside);
+        List<Entry> tree = FileTree.build(project, "");
+        Entry top = tree.stream().filter(e -> e.node() instanceof TopDirectory).findFirst().orElseThrow();
+        FileNode inNotes = (FileNode) top.children().stream().filter(e -> e.node() instanceof FileNode)
+            .findFirst().orElseThrow().node();
+        SubDirectory sub = (SubDirectory) top.children().stream().filter(e -> e.node() instanceof SubDirectory)
+            .findFirst().orElseThrow().node();
+        FileNode looseNode = new FileNode(project.getParsedText(loose), Optional.empty());
+        FileNode insideNode = new FileNode(project.getParsedText(inside), Optional.empty());
+
+        assertFalse(FileTree.outside(top.node(), Optional.empty(), false), "unsaved project: no mark");
+        assertTrue(FileTree.outsideEntries(project).isEmpty());
+
+        project.setFile(projectDir.resolve("p.mbx").toFile());
+        Optional<Path> base = project.directory();
+        assertTrue(FileTree.outside(top.node(), base, false), "a top directory outside");
+        assertTrue(FileTree.outside(looseNode, base, false), "a file added alone outside");
+        assertFalse(FileTree.outside(insideNode, base, false), "inside");
+        assertFalse(FileTree.outside(inNotes, base, false), "not marked again below a marked directory");
+        assertFalse(FileTree.outside(sub, base, false));
+        assertTrue(FileTree.outside(inNotes, base, true), "the flat list marks every file outside");
+        assertEquals(List.of(notes, loose), FileTree.outsideEntries(project), "in definition order");
+
+        project.setFile(dir.resolve("p.mbx").toFile());
+        assertFalse(FileTree.outside(top.node(), project.directory(), false), "saved in the parent: inside");
+        assertTrue(FileTree.outsideEntries(project).isEmpty());
+    }
 }

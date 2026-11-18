@@ -62,7 +62,14 @@ public final class ProjectFiles {
             return alert.showAndWait().orElse(ButtonType.CANCEL) == yes;
         };
         this.unsaved = (documents, action) -> UnsavedChangesDialog.confirm(workbench.window(), documents, action);
-        this.directoryChooser = () -> new DirectoryChooser().showDialog(workbench.window());
+        this.directoryChooser = () -> {
+            DirectoryChooser chooser = new DirectoryChooser();
+            var project = workbench.session().project();
+            if (project != null) {
+                project.directory().map(java.nio.file.Path::toFile).filter(java.io.File::isDirectory).ifPresent(chooser::setInitialDirectory);
+            }
+            return chooser.showDialog(workbench.window());
+        };
     }
 
     /** Replaces the dialogs (GUI tests). */

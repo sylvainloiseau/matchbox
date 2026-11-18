@@ -135,11 +135,7 @@ public final class CloseProjectDialog {
 
     /** The path relative to the project directory when the file is inside it. */
     static String displayPath(Path file, Optional<Path> projectDirectory) {
-        Path absolute = file.toAbsolutePath().normalize();
-        return projectDirectory.map(d -> d.toAbsolutePath().normalize())
-            .filter(absolute::startsWith)
-            .map(d -> d.relativize(absolute).toString())
-            .orElse(absolute.toString());
+        return fr.cnrs.lacito.matchbox.corpus.ProjectPaths.display(file, projectDirectory);
     }
 
 }

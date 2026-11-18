@@ -89,9 +89,8 @@ final class InheritedContextGroup {
 
     /** Where a file chooser opens: the directory of the current file, else of the project file. */
     private Optional<File> initialDirectory(String current) {
-        File projectFile = ctx.project().fileProperty().get();
         File base = !current.isEmpty() ? new File(current).getParentFile()
-            : projectFile == null ? null : projectFile.getParentFile();
+            : ctx.project().directory().map(Path::toFile).orElse(null);
         return Optional.ofNullable(base).filter(File::isDirectory);
     }
 }

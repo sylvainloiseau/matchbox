@@ -52,19 +52,7 @@ public final class ProblemExport {
 
     /** The path relative to the project directory when inside it, with "/" separators. */
     static String relativePath(Path file, Optional<Path> projectDirectory) {
-        Path shown = file;
-        if (projectDirectory.isPresent()) {
-            Path dir = projectDirectory.get().toAbsolutePath().normalize();
-            Path abs = file.toAbsolutePath().normalize();
-            if (abs.startsWith(dir)) shown = dir.relativize(abs);
-        }
-        StringBuilder s = new StringBuilder();
-        if (shown.isAbsolute()) return shown.toString();
-        for (Path element : shown) {
-            if (!s.isEmpty()) s.append('/');
-            s.append(element);
-        }
-        return s.toString();
+        return fr.cnrs.lacito.matchbox.corpus.ProjectPaths.toStored(file, projectDirectory);
     }
 
     private static String csvCell(String value) {

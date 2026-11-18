@@ -1,6 +1,7 @@
 package fr.cnrs.lacito.matchbox.gui.mode.fileMode;
 
 import fr.cnrs.lacito.matchbox.corpus.FileOrder;
+import fr.cnrs.lacito.matchbox.corpus.ProjectPaths;
 import fr.cnrs.lacito.matchbox.model.TextDocument;
 import fr.cnrs.lacito.matchbox.model.project.Project;
 import java.nio.file.Path;
@@ -120,6 +121,28 @@ public final class FileTree {
         }
         top.sort(Comparator.comparing((Entry e) -> e.node().path(), FileOrder.PATHS));
         return top;
+    }
+
+    /**
+     * True if a node is marked as not in the project directory: an entry of the project definition
+     * (a top directory, a file added alone) outside it; in the flat list, every file outside it.
+     * Files and sub-directories of a marked directory are not marked again; nothing is marked while
+     * the project has no directory (not saved).
+     */
+    public static boolean outside(Node node, Optional<Path> projectDirectory, boolean flatList) {
+        if (projectDirectory.isEmpty()) return false;
+        boolean marked = switch (node) {
+            case TopDirectory d -> true;
+            case SubDirectory d -> false;
+            case FileNode f -> flatList || f.directory().isEmpty();
+        };
+        return marked && !ProjectPaths.isInside(node.path(), projectDirectory);
+    }
+
+    /** The entries of the project definition (files and directories) outside the project directory, in order. */
+    public static List<Path> outsideEntries(Project project) {
+        if (project.directory().isEmpty()) return List.of();
+        return project.getDefinitionPaths().stream().filter(p -> !project.isInsideDirectory(p)).toList();
     }
 
     /** The files of the tree, depth first: the project's path order. */

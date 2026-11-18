@@ -121,6 +121,43 @@ public class Project {
         null
     );
 
+    /** The project directory, derived from {@link #projectFile}. */
+    private final javafx.beans.property.ReadOnlyObjectWrapper<Optional<Path>> directory =
+        new javafx.beans.property.ReadOnlyObjectWrapper<>(Optional.empty());
+
+    {
+        projectFile.addListener((obs, o, n) -> directory.set(directoryOf(n)));
+    }
+
+    private static Optional<Path> directoryOf(File projectFile) {
+        if (projectFile == null) return Optional.empty();
+        return Optional.ofNullable(projectFile.toPath().toAbsolutePath().normalize().getParent());
+    }
+
+    /**
+     * The <b>project directory</b>: the directory containing the project file (absolute,
+     * normalised); empty while the project has not been saved. Relative paths of the project file
+     * are relative to it.
+     */
+    public Optional<Path> directory() {
+        return directory.get();
+    }
+
+    /** The project directory; changes when the project is saved to another directory. */
+    public javafx.beans.property.ReadOnlyObjectProperty<Optional<Path>> directoryProperty() {
+        return directory.getReadOnlyProperty();
+    }
+
+    /** True if the path is in the project directory or one of its sub-directories (false while unsaved). */
+    public boolean isInsideDirectory(Path path) {
+        return fr.cnrs.lacito.matchbox.corpus.ProjectPaths.isInside(path, directory());
+    }
+
+    /** The form in which paths are kept: absolute and normalised (they match {@code TextId.of}). */
+    private static Path absolute(Path path) {
+        return path == null ? null : path.toAbsolutePath().normalize();
+    }
+
     protected Project(List<GrammarPlugin> plugins) {
         this(plugins, DocumentOptions.DEFAULT);
     }
@@ -366,6 +403,7 @@ public class Project {
 
     /** @param dictionary a LIFT file, or null for none */
     public void setContextDictionary(Path dictionary) {
+        dictionary = absolute(dictionary);
         if (!Objects.equals(dictionary, contextDictionary)) {
             this.contextDictionary = dictionary;
             markDefinitionChanged();
@@ -411,6 +449,7 @@ public class Project {
 
     /** @param corpus a Matchbox corpus, or null for none */
     public void setContextCorpus(Path corpus) {
+        corpus = absolute(corpus);
         if (!Objects.equals(corpus, contextCorpus)) {
             this.contextCorpus = corpus;
             markDefinitionChanged();
@@ -476,6 +515,7 @@ public class Project {
      * @throws IOException listing the files that could not be read (the others are added)
      */
     public void addDirectory(Path path, DirectorySettings settings) throws IOException {
+        path = absolute(path);
         if (!Files.isDirectory(path)) {
             throw new IllegalArgumentException(
                 "The provided path is not a directory."
@@ -603,6 +643,7 @@ public class Project {
      * @throws IOException
      */
     public void addFile(Path filePath) throws IOException {
+        filePath = absolute(filePath);
         if (!Files.isRegularFile(filePath)) {
             throw new IllegalArgumentException(
                 "The provided path is not a regular file:" + filePath.toString()
@@ -656,6 +697,7 @@ public class Project {
     }
 
     public void removeFile(Path selected) {
+        selected = absolute(selected);
         filesAndDirectories.remove(selected);
         textDocumentByPath.remove(selected);
         markDefinitionChanged();
@@ -752,6 +794,7 @@ public class Project {
     }
 
     public void removeDirectory(Path dirPath) {
+        dirPath = absolute(dirPath);
         filesAndDirectories.remove(dirPath);
         directorySettings.remove(dirPath);
         for (Path p : filesByDir.getOrDefault(

@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
@@ -143,5 +144,47 @@ class FileTreeGuiTest extends MainWindowFixture {
         assertEquals(1, confirmations.size());
         assertTrue(project().getDefinitionDirectories().isEmpty());
         assertTrue(removeDirectory.isDisable());
+    }
+
+    /** The "!" of an entry of the cell of a node, or null. */
+    private javafx.scene.control.Label mark(FxRobot robot, Path path) {
+        Node graphic = ((TreeCell<?>) treeCell(robot, path)).getGraphic();
+        java.util.stream.Stream<Node> nodes = graphic instanceof javafx.scene.layout.HBox box
+            ? box.getChildren().stream() : java.util.stream.Stream.ofNullable(graphic);
+        return nodes.filter(n -> n.getStyleClass().contains("outside-mark")).map(javafx.scene.control.Label.class::cast)
+            .findFirst().orElse(null);
+    }
+
+    @Test
+    void entriesOutsideTheProjectDirectoryAreMarked(FxRobot robot) throws IOException {
+        addNotes(robot);
+        Path alone = addFile(robot, "alone.txt", "x\n");
+        waitUntil(() -> tree(robot).getRoot().getChildren().size() == 2);
+        assertNull(mark(robot, notes), "unsaved project: no project directory, no mark");
+        assertNull(mark(robot, alone));
+
+        Path projectDir = Files.createDirectories(dir.resolve("project"));
+        robot.interact(() -> project().setFile(projectDir.resolve("p.mbx").toFile()));
+        waitUntil(() -> mark(robot, notes) != null && mark(robot, alone) != null);
+        assertEquals("!", mark(robot, alone).getText());
+        assertEquals("This directory is not in the project directory", mark(robot, notes).getTooltip().getText());
+        assertEquals("This file is not in the project directory", mark(robot, alone).getTooltip().getText());
+        assertNull(mark(robot, notes.resolve("A.txt")), "not marked again below a marked directory");
+
+        List<String> status = new java.util.ArrayList<>();
+        robot.interact(() -> {
+            controller.reportEntriesOutside(project());
+            status.add(workbench().status().messageProperty().get());
+            status.add(workbench().status().linkTextProperty().get());
+        });
+        assertTrue(status.get(0).startsWith("2 entries of the file list are not in the project directory"), status::toString);
+        assertEquals("Show", status.get(1));
+        robot.interact(() -> workbench().status().followLink());
+        assertEquals(notes, tree(robot).getSelectionModel().getSelectedItem().getValue().path(), "the first one");
+
+        // saved in the directory containing them: inside, named relative to it
+        robot.interact(() -> project().setFile(dir.resolve("p.mbx").toFile()));
+        waitUntil(() -> mark(robot, notes) == null && mark(robot, alone) == null);
+        assertEquals("📁 notes", ((TreeCell<?>) treeCell(robot, notes)).getText(), "relative to the project directory");
     }
 }
