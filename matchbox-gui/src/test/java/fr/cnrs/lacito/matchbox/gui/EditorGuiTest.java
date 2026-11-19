@@ -17,6 +17,9 @@ import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.DataFormat;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
@@ -196,5 +199,32 @@ class EditorGuiTest extends MainWindowFixture {
         assertTrue(rows.stream().anyMatch(r -> r.action().startsWith("End of file")));
         assertTrue(rows.stream().anyMatch(r -> r.action().equals("Find…")));
         assertTrue(rows.stream().anyMatch(r -> r.action().equals("Duplicate line") && r.where().contains("Lines")));
+    }
+    @Test
+    void copyThenPasteInsertsPlainText(FxRobot robot) throws IOException {
+        show(robot, "a.txt", "abc\n");
+        boolean mac = EditorKeymap.Platform.current() == EditorKeymap.Platform.MAC;
+        robot.interact(() -> area(robot).selectRange(0, 3));
+        press(robot, KeyCode.C, false, !mac, false, mac);
+        String[] copied = new String[1];
+        robot.interact(() -> copied[0] = Clipboard.getSystemClipboard().getString());
+        assertEquals("abc", copied[0]);
+        // JavaFX 25 gives RichTextFX's styled format back as something other than byte[]
+        // (a ByteBuffer on macOS): RichTextFX's own paste cast it and failed
+        robot.interact(() -> {
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            DataFormat styled = clipboard.getContentTypes().stream()
+                .filter(f -> f.getIdentifiers().stream().anyMatch(id -> id.contains("richtextfx")))
+                .findFirst().orElseThrow(() -> new AssertionError("RichTextFX's format after copy"));
+            ClipboardContent content = new ClipboardContent();
+            content.putString(clipboard.getString());
+            content.put(styled, "not a byte array");
+            clipboard.setContent(content);
+        });
+        robot.interact(() -> area(robot).moveTo(4));
+        press(robot, KeyCode.V, false, !mac, false, mac);
+        assertEquals("abc\nabc", area(robot).getText());
+        press(robot, KeyCode.INSERT, true, false, false, false);
+        assertEquals("abc\nabcabc", area(robot).getText());
     }
 }

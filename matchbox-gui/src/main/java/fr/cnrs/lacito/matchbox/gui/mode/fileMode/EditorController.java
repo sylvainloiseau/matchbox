@@ -33,6 +33,7 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.scene.input.Clipboard;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.text.Font;
 import java.util.Set;
@@ -153,6 +154,12 @@ public class EditorController {
             InputMap.consume(EventPattern.keyPressed(KeyCode.Z, KeyCombination.SHORTCUT_DOWN), e -> undo()),
             InputMap.consume(EventPattern.keyPressed(KeyCode.Z, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN), e -> redo()),
             InputMap.consume(EventPattern.keyPressed(KeyCode.Y, KeyCombination.SHORTCUT_DOWN), e -> redo()),
+            // the paste keys of RichTextFX's own behaviour, as plain text (see pastePlainText)
+            InputMap.consume(EventPattern.anyOf(
+                    EventPattern.keyPressed(KeyCode.V, KeyCombination.SHORTCUT_DOWN),
+                    EventPattern.keyPressed(KeyCode.INSERT, KeyCombination.SHIFT_DOWN),
+                    EventPattern.keyPressed(KeyCode.PASTE)),
+                e -> pastePlainText()),
             // play/pause the media segment at the caret
             InputMap.consume(EventPattern.keyPressed(KeyCode.SPACE, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN),
                 e -> playSegmentAtCaret())
@@ -782,6 +789,20 @@ public class EditorController {
 
     public BooleanExpression getCurrentTextCouldBeParsedAgainProperty() {
         return currentTextCouldBeReparsedProperty;
+    }
+
+    /**
+     * Pastes the clipboard as plain text. RichTextFX's own paste reads first its styled format,
+     * cast to {@code byte[]}; since JavaFX 25 the clipboard no longer deserializes it (only strings,
+     * unless {@code javafx.dnd.deserializeObjectGraph}) and returns a {@code ByteBuffer}, hence a
+     * {@code ClassCastException} when pasting text copied from this editor. The styles are
+     * recomputed from the parse anyway.
+     */
+    void pastePlainText() {
+        Clipboard clipboard = Clipboard.getSystemClipboard();
+        if (clipboard.hasString()) {
+            textArea.replaceSelection(clipboard.getString());
+        }
     }
 
     /** Undoes the last change of the project (the journal is project-wide). */
