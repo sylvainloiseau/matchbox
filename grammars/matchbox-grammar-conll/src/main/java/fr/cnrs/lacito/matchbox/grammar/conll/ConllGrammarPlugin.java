@@ -9,6 +9,8 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.simple.SimpleDependencyTree;
 import fr.cnrs.lacito.matchbox.grammarapi.Spans;
 import fr.cnrs.lacito.matchbox.corpus.Diagnostic;
+import fr.cnrs.lacito.matchbox.corpus.Field;
+import fr.cnrs.lacito.matchbox.corpus.capability.DependencySentence;
 import fr.cnrs.lacito.matchbox.corpus.TextCoordinate;
 import fr.cnrs.lacito.matchbox.corpus.TextId;
 import java.util.ArrayList;
@@ -53,6 +55,7 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
         List<Map<String, String>> tokens = new ArrayList<>();
         List<Integer> heads = new ArrayList<>();
         List<TextCoordinate> tokenSpans = new ArrayList<>();
+        List<Field> fields = new ArrayList<>();
 
         String metadataKey = null;
         Token tokenStart = null;
@@ -70,9 +73,11 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
                         metadataKey = t.getText().strip();
                     } else if (metadataKey != null) {
                         metadata.put(metadataKey, t.getText().strip());
+                        fields.add(valueField(filePath, metadataKey, t));
                     }
                 }
                 case ConllLexer.EQ_OTHER_HEADER -> afterEquals = true;
+                case ConllLexer.SENT_ID -> fields.add(valueField(filePath, SENT_ID, t));
                 case ConllLexer.TOKEN_ID -> {
                     tokenStart = t;
                     token = new LinkedHashMap<>();
@@ -103,8 +108,25 @@ public class ConllGrammarPlugin extends AbstractGrammarPlugin {
             metadata,
             tokens,
             heads,
-            tokenSpans
+            tokenSpans,
+            fields
         );
+    }
+
+    /** The key of the sentence id comment. */
+    static final String SENT_ID = "sent_id";
+
+    /** The value of a comment as a field: the token without its trailing spaces. */
+    private static Field valueField(TextId filePath, String key, Token t) {
+        String value = t.getText().strip();
+        int start = t.getStartIndex() + (t.getText().length() - t.getText().stripLeading().length());
+        return new Field(DependencySentence.metadataField(key), value,
+            new TextCoordinate(filePath, start, start + value.length() - 1, t.getLine(), t.getLine()));
+    }
+
+    @Override
+    public fr.cnrs.lacito.matchbox.grammarapi.ObjectEditor getObjectEditor() {
+        return ConllObjectEditor.INSTANCE;
     }
 
     private static int parseHead(String head) {

@@ -181,7 +181,8 @@ public class SettingsDialog {
             current.tagBrowser(),
             editedEditor(current.editor()),
             current.fileMode(),
-            editedHistory(current.dictionaryHistory())
+            editedHistory(current.dictionaryHistory()),
+            current.metadataMode()
         );
     }
 

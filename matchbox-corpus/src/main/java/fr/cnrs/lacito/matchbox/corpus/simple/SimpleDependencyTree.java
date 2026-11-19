@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  * between 0 and n, exactly one root, no cycle. Multiword ranges ({@code 1-2}) and empty nodes
  * ({@code 1.1}) are not checked; an unspecified head ({@code _}) is not reported.
  */
-public final class SimpleDependencyTree extends AbstractCorpusObject implements DependencySentence, HasIssues {
+public final class SimpleDependencyTree extends AbstractCorpusObject implements DependencySentence, HasIssues, fr.cnrs.lacito.matchbox.corpus.HasFields {
 
     /** Codes of the issues (see {@link Issue#code()}). */
     public static final String CODE_IDS = "dependency.ids";
@@ -33,6 +33,7 @@ public final class SimpleDependencyTree extends AbstractCorpusObject implements 
     private final List<Map<String, String>> tokens;
     private final List<Integer> heads;
     private final List<TextCoordinate> tokenSpans;
+    private final List<fr.cnrs.lacito.matchbox.corpus.Field> fields;
 
     public SimpleDependencyTree(String kind, TextCoordinate coordinate,
         String sentenceId,
@@ -55,7 +56,24 @@ public final class SimpleDependencyTree extends AbstractCorpusObject implements 
         List<Integer> heads,
         List<TextCoordinate> tokenSpans
     ) {
+        this(kind, coordinate, sentenceId, metadata, tokens, heads, tokenSpans, List.of());
+    }
+
+    /**
+     * @param fields the comments {@code # key = value} as fields ({@link DependencySentence#metadataField}),
+     *               {@code sent_id} included, in text order: the values become editable and the
+     *               metadata block follows them; empty: read-only
+     */
+    public SimpleDependencyTree(String kind, TextCoordinate coordinate,
+        String sentenceId,
+        Map<String, String> metadata,
+        List<Map<String, String>> tokens,
+        List<Integer> heads,
+        List<TextCoordinate> tokenSpans,
+        List<fr.cnrs.lacito.matchbox.corpus.Field> fields
+    ) {
         super(kind, coordinate);
+        this.fields = List.copyOf(fields);
         this.sentenceId = sentenceId;
         this.metadata = orderedCopy(metadata);
         this.tokens = tokens.stream().map(SimpleDependencyTree::orderedCopy).toList();
@@ -76,6 +94,24 @@ public final class SimpleDependencyTree extends AbstractCorpusObject implements 
     @Override
     public Map<String, String> getMetadata() {
         return metadata;
+    }
+
+    @Override
+    public List<fr.cnrs.lacito.matchbox.corpus.Field> getFields() {
+        return fields;
+    }
+
+    /** With fields: the comments in text order ({@code sent_id} included); else the default. */
+    @Override
+    public java.util.Optional<fr.cnrs.lacito.matchbox.corpus.MetadataBlock> metadataBlock() {
+        String prefix = DependencySentence.metadataField("");
+        List<fr.cnrs.lacito.matchbox.corpus.MetadataEntry> entries = fields.stream()
+            .filter(f -> f.name().startsWith(prefix))
+            .map(f -> new fr.cnrs.lacito.matchbox.corpus.MetadataEntry(f.name().substring(prefix.length()), f.value(),
+                java.util.Optional.of(f.span())))
+            .toList();
+        if (entries.isEmpty()) return DependencySentence.super.metadataBlock();
+        return java.util.Optional.of(new fr.cnrs.lacito.matchbox.corpus.MetadataBlock(java.util.Optional.empty(), entries));
     }
 
     @Override

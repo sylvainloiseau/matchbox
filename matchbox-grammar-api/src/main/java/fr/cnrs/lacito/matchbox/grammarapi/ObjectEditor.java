@@ -42,6 +42,24 @@ public interface ObjectEditor {
     }
 
     /**
+     * Edits renaming a field (e.g. the key of a metadata entry), its value kept. Refused by default.
+     *
+     * @param newFieldName the new name (e.g. {@code Section.metadataField("speakers")})
+     */
+    default EditProposal renameField(CorpusObject object, String fieldName, String newFieldName, String content) {
+        return new EditProposal.Refused("Fields of " + object.getKind() + " cannot be renamed");
+    }
+
+    /**
+     * Edits giving a text without header a header holding one property ({@code TextHeader}), in the
+     * grammar's notation. Refused by default (the grammar writes no header, or the text has one).
+     */
+    default EditProposal addTextProperty(fr.cnrs.lacito.matchbox.corpus.TextId text, String key, String value,
+                                         String content) {
+        return new EditProposal.Refused("This grammar writes no header");
+    }
+
+    /**
      * Replaces the raw text of the field's span by the value (an empty field: inserts it at the
      * field's position). Refuses a line break in a field written on one line.
      */

@@ -15,7 +15,7 @@ import java.util.Map;
  * <p>Fields ({@link fr.cnrs.lacito.matchbox.corpus.HasFields}): {@link #metadataField} per metadata
  * entry, {@link #lineField} per line, {@link #wordField} per word of a segmented line.
  */
-public interface InterlinearGlossedText extends InterlinearSentence {
+public interface InterlinearGlossedText extends InterlinearSentence, HasMetadata {
 
     /** The metadata written in the IGT's own block, in order; unmodifiable. */
     Map<String, String> metadata();
@@ -25,6 +25,19 @@ public interface InterlinearGlossedText extends InterlinearSentence {
 
     static String metadataField(String key) {
         return "meta/" + key;
+    }
+
+    /** The IGT's own block (no block when it has no metadata); the spans of the fields {@link #metadataField}. */
+    @Override
+    default java.util.Optional<fr.cnrs.lacito.matchbox.corpus.MetadataBlock> metadataBlock() {
+        return metadata().isEmpty() ? java.util.Optional.empty()
+            : java.util.Optional.of(fr.cnrs.lacito.matchbox.corpus.MetadataBlock.of(java.util.Optional.empty(), metadata(),
+                this, InterlinearGlossedText::metadataField));
+    }
+
+    @Override
+    default String metadataFieldName(String key) {
+        return metadataField(key);
     }
 
     /** @param index 0-based index in {@link #lines()} */

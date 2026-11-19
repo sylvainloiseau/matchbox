@@ -268,4 +268,16 @@ class IgtGrammarPluginTest {
         assertEquals(2000, r.objects().size());
         assertTrue(ms < 10_000, "took " + ms + " ms");
     }
+
+    @Test
+    void metadata_keys_are_renamed_and_the_block_is_exposed() {
+        InterlinearGlossedText igt = only(FRENCH);
+        assertEquals(java.util.List.of("id", "olang", "mlang", "media", "offset"),
+            igt.metadataBlock().orElseThrow().entries().stream().map(e -> e.key()).toList());
+        assertEquals("meta/media", igt.metadataFieldName("media"));
+        String t = apply(FRENCH, plugin.getObjectEditor().renameField(igt, "meta/media", "meta/audio", FRENCH));
+        assertEquals("O1.WAV", only(t).metadata().get("audio"));
+        assertTrue(plugin.getObjectEditor().renameField(igt, "meta/media", "meta/id", FRENCH) instanceof EditProposal.Refused);
+        assertTrue(only(":::\na b\nc d\n:::\n").metadataBlock().isEmpty());
+    }
 }

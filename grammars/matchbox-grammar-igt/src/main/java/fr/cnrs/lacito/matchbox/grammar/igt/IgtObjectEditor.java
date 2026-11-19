@@ -114,6 +114,30 @@ final class IgtObjectEditor implements ObjectEditor {
         return new EditProposal.Refused("No entry " + key);
     }
 
+    /** Renames the key of a metadata entry (the value is kept). */
+    @Override
+    public EditProposal renameField(CorpusObject object, String fieldName, String newFieldName, String content) {
+        if (!fieldName.startsWith("meta/") || !newFieldName.startsWith("meta/")) {
+            return new EditProposal.Refused("Only metadata keys can be renamed");
+        }
+        String key = fieldName.substring("meta/".length());
+        String newKey = newFieldName.substring("meta/".length());
+        if (!MetadataSyntax.validKey(newKey)) {
+            return new EditProposal.Refused("A key contains no = , \" { } nor spaces");
+        }
+        Optional<MetadataSyntax.Block> block = block(object, content);
+        if (block.isEmpty()) return new EditProposal.Refused("The text changed");
+        if (block.get().entries().stream().anyMatch(e -> e.key().equals(newKey))) {
+            return new EditProposal.Refused("The key '" + newKey + "' already exists");
+        }
+        for (MetadataSyntax.Entry e : block.get().entries()) {
+            if (e.key().equals(key)) {
+                return new EditProposal.Edits(List.of(TextEdit.replace(content, e.start(), e.start() + key.length(), newKey)));
+            }
+        }
+        return new EditProposal.Refused("No entry " + key);
+    }
+
     /** The metadata block of the start anchor of an IGT, read again from the content. */
     static Optional<MetadataSyntax.Block> block(CorpusObject igt, String content) {
         int start = igt.getTextCoordinate().startIndex();

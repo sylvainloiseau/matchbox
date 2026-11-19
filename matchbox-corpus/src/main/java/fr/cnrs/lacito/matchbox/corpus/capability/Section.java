@@ -4,6 +4,7 @@ import fr.cnrs.lacito.matchbox.corpus.CorpusObject;
 import fr.cnrs.lacito.matchbox.corpus.MatchRole;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * A titled division of a text (chapter, session, story…) with metadata and its own content.
@@ -12,7 +13,7 @@ import java.util.Map;
  * objects the same grammar found in the section, in text order, subsections included; objects of
  * other grammars lying in the section are found with {@code Text.enclosingSections}.
  */
-public interface Section extends CorpusObject {
+public interface Section extends HasMetadata {
 
     /** Name of the title field (see {@link fr.cnrs.lacito.matchbox.corpus.HasFields}). */
     String TITLE = "title";
@@ -31,6 +32,22 @@ public interface Section extends CorpusObject {
      * text header are not included: see {@code Text.metadataOf}.
      */
     Map<String, String> getMetadata();
+
+    /**
+     * The block of the section: its own metadata, the spans of the fields {@link #metadataField}; no
+     * block when the section has no metadata (a grammar knowing an empty block overrides it).
+     */
+    @Override
+    default Optional<fr.cnrs.lacito.matchbox.corpus.MetadataBlock> metadataBlock() {
+        return getMetadata().isEmpty() ? Optional.empty()
+            : Optional.of(fr.cnrs.lacito.matchbox.corpus.MetadataBlock.of(Optional.empty(), getMetadata(), this,
+                Section::metadataField));
+    }
+
+    @Override
+    default String metadataFieldName(String key) {
+        return metadataField(key);
+    }
 
     /** Content in text order: corpus objects and subsections; unmodifiable, never {@code null}. */
     List<? extends CorpusObject> getContent();

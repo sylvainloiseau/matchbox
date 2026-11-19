@@ -30,7 +30,11 @@ public final class Modes {
             new ModeDescriptor(DictionaryHistoryMode.ID, "History", "Dictionary History",
                 "The dictionary as the commands of the notes leave it, and the commands that shaped each entry",
                 shortcut(KeyCode.DIGIT3), DictionaryHistoryMode::new,
-                fr.cnrs.lacito.matchbox.corpus.capability.LexiconMutationCommand.class::isInstance)
+                fr.cnrs.lacito.matchbox.corpus.capability.LexiconMutationCommand.class::isInstance),
+            new ModeDescriptor(MetadataMode.ID, "Metadata", "Metadata",
+                "All the metadata blocks of the corpus in one table: filter, sort and edit them",
+                shortcut(KeyCode.DIGIT4), MetadataMode::new,
+                fr.cnrs.lacito.matchbox.corpus.capability.HasMetadata.class::isInstance)
         );
     }
 

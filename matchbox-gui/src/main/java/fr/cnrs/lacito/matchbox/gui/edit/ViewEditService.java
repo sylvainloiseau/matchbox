@@ -121,6 +121,70 @@ public final class ViewEditService {
         return edit(object, "Remove " + describe(fieldName), e -> e.removeField(object, fieldName, contentOf(object)));
     }
 
+    /** {@link #setField} with the label of the undo entry. */
+    public EditOutcome setField(CorpusObject object, String fieldName, String value, String description) {
+        return edit(object, description, e -> e.setField(object, fieldName, value, contentOf(object)));
+    }
+
+    /** {@link #addField} with the label of the undo entry. */
+    public EditOutcome addField(CorpusObject object, String fieldName, String value, String description) {
+        return edit(object, description, e -> e.addField(object, fieldName, value, contentOf(object)));
+    }
+
+    /** {@link #removeField} with the label of the undo entry. */
+    public EditOutcome removeField(CorpusObject object, String fieldName, String description) {
+        return edit(object, description, e -> e.removeField(object, fieldName, contentOf(object)));
+    }
+
+    /**
+     * Gives a text without header a header holding one property, written by the first grammar of the
+     * file that can ({@code ObjectEditor.addTextProperty}).
+     */
+    public EditOutcome addTextProperty(TextId text, String key, String value, String description) {
+        Project p = project.get();
+        if (p == null) return new EditOutcome.NotEditable("No project");
+        Optional<Text> t = p.getCorpus().text(text);
+        Optional<fr.cnrs.lacito.matchbox.model.TextDocument> document = p.document(text);
+        if (t.isEmpty() || document.isEmpty()) return new EditOutcome.Stale("The file is no longer in the project");
+        EditProposal.Refused refused = new EditProposal.Refused("No plugin of this file writes a header");
+        for (GrammarPlugin g : p.getGrammarsForFile(document.get().getFilePath())) {
+            EditProposal proposal;
+            try {
+                proposal = g.getObjectEditor().addTextProperty(text, key, value, t.get().content());
+            } catch (RuntimeException | LinkageError e) {
+                continue;
+            }
+            if (proposal instanceof EditProposal.Edits e) {
+                return switch (planner().prepare(text, e.edits())) {
+                    case ViewEditPlanner.Failed f -> failed(f);
+                    case ViewEditPlanner.Ready r -> apply(r, description);
+                };
+            }
+            if (!(proposal instanceof EditProposal.Refused r && r.reason().equals("This grammar writes no header"))) {
+                refused = (EditProposal.Refused) proposal;
+            }
+        }
+        return new EditOutcome.Refused(refused.reason());
+    }
+
+    /** True if a grammar of the file of a text without header can give it one. */
+    public boolean canAddTextProperty(Text text) {
+        Project p = project.get();
+        if (p == null) return false;
+        Optional<fr.cnrs.lacito.matchbox.model.TextDocument> document = p.document(text.id());
+        if (document.isEmpty()) return false;
+        for (GrammarPlugin g : p.getGrammarsForFile(document.get().getFilePath())) {
+            try {
+                if (g.getObjectEditor().addTextProperty(text.id(), "k", "v", text.content()) instanceof EditProposal.Edits) {
+                    return true;
+                }
+            } catch (RuntimeException | LinkageError e) {
+                // a failing plugin offers nothing
+            }
+        }
+        return false;
+    }
+
     /** Result of {@link #setFields}. */
     public record BatchResult(boolean applied, int changes, int files, List<String> problems) {}
 

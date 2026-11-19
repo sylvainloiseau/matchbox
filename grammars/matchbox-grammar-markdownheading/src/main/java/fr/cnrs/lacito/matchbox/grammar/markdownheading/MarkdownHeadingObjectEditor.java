@@ -103,13 +103,8 @@ final class MarkdownHeadingObjectEditor implements ObjectEditor {
             return new EditProposal.Refused("Entries cannot be added to " + object.getKind());
         }
         String k = key.get().strip();
-        if (k.isEmpty() || k.contains(":") || k.indexOf('\n') >= 0 || k.indexOf('\r') >= 0
-            || k.startsWith("#") || k.startsWith("-")) {
-            return new EditProposal.Refused("Invalid key: it cannot be empty, contain ':' or start with '#' or '-'");
-        }
-        if (value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
-            return new EditProposal.Refused("Line breaks are not allowed here");
-        }
+        Optional<EditProposal.Refused> invalid = invalidEntry(k, value);
+        if (invalid.isPresent()) return invalid.get();
         if (entries(object).containsKey(k)) {
             return new EditProposal.Refused("The key '" + k + "' already exists: edit its value");
         }
@@ -130,6 +125,63 @@ final class MarkdownHeadingObjectEditor implements ObjectEditor {
             return new EditProposal.Edits(List.of(TextEdit.insert(after, inserted)));
         }
         return new EditProposal.Refused("Entries cannot be added to " + object.getKind());
+    }
+
+    /** Why a key or a value cannot be written in a block, if it cannot. */
+    private static Optional<EditProposal.Refused> invalidEntry(String k, String value) {
+        if (k.isEmpty() || k.contains(":") || k.indexOf('\n') >= 0 || k.indexOf('\r') >= 0
+            || k.startsWith("#") || k.startsWith("-")) {
+            return Optional.of(new EditProposal.Refused("Invalid key: it cannot be empty, contain ':' or start with '#' or '-'"));
+        }
+        if (value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+            return Optional.of(new EditProposal.Refused("Line breaks are not allowed here"));
+        }
+        return Optional.empty();
+    }
+
+    /** A header ({@code ---} lines) at the start of a file that has none, holding one property. */
+    @Override
+    public EditProposal addTextProperty(fr.cnrs.lacito.matchbox.corpus.TextId text, String key, String value,
+                                        String content) {
+        String k = key.strip();
+        Optional<EditProposal.Refused> invalid = invalidEntry(k, value);
+        if (invalid.isPresent()) return invalid.get();
+        int firstLineEnd = LineIndex.lineEnd(content, 0);
+        if (content.substring(0, firstLineEnd).strip().equals("---")) {
+            return new EditProposal.Refused("The file already starts with a header");
+        }
+        String eol = LineIndex.lineEnding(content);
+        String written = write(value.strip());
+        String line = written.isEmpty() ? k + ":" : k + ": " + written;
+        return new EditProposal.Edits(List.of(TextEdit.insert(0, "---" + eol + line + eol + "---" + eol)));
+    }
+
+    /** Renames the key of an entry: the text before the ':' of its line. */
+    @Override
+    public EditProposal renameField(CorpusObject object, String fieldName, String newFieldName, String content) {
+        Optional<String> key = keyOf(object, fieldName);
+        Optional<String> newKey = keyOf(object, newFieldName);
+        if (key.isEmpty() || newKey.isEmpty()) {
+            return new EditProposal.Refused("Only metadata keys can be renamed");
+        }
+        String k = newKey.get().strip();
+        Optional<EditProposal.Refused> invalid = invalidEntry(k, "");
+        if (invalid.isPresent()) return invalid.get();
+        if (entries(object).containsKey(k)) {
+            return new EditProposal.Refused("The key '" + k + "' already exists");
+        }
+        Optional<Field> field = object instanceof HasFields h ? h.field(fieldName) : Optional.empty();
+        if (field.isEmpty() || !field.get().span().isValidFor(content.length())) {
+            return new EditProposal.Refused("The text changed");
+        }
+        int lineStart = LineIndex.lineStart(content, field.get().span().startIndex());
+        int colon = content.indexOf(':', lineStart);
+        if (colon < 0 || colon > field.get().span().startIndex()) return new EditProposal.Refused("The text changed");
+        int start = lineStart;
+        while (start < colon && (content.charAt(start) == ' ' || content.charAt(start) == '\t')) start++;
+        int end = colon;
+        while (end > start && (content.charAt(end - 1) == ' ' || content.charAt(end - 1) == '\t')) end--;
+        return new EditProposal.Edits(List.of(TextEdit.replace(content, start, end, k)));
     }
 
     @Override

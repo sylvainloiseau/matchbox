@@ -81,6 +81,13 @@ public final class MarkdownSection extends AbstractCorpusObject implements Secti
         return Optional.ofNullable(metadataCoordinate);
     }
 
+    /** The block after the heading, even empty; none without block. */
+    @Override
+    public Optional<fr.cnrs.lacito.matchbox.corpus.MetadataBlock> metadataBlock() {
+        return getMetadataCoordinate().map(block ->
+            fr.cnrs.lacito.matchbox.corpus.MetadataBlock.of(Optional.of(block), metadata, this, Section::metadataField));
+    }
+
     /** {@link Section#TITLE} and {@link Section#metadataField(String)} for each key. */
     @Override
     public List<Field> getFields() {

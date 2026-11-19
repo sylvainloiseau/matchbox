@@ -461,6 +461,15 @@ public class FileMode implements Mode {
      * The Dictionary History of the entry at the caret: the entry of the command at the caret, or the
      * entry whose form is the word at the caret (a word of an IGT, of a note…).
      */
+    private void showMetadataAtCaret() {
+        updateFocus();
+        focus.get().ifPresent(f -> {
+            if (!workbench.navigator().browseIn(MetadataMode.ID, f)) {
+                workbench.status().info("No metadata block at the caret");
+            }
+        });
+    }
+
     private void showHistoryAtCaret() {
         updateFocus();
         focus.get().ifPresent(f -> {
@@ -657,6 +666,8 @@ public class FileMode implements Mode {
         goToLine.setAccelerator(shortcut(KeyCode.L));
         MenuItem historyAtCaret = item("Show history of entry at caret", this::showHistoryAtCaret);
         historyAtCaret.setAccelerator(shortcut(KeyCode.H, KeyCombination.SHIFT_DOWN));
+        MenuItem metadataAtCaret = item("Show metadata of the object at caret", this::showMetadataAtCaret);
+        metadataAtCaret.setAccelerator(shortcut(KeyCode.M, KeyCombination.SHIFT_DOWN));
         MenuItem specialCharacter = item("Insert special character…", this::insertSpecialCharacter);
         specialCharacter.setAccelerator(shortcut(KeyCode.I, KeyCombination.SHIFT_DOWN));
 
@@ -735,7 +746,7 @@ public class FileMode implements Mode {
         Menu result = new Menu("File Mode", null,
             buildPanelsMenu(),
             new SeparatorMenuItem(),
-            search, findNext, findPrevious, replace, goToLine, specialCharacter, parse, historyAtCaret,
+            search, findNext, findPrevious, replace, goToLine, specialCharacter, parse, historyAtCaret, metadataAtCaret,
             new SeparatorMenuItem(),
             problemsMenu,
             new SeparatorMenuItem(),

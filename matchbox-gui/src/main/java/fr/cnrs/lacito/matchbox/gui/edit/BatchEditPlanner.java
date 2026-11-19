@@ -59,6 +59,15 @@ public final class BatchEditPlanner {
 
     public Plan plan(List<FieldChange> changes) {
         Set<String> problems = new LinkedHashSet<>();
+        // two additions to an object without metadata block would each create a block
+        Map<CorpusObject, Long> adds = changes.stream().filter(c -> c.kind() == FieldChange.Kind.ADD)
+            .filter(c -> c.object() instanceof fr.cnrs.lacito.matchbox.corpus.capability.HasMetadata m
+                && m.metadataBlock().isEmpty())
+            .collect(java.util.stream.Collectors.groupingBy(c -> c.object(), java.util.IdentityHashMap::new,
+                java.util.stream.Collectors.counting()));
+        adds.forEach((o, n) -> {
+            if (n > 1) problems.add(o.getLabel() + ": it has no metadata block yet; add one key first, then the others");
+        });
         Map<TextId, List<TextEdit>> editsByText = new LinkedHashMap<>();
         for (FieldChange change : changes) {
             Optional<Text> text = corpus.textOf(change.object());
@@ -74,8 +83,14 @@ public final class BatchEditPlanner {
             }
             EditProposal proposal;
             try {
-                proposal = grammar.get().getObjectEditor().setField(change.object(), change.field(), change.value(),
-                    text.get().content());
+                var editor = grammar.get().getObjectEditor();
+                String content = text.get().content();
+                proposal = switch (change.kind()) {
+                    case SET -> editor.setField(change.object(), change.field(), change.value(), content);
+                    case ADD -> editor.addField(change.object(), change.field(), change.value(), content);
+                    case REMOVE -> editor.removeField(change.object(), change.field(), content);
+                    case RENAME -> editor.renameField(change.object(), change.field(), change.newField(), content);
+                };
             } catch (RuntimeException | LinkageError e) {
                 problems.add(where + ": the grammar " + grammar.get().getId() + " failed to write the value: " + e);
                 continue;

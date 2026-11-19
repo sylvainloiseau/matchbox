@@ -155,4 +155,40 @@ class MarkdownHeadingEditingTest {
         assertTrue(!t.replace("\r\n", "").contains("\n"), "no bare \\n inserted");
         assertEquals("v", nouns(parse(t)).getMetadata().get("k"));
     }
+
+    @Test
+    void metadataBlocksOfSectionsAndHeader() {
+        ParseResult r = parse(TEXT);
+        var block = session(r).metadataBlock().orElseThrow();
+        assertTrue(TEXT.substring(block.span().orElseThrow().startIndex()).startsWith("---\ndate:"));
+        assertEquals(java.util.List.of("date", "empty"), block.entries().stream().map(e -> e.key()).toList());
+        assertTrue(nouns(r).metadataBlock().isEmpty(), "no block after Nouns");
+        assertEquals("Elaisa", header(r).metadataValues().get("speaker"));
+        assertEquals(Section.metadataField("date"), session(r).metadataFieldName("date"));
+        assertEquals(TextHeader.propertyField("speaker"), header(r).metadataFieldName("speaker"));
+    }
+
+    @Test
+    void aHeaderIsAddedToAFileWithoutOne() {
+        String text = "# Session\n\nprose\n";
+        String t = apply(editor.addTextProperty(FILE, "speaker", "Ann: the elder", text), text);
+        assertEquals("---\nspeaker: \"Ann: the elder\"\n---\n# Session\n\nprose\n", t);
+        assertEquals("Ann: the elder", header(parse(t)).getProperties().get("speaker"));
+        assertTrue(editor.addTextProperty(FILE, "date", "x", TEXT) instanceof EditProposal.Refused, "already a header");
+        assertTrue(editor.addTextProperty(FILE, "a:b", "x", text) instanceof EditProposal.Refused);
+        String empty = apply(editor.addTextProperty(FILE, "k", "v", ""), "");
+        assertEquals("v", header(parse(empty)).getProperties().get("k"));
+    }
+
+    @Test
+    void keysAreRenamed() {
+        ParseResult r = parse(TEXT);
+        String t = apply(editor.renameField(session(r), Section.metadataField("date"), Section.metadataField("day"), TEXT), TEXT);
+        assertEquals("2024-05-12", session(parse(t)).getMetadata().get("day"));
+        assertEquals(java.util.List.of("day", "empty"), java.util.List.copyOf(session(parse(t)).getMetadata().keySet()));
+        String h = apply(editor.renameField(header(r), TextHeader.propertyField("speaker"), TextHeader.propertyField("speakers"), TEXT), TEXT);
+        assertEquals("Elaisa", header(parse(h)).getProperties().get("speakers"));
+        assertTrue(editor.renameField(session(r), Section.metadataField("date"), Section.metadataField("empty"), TEXT)
+            instanceof EditProposal.Refused, "target exists");
+    }
 }

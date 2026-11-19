@@ -58,6 +58,7 @@ public final class UserSettings implements AutoCloseable {
     private final ObjectProperty<EditorSettingsData> editor = new SimpleObjectProperty<>();
     private final ObjectProperty<FileModeSettingsData> fileMode = new SimpleObjectProperty<>();
     private final ObjectProperty<DictionaryHistorySettingsData> dictionaryHistory = new SimpleObjectProperty<>();
+    private final ObjectProperty<MetadataModeSettingsData> metadataMode = new SimpleObjectProperty<>();
     private String logFile;
     private final ObjectProperty<AssistSettingsData> assist = new SimpleObjectProperty<>();
     private final RecentItems recentFiles = new RecentItems(maxRecentFiles);
@@ -90,7 +91,7 @@ public final class UserSettings implements AutoCloseable {
 
         for (Observable o : List.<Observable>of(charset, morphemeSeparators,
                 fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, assist,
-                allowInvalidViewEdits, tagBrowser, editor, fileMode, dictionaryHistory)) {
+                allowInvalidViewEdits, tagBrowser, editor, fileMode, dictionaryHistory, metadataMode)) {
             o.addListener(obs -> settingsChanged());
         }
         recentFiles.items().addListener((Observable obs) -> recentChanged());
@@ -173,6 +174,8 @@ public final class UserSettings implements AutoCloseable {
     public ObjectProperty<FileModeSettingsData> fileModeProperty() { return fileMode; }
     /** Settings of the Dictionary History mode (replace the whole value to change them). */
     public ObjectProperty<DictionaryHistorySettingsData> dictionaryHistoryProperty() { return dictionaryHistory; }
+    /** Settings of the Metadata mode (replace the whole value to change them). */
+    public ObjectProperty<MetadataModeSettingsData> metadataModeProperty() { return metadataMode; }
     public StringProperty morphemeSeparatorsProperty() { return morphemeSeparators; }
     /** Normalised extensions (lower case, without dot); empty means all files. */
     public ObservableList<String> fileExtensions() { return fileExtensions; }
@@ -227,7 +230,8 @@ public final class UserSettings implements AutoCloseable {
             tagBrowser.get(),
             editor.get(),
             fileMode.get(),
-            dictionaryHistory.get()
+            dictionaryHistory.get(),
+            metadataMode.get()
         );
     }
 
@@ -257,6 +261,7 @@ public final class UserSettings implements AutoCloseable {
         editor.set(d.editor());
         fileMode.set(d.fileMode());
         dictionaryHistory.set(d.dictionaryHistory());
+        metadataMode.set(d.metadataMode());
     }
 
     // ------------------------------------------------------------------

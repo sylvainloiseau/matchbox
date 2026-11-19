@@ -82,4 +82,30 @@ class BatchEditPlannerTest {
         assertTrue(BatchEditPlanner.overlap(List.of(TextEdit.insert(3, "a"), new TextEdit(2, 5, "abc", ""))));
         assertTrue(!BatchEditPlanner.overlap(List.of(new TextEdit(0, 2, "ab", ""), new TextEdit(2, 4, "cd", ""))));
     }
+
+    @Test
+    void addRemoveAndRenameKindsAndTwoAdditionsToAnObjectWithoutBlock() throws Exception {
+        GrammarPlugin md = new fr.cnrs.lacito.matchbox.grammar.markdownheading.MarkdownHeadingGrammarPlugin();
+        String content = "---\nspeaker: Ann\ndate: x\n---\n\n# S\n\nprose\n";
+        TextDocument d = new TextDocument(Files.writeString(dir.resolve("m.md"), content));
+        ParseResult r = md.getResult(d.getId(), content);
+        corpus.put(Text.builder(d.getId(), content).add(md.getId(), r.objects(), r.diagnostics()).build());
+        documents.put(d.getId(), d);
+        ViewEditPlanner single = new ViewEditPlanner(corpus, id -> Optional.ofNullable(documents.get(id)), x -> List.of(md), null);
+        BatchEditPlanner planner = new BatchEditPlanner(corpus, single, (text, object) -> Optional.of(md), x -> true);
+        var header = (fr.cnrs.lacito.matchbox.corpus.capability.TextHeader) r.objects().get(0);
+        var section = (fr.cnrs.lacito.matchbox.corpus.capability.Section) r.objects().get(1);
+        var p = fr.cnrs.lacito.matchbox.corpus.capability.TextHeader.class;
+        var ready = assertInstanceOf(BatchEditPlanner.Ready.class, planner.plan(List.of(
+            FieldChange.remove(header, header.metadataFieldName("date")),
+            FieldChange.rename(header, header.metadataFieldName("speaker"), header.metadataFieldName("talker")),
+            FieldChange.add(section, section.metadataFieldName("place"), "here"))));
+        assertEquals("---\ntalker: Ann\n---\n\n# S\n---\nplace: here\n---\n\nprose\n",
+            TextEdit.applyAll(content, ready.documents().get(0).edits()));
+        var failed = assertInstanceOf(BatchEditPlanner.Failed.class, planner.plan(List.of(
+            FieldChange.add(section, section.metadataFieldName("a"), "1"),
+            FieldChange.add(section, section.metadataFieldName("b"), "2"))));
+        assertTrue(failed.problems().get(0).contains("no metadata block yet"), failed.problems().toString());
+        assertTrue(p.isInstance(header));
+    }
 }

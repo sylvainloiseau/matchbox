@@ -45,7 +45,10 @@ class SettingsStoreTest {
             new FileModeSettingsData(FileModeSettingsData.STACKED, false, true, true, List.of(0.25, 0.5, 0.25),
                 List.of(0.5, 0.5), List.of(0.75, 0.25), 0.5, 0.6),
             new DictionaryHistorySettingsData("tww", "fr", true, false, true, List.of(0.4, 0.6), List.of(0.5, 0.5),
-                java.util.Map.of("/p.mbx", "tww en"), true));
+                java.util.Map.of("/p.mbx", "tww en"), true),
+            new MetadataModeSettingsData(java.util.Map.of("/p.mbx", new MetadataModeSettingsData.ProjectColumns(
+                List.of("speaker", "date"), List.of("media"), java.util.Map.of("@file", 200.0, "speaker", 90.0),
+                List.of("speaker:asc"))), false, "FREQUENCY", true, "FILE"));
         store.saveSettings(data);
         store.saveRecent(new RecentData(1, List.of("/a.txt", "/b"), List.of("/p.mbx")));
 

@@ -32,6 +32,7 @@ import java.util.function.Consumer;
  * @param editor             settings of the text editor of File Mode
  * @param fileMode           layout of File Mode (panels shown, sizes)
  * @param dictionaryHistory  settings of the Dictionary History mode
+ * @param metadataMode       settings of the Metadata mode
  */
 public record SettingsData(
     Integer version,
@@ -48,8 +49,19 @@ public record SettingsData(
     TagBrowserSettingsData tagBrowser,
     EditorSettingsData editor,
     FileModeSettingsData fileMode,
-    DictionaryHistorySettingsData dictionaryHistory
+    DictionaryHistorySettingsData dictionaryHistory,
+    MetadataModeSettingsData metadataMode
 ) {
+    /** Settings without {@code metadataMode} (written before it existed): its defaults. */
+    public SettingsData(Integer version, String charset, String morphemeSeparators, List<String> fileExtensions,
+                        List<String> filePatterns, Integer maxRecentFiles, Integer maxRecentProjects,
+                        Boolean openLastProject, String logFile, AssistSettingsData assist,
+                        Boolean allowInvalidViewEdits, TagBrowserSettingsData tagBrowser, EditorSettingsData editor,
+                        FileModeSettingsData fileMode, DictionaryHistorySettingsData dictionaryHistory) {
+        this(version, charset, morphemeSeparators, fileExtensions, filePatterns, maxRecentFiles, maxRecentProjects,
+            openLastProject, logFile, assist, allowInvalidViewEdits, tagBrowser, editor, fileMode, dictionaryHistory, null);
+    }
+
     /** Settings without {@code dictionaryHistory} (written before it existed): its defaults. */
     public SettingsData(Integer version, String charset, String morphemeSeparators, List<String> fileExtensions,
                         List<String> filePatterns, Integer maxRecentFiles, Integer maxRecentProjects,
@@ -89,7 +101,8 @@ public record SettingsData(
             TagBrowserSettingsData.defaults(),
             EditorSettingsData.defaults(),
             FileModeSettingsData.defaults(),
-            DictionaryHistorySettingsData.defaults()
+            DictionaryHistorySettingsData.defaults(),
+            MetadataModeSettingsData.defaults()
         );
     }
 
@@ -122,7 +135,8 @@ public record SettingsData(
             tagBrowser == null ? d.tagBrowser : tagBrowser.validated(problems),
             editor == null ? d.editor : editor.validated(problems),
             fileMode == null ? d.fileMode : fileMode.validated(problems),
-            dictionaryHistory == null ? d.dictionaryHistory : dictionaryHistory.validated(problems)
+            dictionaryHistory == null ? d.dictionaryHistory : dictionaryHistory.validated(problems),
+            metadataMode == null ? d.metadataMode : metadataMode.validated(problems)
         );
     }
 
@@ -130,35 +144,42 @@ public record SettingsData(
     public SettingsData withAssist(AssistSettingsData newAssist) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, newAssist, allowInvalidViewEdits,
-            tagBrowser, editor, fileMode, dictionaryHistory);
+            tagBrowser, editor, fileMode, dictionaryHistory, metadataMode);
     }
 
     /** Copy with other Tag Browser settings. */
     public SettingsData withTagBrowser(TagBrowserSettingsData newTagBrowser) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
-            newTagBrowser, editor, fileMode, dictionaryHistory);
+            newTagBrowser, editor, fileMode, dictionaryHistory, metadataMode);
     }
 
     /** Copy with other editor settings. */
     public SettingsData withEditor(EditorSettingsData newEditor) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
-            tagBrowser, newEditor, fileMode, dictionaryHistory);
+            tagBrowser, newEditor, fileMode, dictionaryHistory, metadataMode);
     }
 
     /** Copy with other Dictionary History settings. */
     public SettingsData withDictionaryHistory(DictionaryHistorySettingsData newHistory) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
-            tagBrowser, editor, fileMode, newHistory);
+            tagBrowser, editor, fileMode, newHistory, metadataMode);
     }
 
     /** Copy with another File Mode layout. */
     public SettingsData withFileMode(FileModeSettingsData newFileMode) {
         return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
             filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
-            tagBrowser, editor, newFileMode, dictionaryHistory);
+            tagBrowser, editor, newFileMode, dictionaryHistory, metadataMode);
+    }
+
+    /** Copy with other Metadata mode settings. */
+    public SettingsData withMetadataMode(MetadataModeSettingsData newMetadataMode) {
+        return new SettingsData(version, charset, morphemeSeparators, fileExtensions,
+            filePatterns, maxRecentFiles, maxRecentProjects, openLastProject, logFile, assist, allowInvalidViewEdits,
+            tagBrowser, editor, fileMode, dictionaryHistory, newMetadataMode);
     }
 
     /** Validated copy, problems ignored. */
